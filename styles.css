@@ -93,6 +93,27 @@ nav{
 .mobile-nav.open{display:flex}
 .mobile-nav a{padding:14px 0;font-size:15px;font-weight:500;color:var(--ink);text-decoration:none;border-bottom:1px solid var(--border)}
 
+/* ── CURRENCY TOGGLE ── */
+.currency-toggle{
+  display:flex;gap:8px;justify-content:center;margin-bottom:40px;
+}
+
+.currency-btn{
+  padding:10px 24px;border:1.5px solid var(--border);
+  border-radius:8px;background:var(--white);color:var(--ink-light);
+  font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;
+  font-family:var(--sans);
+}
+
+.currency-btn:hover{
+  border-color:var(--cobalt);color:var(--cobalt);
+}
+
+.currency-btn.active{
+  background:var(--cobalt);border-color:var(--cobalt);
+  color:var(--white);
+}
+
 /* ── HERO SECTION ── */
 .hero{
   background:linear-gradient(135deg,#0D1F54 0%,#1A3399 40%,#2355E8 100%);

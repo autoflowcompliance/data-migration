@@ -53,13 +53,19 @@
   <h2>Pricing Tiers</h2>
   <p class="pricing-sub">Choose the package that fits your needs</p>
   
+  <!-- Currency Toggle -->
+  <div class="currency-toggle">
+    <button class="currency-btn active" data-currency="usd" onclick="setCurrency('usd')">$ USD</button>
+    <button class="currency-btn" data-currency="gbp" onclick="setCurrency('gbp')">£ GBP</button>
+  </div>
+  
   <div class="pricing-grid">
     <!-- Quick Scan -->
     <div class="pricing-card">
       <h3>Quick Scan</h3>
       <div>
         <div class="pricing-price-label">Starting at</div>
-        <div class="pricing-price">£799</div>
+        <div class="pricing-price" data-usd="$999" data-gbp="£799">£799</div>
         <div class="pricing-desc">One-time fee. No subscriptions.</div>
       </div>
       <ul class="pricing-list">
@@ -77,7 +83,7 @@
       <h3>Full Fix</h3>
       <div>
         <div class="pricing-price-label">Starting at</div>
-        <div class="pricing-price">£3,999</div>
+        <div class="pricing-price" data-usd="$4,999" data-gbp="£3,999">£3,999</div>
         <div class="pricing-desc">Depends on violations found. Quote within 24h.</div>
       </div>
       <ul class="pricing-list">
@@ -95,7 +101,7 @@
       <h3>Full Compliance Bundle</h3>
       <div>
         <div class="pricing-price-label">Starting at</div>
-        <div class="pricing-price">£6,299</div>
+        <div class="pricing-price" data-usd="$7,999" data-gbp="£6,299">£6,299</div>
         <div class="pricing-desc">Accessibility + GDPR + Cookies all included</div>
       </div>
       <ul class="pricing-list">
@@ -190,7 +196,7 @@
     <div>
       <div class="footer-brand">AutoFlow</div>
       <p class="footer-bio">Website accessibility and compliance, done properly. We serve businesses in the US and UK who want to protect themselves without the legal bill.</p>
-      <div style="margin-top:16px;font-size:18px;letter-spacing:4px">🇺🇸 🇬🇧</div>
+      <div style="margin-top:16px;font-size:14px;color:rgba(255,255,255,0.4)">Serving US and UK markets</div>
     </div>
     <div class="footer-col">
       <h5>Services</h5>

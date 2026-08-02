@@ -58,6 +58,65 @@ function animateTicker(){
 
 document.addEventListener('DOMContentLoaded',animateTicker);
 
+// ── Currency detection and switching ──
+let currentCurrency='gbp';
+
+function detectCurrency(){
+  const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // US timezones
+  const usTimezones=['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Phoenix','America/Anchorage','America/Honolulu'];
+  if(usTimezones.includes(timezone)){
+    return 'usd';
+  }
+  // Default to GBP for UK and rest of world
+  return 'gbp';
+}
+
+function setCurrency(currency){
+  currentCurrency=currency;
+  
+  // Update button states
+  document.querySelectorAll('.currency-btn').forEach(btn=>{
+    btn.classList.remove('active');
+    if(btn.dataset.currency===currency){
+      btn.classList.add('active');
+    }
+  });
+  
+  // Update all prices
+  document.querySelectorAll('.pricing-price').forEach(priceEl=>{
+    const usdPrice=priceEl.dataset.usd;
+    const gbpPrice=priceEl.dataset.gbp;
+    if(currency==='usd' && usdPrice){
+      priceEl.textContent=usdPrice;
+    }else if(currency==='gbp' && gbpPrice){
+      priceEl.textContent=gbpPrice;
+    }
+  });
+  
+  // Save preference to localStorage
+  localStorage.setItem('autoflow-currency',currency);
+}
+
+// Initialize currency on page load
+function initCurrency(){
+  // Check for saved preference first
+  const savedCurrency=localStorage.getItem('autoflow-currency');
+  if(savedCurrency && (savedCurrency==='usd' || savedCurrency==='gbp')){
+    setCurrency(savedCurrency);
+    return;
+  }
+  
+  // Otherwise detect from timezone
+  const detectedCurrency=detectCurrency();
+  setCurrency(detectedCurrency);
+}
+
+// Only run on pricing page
+if(window.location.pathname.includes('pricing.html') || window.location.pathname.endsWith('/pricing')){
+  document.addEventListener('DOMContentLoaded',initCurrency);
+}
+
 // ── FAQ accordion toggle ──
 function toggleFaq(id){
   const faqItem=document.getElementById(id);
