@@ -29,6 +29,35 @@ function setActiveNavLink(){
 
 document.addEventListener('DOMContentLoaded',setActiveNavLink);
 
+// ── Lawsuit ticker animation ──
+function animateTicker(){
+  const tickerNum=document.getElementById('ticker-num');
+  if(!tickerNum)return;
+  
+  let current=3948;
+  const target=5100;
+  const duration=2000;
+  const increment=(target-current)/(duration/16);
+  let count=current;
+  
+  const timer=setInterval(()=>{
+    count+=increment;
+    if(count>=target){
+      tickerNum.textContent='5,100+';
+      clearInterval(timer);
+      // Start 18-second increment
+      setInterval(()=>{
+        const currentVal=parseInt(tickerNum.textContent.replace(/[^0-9]/g,''))||5100;
+        tickerNum.textContent=(currentVal+1).toLocaleString()+'+';
+      },18000);
+    }else{
+      tickerNum.textContent=Math.floor(count).toLocaleString()+'+';
+    }
+  },16);
+}
+
+document.addEventListener('DOMContentLoaded',animateTicker);
+
 // ── FAQ accordion toggle ──
 function toggleFaq(id){
   const faqItem=document.getElementById(id);
@@ -79,7 +108,7 @@ function submitContactForm(event){
       <div style="font-size:48px;margin-bottom:16px">✅</div>
       <h3 style="font-family:var(--serif);font-size:24px;font-weight:700;color:var(--ink);margin-bottom:8px">Got it, ${firstName}.</h3>
       <p style="font-size:15px;color:var(--ink-light);line-height:1.8">We'll be in touch at <strong style="color:var(--ink)">${email}</strong> within 24 hours.</p>
-      <p style="font-size:14px;color:var(--ink-light);margin-top:16px">Also feel free to email us directly at <a href="mailto:hello@autoflow.co.uk" style="color:var(--cobalt)">hello@autoflow.co.uk</a></p>
+      <p style="font-size:14px;color:var(--ink-light);margin-top:16px">Also feel free to email us directly at <a href="mailto:autoflowcompliance@outlook.com" style="color:var(--cobalt)">autoflowcompliance@outlook.com</a></p>
     </div>
   `;
 }
