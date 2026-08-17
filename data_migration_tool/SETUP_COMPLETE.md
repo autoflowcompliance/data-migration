@@ -16,6 +16,7 @@
 - ✅ White-labeling configuration via environment variables
 - ✅ 200MB file upload limits to prevent memory issues
 - ✅ Privacy disclaimer in the web interface
+- ✅ Private admin dashboard for local client processing
 
 ### 3. **Professional Documentation**
 - ✅ Quick Start Guide (GitHub & Streamlit deployment)
@@ -66,7 +67,17 @@ git push -u origin main
    LOGO_URL = "https://your-logo-url.png"
    ```
 
-### Step 4: Set Up Professional Delivery (10 minutes)
+### Step 4: Set Up Private Admin Dashboard (2 minutes)
+
+1. Test the admin dashboard locally:
+   ```bash
+   streamlit run admin.py
+   ```
+2. The admin panel will open at `http://localhost:8501`
+3. Test with the sample file to ensure it works
+4. This is your private backend for client work
+
+### Step 5: Set Up Professional Delivery (10 minutes)
 
 1. **Create Secure Upload Folder:**
    - Go to Google Drive or Dropbox
@@ -91,6 +102,7 @@ git push -u origin main
 - [ ] Deploy app to Streamlit Cloud
 - [ ] Test live app with sample file
 - [ ] Configure white-labeling (optional)
+- [ ] Test admin dashboard locally: `streamlit run admin.py`
 - [ ] Set up secure file transfer system
 - [ ] Create portfolio with sample outputs
 - [ ] Customize client communication templates
@@ -114,6 +126,7 @@ git push -u origin main
 | **README.md** | Tool overview & usage | `data_migration_tool/README.md` |
 | **deployment_guide.md** | Detailed deployment instructions | `data_migration_tool/docs/deployment_guide.md` |
 | **professional_delivery_guide.md** | Business setup & client communication | `data_migration_tool/docs/professional_delivery_guide.md` |
+| **admin_guide.md** | Private admin dashboard usage | `data_migration_tool/docs/admin_guide.md` |
 | **custom_crm_guide.md** | Creating custom CRM configurations | `data_migration_tool/docs/custom_crm_guide.md` |
 
 ## 🔧 Technical Specifications
@@ -149,14 +162,27 @@ export TOOL_NAME="Migration Engine"
 ### Streamlit Cloud:
 Set environment variables in app settings under "Secrets"
 
-## 🌐 Your Live Application
+## 🌐 Your Applications
 
-Once deployed, your app will be available at:
+### Public Web Application
+Once deployed, your public app will be available at:
 ```
 https://data-migration-tool-username.streamlit.app
 ```
-
 This URL can be shared directly with clients or used in your portfolio.
+
+### Private Admin Dashboard
+Your private admin dashboard runs locally:
+```bash
+streamlit run admin.py
+```
+Access at: `http://localhost:8501`
+
+**Use the admin dashboard for:**
+- Paid client work with no file size limits
+- White-label delivery with custom branding
+- Automatic ZIP packaging of all deliverables
+- Complete privacy with local processing only
 
 ## 📧 Client Communication Templates
 
