@@ -16,7 +16,7 @@ import sys
 
 # Import your existing pipeline
 if __package__ in (None, ""):  # allow `streamlit run admin.py` 
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from data_migration_tool.pipeline import run_pipeline
 from data_migration_tool.cleaners import CleaningConfig
 from data_migration_tool.mappers import available_crms
