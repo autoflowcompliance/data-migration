@@ -26,6 +26,7 @@ class ValidationReport:
     required_fields: list[str] = field(default_factory=list)
     unique_fields: list[str] = field(default_factory=list)
     date_format: str = "%Y-%m-%d"
+    total_records: int = 0
 
     @property
     def valid(self) -> bool:
@@ -39,7 +40,7 @@ class ValidationReport:
     def quality_score(self) -> float:
         if not self.issues:
             return 100.0
-        total = max(self.issues[-1].row if self.issues else 0, 1)
+        total = max(self.total_records, 1)
         flagged = len(self.flagged_rows)
         return round((total - flagged) / total * 100, 1)
 
@@ -53,7 +54,7 @@ class ValidationReport:
 
     def summary(self) -> dict[str, Any]:
         return {
-            "total_records": max(self.issues[-1].row if self.issues else 0, 1),
+            "total_records": max(self.total_records, 1),
             "quality_score": self.quality_score,
             "errors": len(self.errors),
             "warnings": len(self.warnings),
@@ -95,6 +96,7 @@ def validate_data(
         required_fields=config.required_fields(),
         unique_fields=config.unique_fields(),
         date_format=date_format,
+        total_records=len(frame),
     )
 
     for idx, row in frame.iterrows():

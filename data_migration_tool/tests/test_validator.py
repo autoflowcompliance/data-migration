@@ -41,6 +41,7 @@ def test_quality_score_is_100_for_clean_data():
     report = validate_data(clean, CONFIG)
     assert report.valid
     assert report.quality_score == 100.0
+    assert report.total_records == 1
 
 
 def test_issue_rows_point_at_spreadsheet_rows():

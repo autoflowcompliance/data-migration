@@ -333,11 +333,12 @@ Best regards,
 ## Pricing Guidelines
 
 **Standard Pricing (Starting Points):**
-- Small files (<1,000 records): $50-100
-- Medium files (1,000-10,000 records): $100-300
-- Large files (10,000+ records): $300-500+
-- Rush processing (4-hour): 2x standard rate
+- **Starter**: $600 (under 2,000 rows) - Full CSV cleanup & standardization
+- **Standard**: $1,500 (under 10,000 rows) - Cleanup + CRM mapping + QA Report
+- **Premium**: $2,000 (10,000+ rows) - Everything + Post-import Audit + Priority Delivery
+- Rush processing (4-hour): +50% of base price
 - Agency partnerships: 20-30% discount for volume
+- Custom CRM configuration: +$200
 
 **Value-Added Services:**
 - Custom CRM configuration: +$50-100
