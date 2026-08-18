@@ -7,7 +7,14 @@ font = "sans serif"
 
 [client]
 showErrorDetails = false
-maxUploadSize = 200
 
 [logger]
 level = "info"
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+serverPort = 8501
+
+[client]
+showErrorDetails = false
