@@ -4,7 +4,7 @@ This guide explains how to create a custom mapping configuration for a CRM that 
 
 ## Quick Start
 
-1. Copy the template file: `configs/mapping_template.yaml`
+1. Copy the template file: `docs/mapping_template.yaml`
 2. Rename it to your CRM name (e.g., `zoho.yaml`)
 3. Edit the file to match your CRM's field structure
 4. Place it in the `configs/` directory
