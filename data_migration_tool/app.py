@@ -77,6 +77,12 @@ with st.sidebar:
         value=False,
         help="Enable for European date formats. Disable for US (MM/DD/YYYY)."
     )
+    
+    # Critical fix: Branding options for white-labeling
+    st.divider()
+    st.header("🏷️ Branding")
+    brand_name = st.text_input("Brand Name", value="AutoFlow", help="Your business name for reports")
+    tool_name = st.text_input("Tool Name", value="Data Migration Tool", help="Custom tool name for white-labeling")
 
 st.subheader("Step 1 — Upload your messy CSV")
 uploaded = st.file_uploader(
@@ -134,6 +140,11 @@ if st.button("🔄 Process File", type="primary", disabled=uploaded is None) and
                 )
                 source = source.head(MAX_DEMO_ROWS)
             # --- END DEMO LIMIT ---
+            
+            # Set branding from sidebar
+            import os
+            os.environ["BRAND_NAME"] = brand_name
+            os.environ["TOOL_NAME"] = tool_name
             
             result = run_pipeline(
                 source=source,
