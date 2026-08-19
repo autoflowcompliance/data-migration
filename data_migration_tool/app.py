@@ -124,6 +124,17 @@ if st.button("🔄 Process File", type="primary", disabled=uploaded is None) and
     try:
         with st.spinner("Cleaning, mapping and validating…"):
             source = read_upload(uploaded)
+            
+            # --- CRITICAL FIX: 500-ROW DEMO LIMIT ---
+            MAX_DEMO_ROWS = 500
+            if len(source) > MAX_DEMO_ROWS:
+                st.warning(
+                    f"🚀 This is a free demo. Only the first {MAX_DEMO_ROWS} rows will be processed. "
+                    f"Your file has {len(source)} rows. For the full file, contact us for the professional service."
+                )
+                source = source.head(MAX_DEMO_ROWS)
+            # --- END DEMO LIMIT ---
+            
             result = run_pipeline(
                 source=source,
                 crm=crm,
