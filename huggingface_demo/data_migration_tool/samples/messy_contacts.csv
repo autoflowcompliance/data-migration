@@ -1,0 +1,8 @@
+First Name,Last Name,Email Address,Phone 1,Company,Title,Created Date,SKU,City,Country
+ John ,Smith,JOHN@Email.com,(555) 123-4567,Acme Inc,CEO,12/31/24,4.05E+14,Boston,USA
+Jane,Doe,jane.doe@example.com,555.987.6543,Globex,CTO,2024-11-05,4.05E+14,Austin,USA
+Jane,Doe,jane.doe@example.com,555.987.6543,Globex,CTO,2024-11-05,4.05E+14,Austin,USA
+Émile,Müller,emile@ex-ample.fr,+33 1 42 68 53 00,Initech,Analyst,31-Dec-24,123456789012345,Paris,France
+Bob,Jones,not-an-email,555-000,Umbrella,Manager,03/04/2024,987654321098765,Denver,USA
+Alice,Brown,,+1 (415) 555-2671,Hooli,VP Sales,2024/02/17,4.06E+14,San Francisco,USA
+Carlos,Diaz,carlos@example.com,4155550137,Vehement Capital,Director,,555000111222333,Miami,USA
