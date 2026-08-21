@@ -13,3 +13,4 @@ services:
         value: "10000"
       - key: GRADIO_SERVER_NAME
         value: "0.0.0.0"
+    pythonVersion: "3.10"

@@ -17,3 +17,6 @@ Jinja2>=3.1.2
 
 # User interface (compatible version for stability)
 gradio>=4.0.0,<5.0.0
+
+# Python 3.14 compatibility for audio processing
+audioop-lts<=0.2.2
