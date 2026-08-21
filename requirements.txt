@@ -15,5 +15,5 @@ PyYAML>=6.0
 # Reporting
 Jinja2>=3.1.2
 
-# User interface
-gradio>=4.0.0
+# User interface (compatible version for stability)
+gradio>=4.0.0,<5.0.0

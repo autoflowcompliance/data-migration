@@ -1,6 +1,6 @@
 """Entry point for Gradio demo (works with both Hugging Face and Render)."""
-from demo_gradio import demo
 import os
+from demo_gradio import demo
 
 # Use PORT environment variable for Render, default to 7860 for local/Hugging Face
 port = int(os.environ.get("PORT", 7860))
