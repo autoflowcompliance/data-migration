@@ -15,8 +15,5 @@ PyYAML>=6.0
 # Reporting
 Jinja2>=3.1.2
 
-# User interface (compatible version for stability)
-gradio>=4.0.0,<5.0.0
-
-# Hugging Face Hub (compatible with Gradio 4.x)
-huggingface_hub>=0.19.3,<0.25.0
+# User interface - Streamlit (no Hugging Face dependencies)
+streamlit>=1.40.0,<2.0.0
