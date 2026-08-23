@@ -2,6 +2,7 @@
 
 Run with: ``streamlit run app.py``
 Deploy to Streamlit Cloud: Configure main file path as app.py
+Updated for Streamlit Cloud deployment
 """
 from __future__ import annotations
 
