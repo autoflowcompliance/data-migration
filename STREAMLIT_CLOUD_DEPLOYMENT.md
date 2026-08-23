@@ -7,7 +7,7 @@ Streamlit Cloud is the most reliable option for your Streamlit application.
 ### 📋 Prerequisites
 - GitHub account
 - Streamlit Cloud account (free at share.streamlit.io)
-- Your repository with data_migration_tool/app.py and data_migration_tool/requirements.txt
+- Your repository with app.py and requirements.txt
 
 ### 🎯 Step-by-Step Deployment
 
@@ -28,7 +28,7 @@ Streamlit Cloud is the most reliable option for your Streamlit application.
 **Repository Details:**
 - **Repository**: `autoflowcompliance/data-migration`
 - **Branch**: `main`
-- **Main file path**: `data_migration_tool/app.py`
+- **Main file path**: `app.py`
 
 **App Details:**
 - **App name**: `data-migration-tool` (or your preferred name)
@@ -184,8 +184,8 @@ The Streamlit interface includes pricing tiers:
 
 **Deployment Fails:**
 - Check deployment logs in Streamlit Cloud dashboard
-- Verify data_migration_tool/requirements.txt has all dependencies
-- Check that data_migration_tool/app.py exists
+- Verify requirements.txt has all dependencies
+- Check that app.py is in the repository root
 - Ensure all imports work correctly
 
 **App Not Loading:**

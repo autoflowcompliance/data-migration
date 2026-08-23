@@ -1,0 +1,19 @@
+# Core data processing
+pandas>=2.0.0,<3.0.0
+python-dateutil>=2.8.2
+
+# Cleaning and validation
+phonenumbers>=8.13.0
+frictionless>=5.0.0,<6.0.0
+
+# Encoding detection
+chardet>=5.0.0
+
+# Mapping configuration
+PyYAML>=6.0
+
+# Reporting
+Jinja2>=3.1.2
+
+# User interface - Streamlit (no Hugging Face dependencies)
+streamlit>=1.40.0,<2.0.0
