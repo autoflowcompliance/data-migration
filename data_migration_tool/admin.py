@@ -19,7 +19,14 @@ import pandas as pd
 import streamlit as st
 
 if __package__ in (None, ""):  # allow `streamlit run admin.py` 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    # Try to add the repository root to the path
+    file_path = Path(__file__).resolve()
+    if file_path.parent.name == "data_migration_tool":
+        # Running from data_migration_tool/admin.py
+        sys.path.insert(0, str(file_path.parent.parent))
+    else:
+        # Running from different location
+        sys.path.insert(0, str(file_path.parent))
 
 from data_migration_tool.auditors import audit_import
 from data_migration_tool.cleaners import CleaningConfig
