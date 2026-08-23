@@ -7,7 +7,7 @@ Streamlit Cloud is the most reliable option for your Streamlit application.
 ### 📋 Prerequisites
 - GitHub account
 - Streamlit Cloud account (free at share.streamlit.io)
-- Your repository with app.py and requirements.txt
+- Your repository with data_migration_tool/app.py and data_migration_tool/requirements.txt
 
 ### 🎯 Step-by-Step Deployment
 
@@ -28,7 +28,7 @@ Streamlit Cloud is the most reliable option for your Streamlit application.
 **Repository Details:**
 - **Repository**: `autoflowcompliance/data-migration`
 - **Branch**: `main`
-- **Main file path**: `app.py`
+- **Main file path**: `data_migration_tool/app.py`
 
 **App Details:**
 - **App name**: `data-migration-tool` (or your preferred name)
@@ -114,7 +114,7 @@ font = "sans serif"
 **For Clients (Full Processing):**
 1. They pay via your preferred method
 2. Send full CSV via Google Drive
-3. You run CLI admin locally: `python -m streamlit run data_migration_tool/admin.py`
+3. You run admin locally: `cd data_migration_tool && streamlit run admin.py`
 4. Process unlimited files
 5. Email them ZIP package
 
@@ -147,7 +147,7 @@ The Streamlit interface includes pricing tiers:
    - Test download functionality
 
 2. **Test the admin system:**
-   - Run `python -m streamlit run data_migration_tool/admin.py`
+   - Run `cd data_migration_tool && streamlit run admin.py`
    - Process a full client file
    - Verify ZIP package generation
    - Test branding customization
@@ -184,8 +184,8 @@ The Streamlit interface includes pricing tiers:
 
 **Deployment Fails:**
 - Check deployment logs in Streamlit Cloud dashboard
-- Verify requirements.txt has all dependencies
-- Check that app.py is in the repository root
+- Verify data_migration_tool/requirements.txt has all dependencies
+- Check that data_migration_tool/app.py exists
 - Ensure all imports work correctly
 
 **App Not Loading:**
