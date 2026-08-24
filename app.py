@@ -2,7 +2,6 @@
 
 Run with: ``streamlit run app.py``
 Deploy to Streamlit Cloud: Configure main file path as app.py
-Updated for Streamlit Cloud deployment
 """
 from __future__ import annotations
 
@@ -39,8 +38,8 @@ def get_brand_config() -> dict[str, str]:
     return {
         "brand_name": os.getenv("BRAND_NAME", "AutoFlow"),
         "tool_name": os.getenv("TOOL_NAME", "Data Migration Tool"),
-        "operator_name": os.getenv("OPERATOR_NAME", "Your Name"),
-        "contact_email": os.getenv("CONTACT_EMAIL", "you@example.com"),
+        "operator_name": os.getenv("OPERATOR_NAME", "Neo Dlamini"),
+        "contact_email": os.getenv("CONTACT_EMAIL", "autoflowcomliance@outlook.com"),
     }
 
 
@@ -63,7 +62,7 @@ def read_upload(upload: UploadedFile) -> pd.DataFrame:
 #          a literal pipeline rail for the four processing steps, since the
 #          workflow genuinely is a sequence.
 # --------------------------------------------------------------------------
-st.markdown(
+st.html(
     """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -196,23 +195,21 @@ st.markdown(
         .af-rail-step:not(:last-child)::after{ display:none; }
     }
     </style>
-    """,
-    unsafe_allow_html=True,
+    """
 )
 
 
 def step_heading(number: str, title: str) -> None:
-    st.markdown(
+    st.html(
         f'<div class="af-step-heading"><span class="af-step-kicker">STEP {number}</span>'
-        f'<span class="af-step-title">{title}</span></div>',
-        unsafe_allow_html=True,
+        f'<span class="af-step-title">{title}</span></div>'
     )
 
 
 # --------------------------------------------------------------------------
 # Header
 # --------------------------------------------------------------------------
-st.markdown(
+st.html(
     f"""
     <div class="af-header">
         <div>
@@ -221,19 +218,17 @@ st.markdown(
         </div>
         <div class="af-header-badge">FREE DEMO · 500 ROW LIMIT</div>
     </div>
-    """,
-    unsafe_allow_html=True,
+    """
 )
 
-st.markdown(
+st.html(
     """
     <div class="af-note">
         <span>🔒</span>
         <div><b>Your file stays in memory.</b> Nothing is written to disk or stored after your
         session ends — the upload is discarded once you close this tab.</div>
     </div>
-    """,
-    unsafe_allow_html=True,
+    """
 )
 
 # --------------------------------------------------------------------------
@@ -252,7 +247,7 @@ for num, label, desc in rail_steps:
         f'<div class="af-rail-label"><b>{label}</b><br>{desc}</div></div>'
     )
 rail_html += "</div>"
-st.markdown(rail_html, unsafe_allow_html=True)
+st.html(rail_html)
 
 # --------------------------------------------------------------------------
 # Sidebar — cleaning options & branding
@@ -448,13 +443,12 @@ elif uploaded is None:
 # --------------------------------------------------------------------------
 # Footer
 # --------------------------------------------------------------------------
-st.markdown(
+st.html(
     f"""
     <div class="af-footer">
         <div>Built and maintained by <b>{brand['operator_name']}</b> — data migration & CRM cleanup.
         Questions? <b>{brand['contact_email']}</b></div>
         <div>This is a working demo. Full-file processing available on request.</div>
     </div>
-    """,
-    unsafe_allow_html=True,
+    """
 )
