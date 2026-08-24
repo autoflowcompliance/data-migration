@@ -2,6 +2,7 @@
 
 Run with: ``streamlit run app.py``
 Deploy to Streamlit Cloud: Configure main file path as app.py
+Updated: 2026-08-24 - CSS fix and branding update
 """
 from __future__ import annotations
 
@@ -216,7 +217,7 @@ st.html(
             <div class="af-wordmark">{brand['tool_name'].upper()}<span>_</span></div>
             <div class="af-tagline">Clean, map, and validate a CRM export into an import-ready file.</div>
         </div>
-        <div class="af-header-badge">FREE DEMO · 500 ROW LIMIT</div>
+        <div class="af-header-badge">FREE DEMO · 500 ROW LIMIT · UPDATED</div>
     </div>
     """
 )
