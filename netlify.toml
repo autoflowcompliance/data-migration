@@ -1,19 +1,6 @@
 [build]
-  command = "pip install -r requirements.txt"
+  command = "npx @stlite/cli web data_migration_tool --requirements data_migration_tool/requirements.txt"
+  publish = "build"
 
-[build.environment]
-  PYTHON_VERSION = "3.11"
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/api/:splat"
-  status = 200
-  force = true
-
-[functions]
-  directory = "api"
-
-[[functions]]
-  name = "api"
-  runtime = "python3.11"
-  timeout = 300
+# This site is a static stlite (in-browser Streamlit) build; no Netlify
+# Functions are used. The `@stlite/cli web` command outputs into `./build`.

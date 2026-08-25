@@ -1,0 +1,38 @@
+crm: Salesforce
+version: "1.0"
+fields:
+  - name: FirstName
+    required: true
+    aliases: ["First Name", "Given Name", "fname"]
+  - name: LastName
+    required: true
+    aliases: ["Last Name", "Surname", "Family Name", "lname"]
+  - name: Email
+    required: true
+    unique: true
+    transform: email_lowercase
+    aliases: ["Email Address", "E-mail", "Primary Email"]
+  - name: Phone
+    transform: phone_e164
+    aliases: ["Phone 1", "Phone Number", "Work Phone", "Telephone"]
+  - name: MobilePhone
+    transform: phone_e164
+    aliases: ["Mobile", "Cell", "Cell Phone", "Phone 2"]
+  - name: AccountName
+    aliases: ["Company", "Company Name", "Organisation", "Organization", "Employer"]
+  - name: Title
+    aliases: ["Job Title", "Position", "Role"]
+  - name: MailingStreet
+    aliases: ["Street", "Address", "Address 1", "Street Address"]
+  - name: MailingCity
+    aliases: ["City", "Town"]
+  - name: MailingState
+    aliases: ["State", "Province", "County", "Region"]
+  - name: MailingPostalCode
+    aliases: ["Zip", "Zip Code", "Postcode", "Postal Code"]
+  - name: MailingCountry
+    aliases: ["Country", "Nation"]
+  - name: LeadSource
+    aliases: ["Source", "Lead Source", "Origin"]
+  - name: Description
+    aliases: ["Notes", "Comments", "Details"]
