@@ -1,0 +1,2 @@
+# Netlify Functions dependencies
+netlify-lambda>=1.4.0

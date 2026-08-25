@@ -15,5 +15,10 @@ PyYAML>=6.0
 # Reporting
 Jinja2>=3.1.2
 
-# User interface - Streamlit (no Hugging Face dependencies)
-streamlit>=1.40.0,<2.0.0
+# Web framework - FastAPI
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Netlify Functions
+mangum>=0.17.0
