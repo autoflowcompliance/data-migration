@@ -16,8 +16,6 @@ from pathlib import Path
 import chardet
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from app_files.auditors import audit_import
 from app_files.cleaners import CleaningConfig
 from app_files.mappers import available_crms
