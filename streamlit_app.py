@@ -6,8 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Redirect to the actual app in data_migration_tool
+# Redirect to the actual app
 if __name__ == "__main__":
-    app_path = Path(__file__).parent / "data_migration_tool" / "app.py"
+    app_path = Path(__file__).parent / "app.py"
     sys.argv[0] = str(app_path)
     exec(open(app_path).read())

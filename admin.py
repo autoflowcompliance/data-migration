@@ -18,11 +18,11 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from data_migration_tool.auditors import audit_import
-from data_migration_tool.cleaners import CleaningConfig
-from data_migration_tool.mappers import available_crms
-from data_migration_tool.pipeline import run_pipeline
-from data_migration_tool.reporters import render_audit_report
+from app_files.auditors import audit_import
+from app_files.cleaners import CleaningConfig
+from app_files.mappers import available_crms
+from app_files.pipeline import run_pipeline
+from app_files.reporters import render_audit_report
 
 BASE_DIR = Path(__file__).resolve().parent
 DELIVERIES_DIR = BASE_DIR / "deliveries"
