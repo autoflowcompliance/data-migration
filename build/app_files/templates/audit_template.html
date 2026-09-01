@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Post-import audit - {{ project_name }}{% endblock %}
+{% block content %}
+<h1>Post-Import Audit Report</h1>
+<p class="meta">{{ project_name }} &middot; {{ generated_at }}</p>
+
+<div class="cards">
+  <div class="card"><div class="label">Expected records</div><div class="value">{{ stats.expected_records }}</div></div>
+  <div class="card"><div class="label">Imported records</div><div class="value">{{ stats.imported_records }}</div></div>
+  <div class="card"><div class="label">Missing</div><div class="value {% if stats.missing_records %}bad{% else %}ok{% endif %}">{{ stats.missing_records }}</div></div>
+  <div class="card"><div class="label">Unexpected</div><div class="value {% if stats.unexpected_records %}warn{% else %}ok{% endif %}">{{ stats.unexpected_records }}</div></div>
+  <div class="card"><div class="label">Field mismatches</div><div class="value {% if stats.mismatched_values %}warn{% else %}ok{% endif %}">{{ stats.mismatched_values }}</div></div>
+</div>
+
+<h2>Mismatches by field</h2>
+<table class="data">
+  <tr><th>Field</th><th>Mismatches</th></tr>
+  {% for field, count in stats.mismatches_by_field.items() %}
+  <tr><td>{{ field }}</td><td class="{% if count %}warn{% else %}ok{% endif %}">{{ count }}</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Records to review</h2>
+{{ mismatch_table|safe }}
+{% endblock %}
