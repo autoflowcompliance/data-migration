@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from .auditors import audit_import
-from .cleaners import load_cleaning_config
-from .mappers import available_crms
-from .pipeline import run_pipeline
-from .reporters import render_audit_report
+from app_files.auditors import audit_import
+from app_files.cleaners import load_cleaning_config
+from app_files.mappers import available_crms
+from app_files.pipeline import run_pipeline
+from app_files.reporters import render_audit_report
 
 
 def _read_csv(path: Path) -> pd.DataFrame:

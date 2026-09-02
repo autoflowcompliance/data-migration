@@ -1,5 +1,5 @@
-from .schema import MappingConfig, TargetField, available_crms, load_mapping_config
-from .yaml_mapper import MappingResult, map_data
+from app_files.mappers.schema import MappingConfig, TargetField, available_crms, load_mapping_config
+from app_files.mappers.yaml_mapper import MappingResult, map_data
 
 __all__ = [
     "MappingConfig",

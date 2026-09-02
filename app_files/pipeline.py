@@ -9,10 +9,10 @@ from typing import Any
 
 import pandas as pd
 
-from .cleaners import CleaningConfig, CleaningResult, clean_data
-from .mappers import MappingConfig, MappingResult, load_mapping_config, map_data
-from .reporters import render_qa_report
-from .validators import ValidationReport, frictionless_summary, validate_data
+from app_files.cleaners import CleaningConfig, CleaningResult, clean_data
+from app_files.mappers import MappingConfig, MappingResult, load_mapping_config, map_data
+from app_files.reporters import render_qa_report
+from app_files.validators import ValidationReport, frictionless_summary, validate_data
 
 
 @dataclass

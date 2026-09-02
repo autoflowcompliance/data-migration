@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..transforms import (
+from app_files.transforms import (
     email_lowercase,
     expand_scientific_notation,
     is_missing,
@@ -18,7 +18,7 @@ from ..transforms import (
     to_iso_date,
     trim_whitespace,
 )
-from .config import CleaningConfig
+from app_files.cleaners.config import CleaningConfig
 
 DATE_HINT = re.compile(r"date|dob|birth|created|updated|closed|renewal", re.I)
 PHONE_HINT = re.compile(r"phone|mobile|cell|tel|fax", re.I)

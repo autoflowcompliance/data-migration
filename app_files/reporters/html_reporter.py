@@ -9,7 +9,7 @@ from typing import Any
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from ..validators.quality_validator import ValidationReport
+from app_files.validators.quality_validator import ValidationReport
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 

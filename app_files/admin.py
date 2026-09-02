@@ -20,13 +20,13 @@ import pandas as pd
 import streamlit as st
 
 if __package__ in (None, ""):  # allow `streamlit run admin.py` 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from auditors import audit_import
-from cleaners import CleaningConfig
-from mappers import available_crms
-from pipeline import run_pipeline
-from reporters import render_audit_report
+from app_files.auditors import audit_import
+from app_files.cleaners import CleaningConfig
+from app_files.mappers import available_crms
+from app_files.pipeline import run_pipeline
+from app_files.reporters import render_audit_report
 
 
 def build_cleaning_config(
