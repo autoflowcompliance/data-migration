@@ -1,6 +1,6 @@
 """FastAPI web application for the AutoFlow data migration tool.
 
-Deployed to Netlify Functions
+Deployed to Netlify Functions for serverless deployment.
 """
 from __future__ import annotations
 
