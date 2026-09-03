@@ -28,7 +28,7 @@ A professional data migration and CRM cleanup tool that transforms messy CRM exp
    - Click "New app"
    - Select repository: `autoflowcompliance/data-migration`
    - Branch: `main`
-   - Main file path: `app_files/app.py`
+   - Main file path: `app.py` (root level file)
    - Click "Deploy"
 
 3. **Configuration**
@@ -62,20 +62,20 @@ streamlit run app_files/admin.py
 
 ```
 autoflow/
-├── app_files/              # Main application package
-│   ├── app.py            # Public demo (500-row limit)
-│   ├── admin.py          # Private admin (no limits)
-│   ├── auditors/         # Post-import audit functionality
-│   ├── cleaners/         # Data cleaning modules
-│   ├── configs/          # CRM mapping configurations
-│   ├── mappers/          # Field mapping logic
-│   ├── reporters/        # Report generation
-│   ├── templates/        # HTML report templates
-│   ├── validators/       # Data validation
-│   └── samples/          # Sample data for testing
-├── .streamlit/           # Streamlit configuration
-├── requirements.txt      # Python dependencies
-└── packages.txt         # Streamlit Cloud package path
+├── app.py                 # Public demo (500-row limit) - Streamlit Cloud entry point
+├── app_files/            # Main application package
+│   ├── app.py           # Source Streamlit demo code
+│   ├── admin.py         # Private admin (no limits)
+│   ├── auditors/        # Post-import audit functionality
+│   ├── cleaners/        # Data cleaning modules
+│   ├── configs/         # CRM mapping configurations
+│   ├── mappers/         # Field mapping logic
+│   ├── reporters/       # Report generation
+│   ├── templates/       # HTML report templates
+│   ├── validators/      # Data validation
+│   └── samples/         # Sample data for testing
+├── .streamlit/          # Streamlit configuration
+└── requirements.txt     # Python dependencies
 ```
 
 ## 🎯 Features
