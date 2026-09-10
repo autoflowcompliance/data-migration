@@ -3,10 +3,12 @@ version: "1.0"
 fields:
   - name: FirstName
     required: true
-    aliases: ["First Name", "Given Name", "fname"]
+    transform: split_full_name_first
+    aliases: ["First Name", "Given Name", "fname", "Full Name"]
   - name: LastName
     required: true
-    aliases: ["Last Name", "Surname", "Family Name", "lname"]
+    transform: split_full_name_last
+    aliases: ["Last Name", "Surname", "Family Name", "lname", "Full Name"]
   - name: Email
     required: true
     unique: true
