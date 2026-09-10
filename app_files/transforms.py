@@ -1,15 +1,12 @@
 """Value level transforms shared by the cleaner, the mapper and the validator."""
-
 from __future__ import annotations
-
 import math
 import re
 import unicodedata
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
-
 import pandas as pd
 import phonenumbers
 from dateutil import parser as date_parser
@@ -90,11 +87,10 @@ def is_valid_email(value: Any) -> bool:
 
 def to_iso_date(value: Any, output_format: str = "%Y-%m-%d", day_first: bool = False) -> Any:
     """Parse a heterogeneous date value into a single output format.
-
     Args:
         value: The date value to parse
         output_format: The desired output format (default: YYYY-MM-DD)
-        day_first: If True, parse dates with day first (DD/MM/YYYY), 
+        day_first: If True, parse dates with day first (DD/MM/YYYY),
                    if False, parse with month first (MM/DD/YYYY)
     """
     if is_missing(value):
@@ -102,13 +98,44 @@ def to_iso_date(value: Any, output_format: str = "%Y-%m-%d", day_first: bool = F
     if isinstance(value, (datetime, date, pd.Timestamp)):
         return value.strftime(output_format)
     text = str(value).strip()
-    
+
+    # Excel date serial number detection: a bare integer, roughly covering
+    # 1900-2100. Must be checked BEFORE normal parsing below — dateutil
+    # otherwise tries to interpret it as a literal year (e.g. "year 44197
+    # is out of range") and fails, silently returning the raw serial number
+    # unchanged instead of the actual date it represents.
+    bare_digits = text[:-2] if text.endswith(".0") else text
+    if bare_digits.isdigit():
+        serial = int(bare_digits)
+        if 1 <= serial <= 80000:
+            parsed = datetime(1899, 12, 30) + timedelta(days=serial)
+            return parsed.strftime(output_format)
+
     # Use the explicit day_first parameter instead of guessing
     try:
         parsed = date_parser.parse(text, dayfirst=day_first)
     except (ValueError, OverflowError):
         return text
     return parsed.strftime(output_format)
+
+
+def split_full_name_first(value: Any) -> str:
+    """Extract the first name from a combined 'Full Name' style column.
+    'Michael O'Brien' -> 'Michael'. 'DANIEL HARRIS' -> 'Daniel' (title-cased).
+    Single-token names return the whole token."""
+    if is_missing(value):
+        return ""
+    parts = str(value).strip().split()
+    return parts[0].title() if parts else ""
+
+
+def split_full_name_last(value: Any) -> str:
+    """Extract the last name (everything after the first token) from a
+    combined 'Full Name' style column. Single-token names return ''."""
+    if is_missing(value):
+        return ""
+    parts = str(value).strip().split()
+    return " ".join(w.title() for w in parts[1:]) if len(parts) > 1 else ""
 
 
 def expand_scientific_notation(value: Any) -> Any:
@@ -156,6 +183,8 @@ TRANSFORMS: dict[str, Callable[[Any], Any]] = {
     "digits_only": digits_only,
     "ascii": normalize_unicode,
     "expand_scientific_notation": expand_scientific_notation,
+    "split_full_name_first": split_full_name_first,
+    "split_full_name_last": split_full_name_last,
 }
 
 
