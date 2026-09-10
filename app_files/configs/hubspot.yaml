@@ -3,10 +3,12 @@ version: "1.0"
 fields:
   - name: firstname
     required: true
-    aliases: ["First Name", "Given Name", "fname", "Contact First Name"]
+    transform: split_full_name_first
+    aliases: ["First Name", "Given Name", "fname", "Contact First Name", "Full Name"]
   - name: lastname
     required: true
-    aliases: ["Last Name", "Surname", "Family Name", "lname"]
+    transform: split_full_name_last
+    aliases: ["Last Name", "Surname", "Family Name", "lname", "Full Name"]
   - name: email
     required: true
     unique: true
@@ -39,4 +41,4 @@ fields:
     aliases: ["Lead Status", "Contact Status"]
   - name: createdate
     transform: date_iso
-    aliases: ["Created Date", "Date Created", "Created At", "Create Date"]
+    aliases: ["Created Date", "Date Created", "Created At", "Create Date", "Hire Date", "Start Date", "Date Hired", "Join Date", "Employment Date"]
