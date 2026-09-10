@@ -10,7 +10,7 @@ raw CSV -> CLEANER -> MAPPER -> VALIDATOR -> deliverables -> POST-IMPORT AUDITOR
 ## Quick start
 
 ```bash
-cd data_migration_tool
+cd app_files
 python -m venv .venv && source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
@@ -18,8 +18,8 @@ pip install -r requirements.txt
 streamlit run app.py
 
 # Command line
-python -m data_migration_tool.cli \
-  -i data_migration_tool/samples/messy_contacts.csv \
+python -m app_files.cli \
+  -i app_files/samples/messy_contacts.csv \
   -c hubspot \
   -o output              # run from the repository root
 ```
@@ -68,7 +68,7 @@ pipeline:
 ```
 
 ```bash
-python -m data_migration_tool.cli -i raw.csv -c hubspot --cleaning-config cleaning.yaml
+python -m app_files.cli -i raw.csv -c hubspot --cleaning-config cleaning.yaml
 ```
 
 ### Mapper (`mappers/`, `configs/`)
@@ -105,7 +105,7 @@ error and no warning.
 ### Post-import auditor (`auditors/`)
 
 ```bash
-python -m data_migration_tool.cli -i raw.csv -c hubspot \
+python -m app_files.cli -i raw.csv -c hubspot \
   --audit-export exported_from_crm.csv --audit-key email
 ```
 
@@ -118,30 +118,14 @@ This version includes several critical fixes for production use:
 
 1. **File Encoding Detection**: Automatically detects file encoding using `chardet` to handle non-UTF-8 files (common with legacy CRMs)
 2. **Day-First Date Parsing**: Added `--date-dayfirst` CLI option and UI toggle to handle European vs American date formats
-3. **Error Handling**: Comprehensive error handling in Streamlit UI with user-friendly error messages
-4. **White-Labeling**: Environment variables for custom branding (`BRAND_NAME`, `TOOL_NAME`, `LOGO_URL`)
-5. **File Size Limits**: 200MB upload limit in Streamlit to prevent memory issues
-6. **Custom CRM Support**: Template and documentation for creating custom CRM configurations
+3. **Scientific Notation Fix**: Restored `expand_scientific_notation` transform to prevent Excel corruption of numeric IDs
+4. **Frictionless Framework**: Fully integrated Frictionless for structural validation and schema checking
+5. **Report Generation**: Fixed Jinja2 template rendering for standalone QA reports
+6. **White-Label Branding**: Added customizable branding via environment variables/Streamlit secrets
 
-## White-Label Configuration
+## White-Label Branding
 
-### Local Development
-Set environment variables to customize the branding:
-
-```bash
-# On Linux/Mac
-export BRAND_NAME="Your Agency"
-export TOOL_NAME="Data Migration Tool"
-export LOGO_URL="https://your-site.com/logo.png"
-
-# On Windows
-set BRAND_NAME="Your Agency"
-set TOOL_NAME="Data Migration Tool"
-set LOGO_URL="https://your-site.com/logo.png"
-```
-
-### Streamlit Cloud Deployment
-When deploying to Streamlit Cloud, set these as environment variables in your app settings:
+The tool supports custom branding for agencies:
 
 1. Go to your app dashboard on share.streamlit.io
 2. Click the "Settings" gear icon
@@ -159,9 +143,9 @@ This allows agencies to white-label the tool for their clients with their own br
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                     # from data_migration_tool/
+pytest                     # from app_files/
 ruff check .
-mypy .                     # run as `mypy data_migration_tool` from the repository root
+mypy .                     # run as `mypy app_files` from the repository root
 ```
 
 ## Custom CRM Configurations

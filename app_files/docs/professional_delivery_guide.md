@@ -62,8 +62,8 @@ Best regards,
 
 ```bash
 # Run the tool on the sample file
-python -m data_migration_tool.cli \
-  -i data_migration_tool/samples/messy_contacts.csv \
+python -m app_files.cli \
+  -i app_files/samples/messy_contacts.csv \
   -c hubspot \
   -o demo_output
 ```

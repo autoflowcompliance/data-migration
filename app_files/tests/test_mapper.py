@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from data_migration_tool.mappers import available_crms, load_mapping_config, map_data
+from app_files.mappers import available_crms, load_mapping_config, map_data
 
 
 @pytest.fixture()

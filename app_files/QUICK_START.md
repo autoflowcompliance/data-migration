@@ -17,7 +17,7 @@ This guide will get your data migration tool deployed to Streamlit Cloud in minu
 3. **Configure Your App**
    - Repository: `autoflowcompliance/data-migration`
    - Branch: `main`
-   - Main file path: `data_migration_tool/app.py`
+   - Main file path: `app.py`
 
 4. **Deploy**
    - Click "Deploy" button
@@ -30,8 +30,10 @@ This guide will get your data migration tool deployed to Streamlit Cloud in minu
 
 ```
 data-migration/
-├── data_migration_tool/
-│   ├── app.py                 # Main Streamlit app (for Streamlit Cloud)
+├── app.py                     # Main Streamlit app (for Streamlit Cloud)
+├── requirements.txt           # Python dependencies
+├── app_files/
+│   ├── app.py                 # Core Streamlit app module
 │   ├── admin.py               # Admin system (local use only)
 │   ├── requirements.txt       # Python dependencies
 │   ├── .streamlit/
@@ -43,13 +45,13 @@ data-migration/
 ### 🎯 Two-Tier System
 
 **Public Demo (Streamlit Cloud):**
-- **Location**: `data_migration_tool/app.py`
+- **Location**: `app.py` (repository root)
 - **Purpose**: Public-facing demo with 500-row limit
 - **Deployment**: Streamlit Cloud
 - **Access**: Anyone can use the demo version
 
 **Admin System (Local):**
-- **Location**: `data_migration_tool/admin.py`
+- **Location**: `app_files/admin.py`
 - **Purpose**: Paid client processing (no row limits)
 - **Deployment**: Local machine only
 - **Access**: Your private client fulfillment system
@@ -59,7 +61,7 @@ data-migration/
 To run the admin system for client work:
 
 ```bash
-cd data_migration_tool
+cd app_files
 streamlit run admin.py
 ```
 

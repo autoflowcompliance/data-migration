@@ -140,7 +140,7 @@ If no match is found above the threshold (0.82), the field will be marked as "mi
 1. Create a sample CSV with data that matches your source system
 2. Run the tool with your new configuration:
    ```bash
-   python -m data_migration_tool.cli -i your_sample.csv -c your_crm_name
+   python -m app_files.cli -i your_sample.csv -c your_crm_name
    ```
 3. Check the `mapping_log.csv` to see how fields were matched
 4. Review the `qa_report.html` to identify any issues

@@ -1,4 +1,4 @@
-"""Command line entry point: ``python -m data_migration_tool.cli``."""
+"""Command line entry point: ``python -m app_files.cli``."""
 
 from __future__ import annotations
 

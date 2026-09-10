@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 import pandas as pd
@@ -34,7 +35,7 @@ class ValidationReport:
 
     @property
     def flagged_rows(self) -> set[int]:
-        return {issue.row for issue in self.issues}
+        return {issue.row + 2 for issue in self.issues}
 
     @property
     def quality_score(self) -> float:
@@ -163,8 +164,8 @@ def validate_data(
             # Date validation
             if "date" in field.lower():
                 try:
-                    to_iso_date(value, date_format)
-                except Exception:
+                    datetime.strptime(str(value), date_format)
+                except (ValueError, TypeError):
                     report.issues.append(
                         Issue(
                             row=idx,

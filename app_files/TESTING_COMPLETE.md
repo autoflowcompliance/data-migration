@@ -108,7 +108,7 @@ git push -u origin main
 3. Click "New app"
 4. Select repository: `data-migration-tool`
 5. Branch: `main`
-6. Main file path: `data_migration_tool/app.py`
+6. Main file path: `app.py`
 7. Click "Deploy"
 
 ### Step 3: Configure Environment Variables

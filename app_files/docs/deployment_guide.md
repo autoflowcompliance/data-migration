@@ -47,7 +47,7 @@ git push -u origin main
 3. Click "New app"
 4. Select your repository (`data-migration-tool`)
 5. For "Branch", select `main`
-6. For "Main file path", type: `data_migration_tool/app.py`
+6. For "Main file path", type: `app.py`
 7. Click "Deploy"
 
 ## Step 4: Configure Environment Variables (Optional)
@@ -96,7 +96,7 @@ To update your deployed app:
 ## Troubleshooting
 
 ### Deployment Fails
-- Check that the main file path is correct: `data_migration_tool/app.py`
+- Check that the main file path is correct: `app.py`
 - Ensure all dependencies are in `requirements.txt`
 - Check the deployment logs in Streamlit Cloud for specific errors
 

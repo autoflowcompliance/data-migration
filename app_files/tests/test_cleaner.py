@@ -1,6 +1,6 @@
 import pandas as pd
 
-from data_migration_tool.cleaners import CleaningConfig, clean_data
+from app_files.cleaners import CleaningConfig, clean_data
 
 
 def sample() -> pd.DataFrame:

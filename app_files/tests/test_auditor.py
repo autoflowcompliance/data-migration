@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from data_migration_tool.auditors import audit_import
+from app_files.auditors import audit_import
 
 
 def test_audit_detects_mismatches_and_missing_records():

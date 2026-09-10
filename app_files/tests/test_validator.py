@@ -1,7 +1,7 @@
 import pandas as pd
 
-from data_migration_tool.mappers import load_mapping_config
-from data_migration_tool.validators import validate_data
+from app_files.mappers import load_mapping_config
+from app_files.validators import validate_data
 
 CONFIG = load_mapping_config("hubspot")
 

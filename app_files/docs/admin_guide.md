@@ -16,7 +16,7 @@ The admin dashboard (`admin.py`) is your **private backend system** that runs lo
 
 ### Prerequisites
 - Python 3.10+ installed
-- All dependencies installed: `pip install -r data_migration_tool/requirements.txt`
+- All dependencies installed: `pip install -r app_files/requirements.txt`
 
 ### Running the Admin Dashboard
 
@@ -135,7 +135,7 @@ For multiple client files:
 
 If you need to process for a CRM not in the default list:
 
-1. Create custom YAML config in `data_migration_tool/configs/`
+1. Create custom YAML config in `app_files/configs/`
 2. Follow the guide in `docs/custom_crm_guide.md`
 3. The custom CRM will appear in the dropdown automatically
 
@@ -147,7 +147,7 @@ If you need to process for a CRM not in the default list:
 
 **Solution:**
 ```bash
-pip install -r data_migration_tool/requirements.txt
+pip install -r app_files/requirements.txt
 ```
 
 ### File Upload Fails

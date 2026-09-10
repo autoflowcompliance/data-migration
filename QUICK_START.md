@@ -34,7 +34,7 @@ data-migration/
 ├── requirements.txt                # Python dependencies
 ├── .streamlit/
 │   └── config.toml                 # Streamlit configuration
-├── data_migration_tool/
+├── app_files/
 │   ├── admin.py                    # Admin system (local use only)
 │   ├── requirements.txt            # Tool-specific dependencies
 │   ├── .streamlit/
@@ -52,7 +52,7 @@ data-migration/
 - **Access**: Anyone can use the demo version
 
 **Admin System (Local):**
-- **Location**: `data_migration_tool/admin.py`
+- **Location**: `app_files/admin.py`
 - **Purpose**: Paid client processing (no row limits)
 - **Deployment**: Local machine only
 - **Access**: Your private client fulfillment system
@@ -62,7 +62,7 @@ data-migration/
 To run the admin system for client work:
 
 ```bash
-cd data_migration_tool
+cd app_files
 streamlit run admin.py
 ```
 

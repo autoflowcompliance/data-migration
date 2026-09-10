@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from data_migration_tool.cli import main
-from data_migration_tool.pipeline import run_pipeline
+from app_files.cli import main
+from app_files.pipeline import run_pipeline
 
 SAMPLE = Path(__file__).resolve().parent.parent / "samples" / "messy_contacts.csv"
 

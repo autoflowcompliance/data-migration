@@ -53,7 +53,7 @@ git push -u origin main
 3. Click "New app"
 4. Select your repository: `data-migration-tool`
 5. Branch: `main`
-6. Main file path: `data_migration_tool/app.py`
+6. Main file path: `app.py`
 7. Click "Deploy"
 
 ### Step 3: Configure White-Labeling (2 minutes)
@@ -85,7 +85,7 @@ git push -u origin main
    - Set to "Anyone with link can upload"
 
 2. **Create Your Portfolio:**
-   - Run tool on sample file: `data_migration_tool/samples/messy_contacts.csv`
+   - Run tool on sample file: `app_files/samples/messy_contacts.csv`
    - Open `qa_report.html` and take screenshots
    - Create simple portfolio page with images
 
@@ -113,7 +113,7 @@ git push -u origin main
 - [ ] Set business pricing structure
 - [ ] Prepare NDA template
 - [ ] Create privacy guarantee documentation
-- [ ] Set up business email/signature
+- [ ] Set business email/signature
 - [ ] Create portfolio website or page
 - [ ] Prepare outreach templates
 - [ ] Set up payment processing (if needed)
@@ -122,12 +122,12 @@ git push -u origin main
 
 | Document | Purpose | Location |
 |----------|---------|----------|
-| **QUICK_START.md** | Get online in 15 minutes | `data_migration_tool/QUICK_START.md` |
-| **README.md** | Tool overview & usage | `data_migration_tool/README.md` |
-| **deployment_guide.md** | Detailed deployment instructions | `data_migration_tool/docs/deployment_guide.md` |
-| **professional_delivery_guide.md** | Business setup & client communication | `data_migration_tool/docs/professional_delivery_guide.md` |
-| **admin_guide.md** | Private admin dashboard usage | `data_migration_tool/docs/admin_guide.md` |
-| **custom_crm_guide.md** | Creating custom CRM configurations | `data_migration_tool/docs/custom_crm_guide.md` |
+| **QUICK_START.md** | Get online in 15 minutes | `app_files/QUICK_START.md` |
+| **README.md** | Tool overview & usage | `app_files/README.md` |
+| **deployment_guide.md** | Detailed deployment instructions | `app_files/docs/deployment_guide.md` |
+| **professional_delivery_guide.md** | Business setup & client communication | `app_files/docs/professional_delivery_guide.md` |
+| **admin_guide.md** | Private admin dashboard usage | `app_files/docs/admin_guide.md` |
+| **custom_crm_guide.md** | Creating custom CRM configurations | `app_files/docs/custom_crm_guide.md` |
 
 ## 🔧 Technical Specifications
 
