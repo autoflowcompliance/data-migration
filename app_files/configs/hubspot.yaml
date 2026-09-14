@@ -36,9 +36,11 @@ fields:
     aliases: ["Nation", "Mailing Country", "Billing Country"]
   - name: lifecyclestage
     default: lead
+    transform: lower_case
     aliases: ["Lifecycle Stage", "Stage", "Status"]
   - name: hs_lead_status
     aliases: ["Lead Status", "Contact Status"]
   - name: createdate
     transform: date_iso
     aliases: ["Created Date", "Date Created", "Created At", "Create Date", "Hire Date", "Start Date", "Date Hired", "Join Date", "Employment Date"]
+   
