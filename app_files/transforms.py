@@ -85,6 +85,9 @@ def is_valid_email(value: Any) -> bool:
     return bool(EMAIL_PATTERN.match(str(value).strip()))
 
 
+ISO_DATE_PATTERN = re.compile(r"^(\d{4})[-/](\d{2})[-/](\d{2})$")
+
+
 def to_iso_date(value: Any, output_format: str = "%Y-%m-%d", day_first: bool = False) -> Any:
     """Parse a heterogeneous date value into a single output format.
     Args:
@@ -110,6 +113,21 @@ def to_iso_date(value: Any, output_format: str = "%Y-%m-%d", day_first: bool = F
         if 1 <= serial <= 80000:
             parsed = datetime(1899, 12, 30) + timedelta(days=serial)
             return parsed.strftime(output_format)
+
+    # Already-unambiguous year-first format (YYYY-MM-DD or YYYY/MM/DD).
+    # day_first is only meaningful for genuinely ambiguous DD/MM vs MM/DD
+    # formats — applying dateutil's dayfirst=True to an already-unambiguous
+    # ISO date incorrectly swaps its month and day (e.g. "2017-09-12" with
+    # day_first=True becomes "2017-12-09", which is simply wrong, not a
+    # different valid interpretation). Parse these directly instead.
+    iso_match = ISO_DATE_PATTERN.match(text)
+    if iso_match:
+        year, month, day = iso_match.groups()
+        try:
+            parsed = datetime(int(year), int(month), int(day))
+            return parsed.strftime(output_format)
+        except ValueError:
+            pass  # not actually a valid calendar date — fall through
 
     # Use the explicit day_first parameter instead of guessing
     try:
