@@ -79,8 +79,10 @@ brand = get_brand_config()
 
 
 def read_upload(upload: UploadedFile) -> pd.DataFrame:
-    """Read uploaded CSV with automatic encoding detection."""
+    """Read uploaded CSV or Excel file into a DataFrame."""
     raw = upload.read()
+    if upload.name.lower().endswith((".xlsx", ".xls")):
+        return pd.read_excel(io.BytesIO(raw), dtype=str, keep_default_na=False)
     result = chardet.detect(raw)
     encoding = result["encoding"] or "utf-8"
     return pd.read_csv(io.BytesIO(raw), dtype=str, encoding=encoding, keep_default_na=False)
@@ -317,8 +319,8 @@ with st.sidebar:
 # --------------------------------------------------------------------------
 step_heading("1", "Upload your source CSV")
 uploaded = st.file_uploader(
-    "CSV export from the source CRM",
-    type=["csv"],
+    "CSV or Excel export from the source CRM",
+    type=["csv", "xlsx", "xls"],
     help=f"Maximum file size: {MAX_UPLOAD_SIZE // (1024*1024)}MB",
     label_visibility="collapsed",
 )
@@ -357,7 +359,7 @@ include_audit = col_c.checkbox("Include post-import audit", value=False, help="R
 audit_upload = None
 audit_key = None
 if include_audit:
-    audit_upload = st.file_uploader("CRM export to audit against", type=["csv"], key="audit")
+    audit_upload = st.file_uploader("CRM export to audit against", type=["csv", "xlsx", "xls"], key="audit")
     audit_key = st.text_input("Unique key column (must exist in both files)", value="email")
 
 st.write("")
