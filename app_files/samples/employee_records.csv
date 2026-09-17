@@ -1,0 +1,11 @@
+Employee ID,Full Name,Email,Phone,Hire Date,Department,Status
+1001,Ann Smith,ann.smith@acme.com,+14155552671,2021-03-01,Finance,Active
+1002,Bob Jones,bob.jones@acme.com,+14155552672,2020-07-15,Engineering,Active
+1003,Cara Diaz,CARA.DIAZ@ACME.COM,+14155552673,2022-01-10,Sales,Active
+1004,Dan Lee,not-an-email,555-000,2019-11-30,Marketing,Inactive
+1005,Eve Mokoena,eve.mokoena@acme.com,+27821234567,2023-05-22,Finance,Active
+1006,Fan Wu,fan.wu@acme.com,,2024-02-01,Engineering,Active
+1006,Fan Wu,fan.wu@acme.com,,2024-02-01,Engineering,Active
+1007,Gus Hall,GUS@ACME.COM,+14155552677,12/31/24,Sales,Active
+1008,Hana Patel,hana.patel@acme.com,+14155552678,2018-09-09,Operations,Active
+1009,Ivan Petrov,ivan.petrov@acme.com,bad-phone,,Engineering,Active

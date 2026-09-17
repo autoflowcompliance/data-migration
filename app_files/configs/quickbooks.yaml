@@ -1,0 +1,68 @@
+crm: QuickBooks
+version: "1.0"
+description: >
+  Maps a QuickBooks customer/contact export onto the canonical contact shape
+  used by the other CRM configs, so the same QA report and rule set apply.
+
+fields:
+  - name: firstname
+    required: true
+    transform: split_full_name_first
+    aliases: ["First Name", "Given Name", "Customer First Name"]
+  - name: lastname
+    required: true
+    transform: split_full_name_last
+    aliases: ["Last Name", "Surname", "Family Name", "Customer Last Name"]
+  - name: full_name
+    sources: ["First Name", "Last Name"]
+    separator: " "
+    aliases: ["Display Name", "Customer", "Name", "Company Name"]
+  - name: email
+    type: email
+    required: true
+    transform: lower_case
+    aliases: ["Email", "Email Address", "Main Email", "Customer Email"]
+  - name: phone
+    type: phone
+    transform: phone_e164
+    aliases: ["Phone", "Main Phone", "Phone Number", "Mobile", "Customer Phone"]
+  - name: company
+    aliases: ["Company", "Company Name", "Organization", "Customer Name"]
+  - name: address
+    aliases: ["Address", "Billing Address", "Street", "Address Line 1"]
+  - name: city
+    transform: title_case
+    aliases: ["City", "Billing City", "Town"]
+  - name: state
+    transform: upper_case
+    aliases: ["State", "Province", "Billing State", "Region"]
+  - name: postal_code
+    aliases: ["Postal Code", "Zip", "Zip Code", "Billing Zip"]
+  - name: country
+    transform: title_case
+    aliases: ["Country", "Billing Country"]
+  - name: createdate
+    transform: date_iso
+    aliases: ["Created Date", "Date Created", "Customer Since", "Created At"]
+
+rules:
+  # A customer record with no usable name cannot be migrated into a CRM.
+  - name: lastname_required
+    field: lastname
+    type: required
+    severity: error
+    message: "Customer record has no last name, so it cannot be created in the CRM"
+  # QuickBooks phone exports are free-text; E.164 is what CRMs expect.
+  - name: phone_e164_format
+    field: phone
+    type: regex
+    pattern: "^\\+[1-9]\\d{6,14}$"
+    severity: warning
+    message: "Phone is not in E.164 form (e.g. +15551234567)"
+  # US state codes are two letters; anything longer is usually a full name.
+  - name: state_abbreviation
+    field: state
+    type: length
+    exactly: 2
+    severity: warning
+    message: "State is not a two-letter code — check for a full state name"

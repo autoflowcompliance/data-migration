@@ -15,7 +15,10 @@ import streamlit as st
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from services.bank_reconciliation.reconciler import run_reconciliation
+from services.bank_reconciliation.reconciler import (
+    UnreadableStatementError,
+    run_reconciliation,
+)
 
 st.set_page_config(page_title="Bank Reconciliation", page_icon="◆", layout="wide")
 
@@ -89,24 +92,26 @@ if run_clicked and bank_file and ledger_file:
         tabs = st.tabs(["Missing from your books", "Recorded but never cleared", "Matched transactions"])
         with tabs[0]:
             st.caption("These showed up in your bank statement but aren't in your books yet.")
-            st.dataframe(result["bank_only"], use_container_width=True)
+            st.dataframe(result["bank_only"], width="stretch")
             st.download_button(
                 "Download CSV", result["bank_only"].to_csv(index=False),
                 file_name="missing_from_your_books.csv", mime="text/csv",
             )
         with tabs[1]:
             st.caption("These are in your books but never actually cleared the bank — worth double-checking.")
-            st.dataframe(result["ledger_only"], use_container_width=True)
+            st.dataframe(result["ledger_only"], width="stretch")
             st.download_button(
                 "Download CSV", result["ledger_only"].to_csv(index=False),
                 file_name="recorded_but_never_cleared.csv", mime="text/csv",
             )
         with tabs[2]:
             import pandas as pd
-            st.dataframe(pd.DataFrame(result["matches"]), use_container_width=True)
+            st.dataframe(pd.DataFrame(result["matches"]), width="stretch")
 
     except KeyError as e:
         st.error(f"Column not found: {e}. Check the column names match your file's actual headers.")
+    except UnreadableStatementError as e:
+        st.error(str(e))
     except Exception as e:
         st.error("Something went wrong processing these files.")
         st.caption(f"Technical details: {str(e)}")

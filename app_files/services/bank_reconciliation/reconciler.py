@@ -45,6 +45,62 @@ def clean_currency_amount(value: Any) -> float | None:
     return float(-amount if negative else amount)
 
 
+class UnreadableStatementError(ValueError):
+    """Raised when an uploaded statement cannot be parsed as a CSV table.
+
+    A distinct type lets the UI show a plain-language reason instead of a raw
+    pandas ``EmptyDataError``.
+    """
+
+
+def _read_statement(raw: bytes, label: str) -> pd.DataFrame:
+    """Read an uploaded statement, turning an empty file into a clear error."""
+    import io
+
+    if not raw or not raw.strip():
+        raise UnreadableStatementError(
+            f"The {label} file is empty. Upload a CSV with a header row, for example: Date,Amount"
+        )
+    try:
+        return pd.read_csv(io.BytesIO(raw), dtype=str, keep_default_na=False)
+    except pd.errors.EmptyDataError as exc:
+        raise UnreadableStatementError(
+            f"The {label} file has no header row, so no columns could be read. "
+            f"Expected a CSV beginning with a header such as: Date,Amount"
+        ) from exc
+    except pd.errors.ParserError as exc:
+        raise UnreadableStatementError(
+            f"The {label} file could not be parsed as CSV: {exc}"
+        ) from exc
+
+
+def _numeric_or_none(value: Any) -> float | None:
+    """Return ``value`` as a float if it is a usable number, else ``None``.
+
+    Amounts arrive as ``None`` from ``clean_currency_amount`` when unparseable,
+    and as ``NaN``/``NaT`` from pandas' coercion.
+    """
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        parsed = clean_currency_amount(value)
+        return parsed
+    return None if number != number else number
+
+
+def _date_or_none(value: Any) -> Any:
+    """Return ``value`` as a Timestamp if it is a usable date, else ``None``."""
+    if value is None or value is pd.NaT:
+        return None
+    try:
+        stamp = pd.Timestamp(value)
+    except (TypeError, ValueError):
+        return None
+    return None if pd.isna(stamp) else stamp
+
+
 def reconcile_transactions(
     bank_df: pd.DataFrame,
     ledger_df: pd.DataFrame,
@@ -68,15 +124,26 @@ def reconcile_transactions(
 
     matches = []
     for i, brow in bank.iterrows():
+        bank_amount = _numeric_or_none(brow[bank_amount_col])
+        bank_date = _date_or_none(brow[bank_date_col])
+        if bank_amount is None or bank_date is None:
+            # Unparseable amount or date: the row cannot be compared, so it
+            # stays unmatched and surfaces in bank_only for a human to look at
+            # rather than crashing the whole run.
+            continue
         for j, lrow in ledger.iterrows():
             if ledger.at[j, "_matched"]:
                 continue
-            same_amount = abs(brow[bank_amount_col] - lrow[ledger_amount_col]) < 0.01
-            date_diff = abs((brow[bank_date_col] - lrow[ledger_date_col]).days)
+            ledger_amount = _numeric_or_none(lrow[ledger_amount_col])
+            ledger_date = _date_or_none(lrow[ledger_date_col])
+            if ledger_amount is None or ledger_date is None:
+                continue
+            same_amount = abs(bank_amount - ledger_amount) < 0.01
+            date_diff = abs((bank_date - ledger_date).days)
             if same_amount and date_diff <= date_tolerance_days:
                 matches.append({
                     "bank_row": i, "ledger_row": j,
-                    "amount": brow[bank_amount_col], "date_diff_days": date_diff,
+                    "amount": bank_amount, "date_diff_days": date_diff,
                 })
                 bank.at[i, "_matched"] = True
                 ledger.at[j, "_matched"] = True
@@ -100,8 +167,8 @@ def run_reconciliation(
     """Full pipeline from raw uploaded file bytes to a reconciliation result.
     Returns cleaned frames, match results, and a summary dict."""
     import io
-    bank_df = pd.read_csv(io.BytesIO(bank_bytes), dtype=str, keep_default_na=False)
-    ledger_df = pd.read_csv(io.BytesIO(ledger_bytes), dtype=str, keep_default_na=False)
+    bank_df = _read_statement(bank_bytes, "bank statement")
+    ledger_df = _read_statement(ledger_bytes, "ledger")
 
     bank_df[bank_amount_col] = bank_df[bank_amount_col].map(clean_currency_amount)
     ledger_df[ledger_amount_col] = ledger_df[ledger_amount_col].map(clean_currency_amount)

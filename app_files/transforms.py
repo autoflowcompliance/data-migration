@@ -148,12 +148,20 @@ def split_full_name_first(value: Any) -> str:
 
 
 def split_full_name_last(value: Any) -> str:
-    """Extract the last name (everything after the first token) from a
-    combined 'Full Name' style column. Single-token names return ''."""
+    """Extract the last name from a combined 'Full Name' style column, or
+    return the value itself when it is a dedicated single-token surname.
+
+    'Michael O'Brien' -> "O'Brien". 'Smith' -> 'Smith'. This has to handle the
+    single-token case by returning the token rather than '' — the same
+    transform is wired to the dedicated 'Last Name' alias in hubspot.yaml and
+    salesforce.yaml, and a dedicated surname column holds exactly one token,
+    so returning '' would silently blank the last name for every record."""
     if is_missing(value):
         return ""
     parts = str(value).strip().split()
-    return " ".join(w.title() for w in parts[1:]) if len(parts) > 1 else ""
+    if not parts:
+        return ""
+    return " ".join(w.title() for w in (parts[1:] if len(parts) > 1 else parts))
 
 
 def expand_scientific_notation(value: Any) -> Any:

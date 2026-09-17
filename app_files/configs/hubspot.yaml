@@ -43,4 +43,17 @@ fields:
   - name: createdate
     transform: date_iso
     aliases: ["Created Date", "Date Created", "Created At", "Create Date", "Hire Date", "Start Date", "Date Hired", "Join Date", "Employment Date"]
-   
+
+rules:
+  # A blank last name is a genuinely unusable contact record.
+  - name: lastname_required
+    field: lastname
+    type: required
+    severity: error
+  # Catch phone numbers that didn't reach valid E.164 form.
+  - name: phone_e164_format
+    field: phone
+    type: regex
+    pattern: "^\\+[1-9]\\d{6,14}$"
+    severity: warning
+    message: "Phone is not in E.164 form (e.g. +15551234567)"

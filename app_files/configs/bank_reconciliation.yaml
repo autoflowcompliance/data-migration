@@ -1,0 +1,36 @@
+crm: Bank Reconciliation
+version: "1.0"
+description: >
+  Maps a bank statement onto the canonical Date / Description / Amount shape
+  used by the reconciliation service, and validates the amounts before matching.
+
+fields:
+  - name: date
+    required: true
+    transform: date_iso
+    aliases: ["Date", "Transaction Date", "Trans Date", "Posting Date", "Value Date", "Txn Date"]
+  - name: description
+    aliases: ["Description", "Details", "Narrative", "Memo", "Particulars", "Reference", "Payee"]
+  - name: amount
+    type: number
+    required: true
+    aliases: ["Amount", "Value", "Transaction Amount", "Amount (USD)", "Amount (ZAR)"]
+  - name: balance
+    aliases: ["Balance", "Running Balance", "Closing Balance"]
+
+rules:
+  # A statement line with no amount cannot be matched to anything.
+  - name: amount_present
+    field: amount
+    type: required
+    severity: error
+    message: "Statement line has no amount, so it cannot be reconciled"
+  # Statements of this size should never carry a 7-figure single line; treat
+  # anything larger as a probable decimal/typo error worth a human look.
+  - name: amount_within_expected_range
+    field: amount
+    type: range
+    min: -1000000
+    max: 1000000
+    severity: warning
+    message: "Amount is unusually large for this account — check for a typo"

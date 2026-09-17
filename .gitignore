@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+.streamlit/credentials.toml
+.DS_Store
+lineage_report.csv
+
+# Generated deliverables (write_deliverables defaults to ./output). Anchored so
+# it never matches the app_files/output/ source package.
+/output/

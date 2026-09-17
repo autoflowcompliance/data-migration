@@ -12,6 +12,9 @@ chardet>=5.0.0
 # Excel file support
 openpyxl>=3.1.0
 
+# PDF bank statement extraction (ingestion layer)
+pdfplumber>=0.11.0
+
 # Mapping configuration
 PyYAML>=6.0
 

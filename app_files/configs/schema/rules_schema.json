@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://autoflow.dev/schemas/rules_schema.json",
+  "title": "AutoFlow validation rules",
+  "description": "Schema for the optional top-level 'rules' list in any config YAML. Editors that understand JSON Schema will validate and autocomplete rule files against this.",
+  "type": "array",
+  "items": { "$ref": "#/definitions/rule" },
+  "definitions": {
+    "severity": {
+      "type": "string",
+      "enum": ["error", "warning", "info"],
+      "default": "error",
+      "description": "How the failure is reported in the QA report and issues CSV."
+    },
+    "rule": {
+      "type": "object",
+      "required": ["field", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Identifier for the rule. Defaults to '<type>_<field>' when omitted."
+        },
+        "field": {
+          "type": "string",
+          "description": "Mapped column name this rule applies to."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["required", "range", "length", "list_of_values", "regex"],
+          "description": "Which check to run."
+        },
+        "severity": { "$ref": "#/definitions/severity" },
+        "message": {
+          "type": "string",
+          "description": "Optional custom failure message shown instead of the generated one."
+        },
+        "min": {
+          "type": ["number", "null"],
+          "description": "range only: inclusive lower bound."
+        },
+        "max": {
+          "type": ["number", "null"],
+          "description": "range only: inclusive upper bound."
+        },
+        "exactly": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "length only: required exact character count."
+        },
+        "min_length": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "length only: inclusive minimum character count."
+        },
+        "max_length": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "length only: inclusive maximum character count."
+        },
+        "values": {
+          "type": "array",
+          "description": "list_of_values only: the allowed values.",
+          "items": {}
+        },
+        "case_sensitive": {
+          "type": "boolean",
+          "default": false,
+          "description": "list_of_values only: whether matching is case sensitive."
+        },
+        "pattern": {
+          "type": "string",
+          "description": "regex only: the regular expression to search for."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "range" } }, "required": ["type"] },
+          "then": {
+            "anyOf": [{ "required": ["min"] }, { "required": ["max"] }]
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "length" } }, "required": ["type"] },
+          "then": {
+            "anyOf": [
+              { "required": ["exactly"] },
+              { "required": ["min_length"] },
+              { "required": ["max_length"] }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "list_of_values" } },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["values"],
+            "properties": { "values": { "minItems": 1 } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "regex" } }, "required": ["type"] },
+          "then": { "required": ["pattern"] }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

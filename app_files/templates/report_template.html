@@ -27,6 +27,26 @@
   {% endfor %}
 </table>
 
+{% if scorecard %}
+<h2>Quality scorecard</h2>
+<p class="meta">Five independent dimensions, each scored 0&ndash;100.
+  Overall quality: <strong>{{ profile.overall }}%</strong>.</p>
+<div class="scorecard">
+  {% for row in scorecard %}
+  <div class="score-row">
+    <div class="score-name">{{ row.dimension }}</div>
+    <div class="score-track">
+      <div class="score-fill {{ row.band }}" style="width: {{ row.score }}%;"></div>
+    </div>
+    <div class="score-value {{ row.band }}">{{ row.score }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% if profile.notes %}
+<ul class="empty">{% for note in profile.notes %}<li>{{ note }}</li>{% endfor %}</ul>
+{% endif %}
+{% endif %}
+
 {% if structural %}
 <h2>File structure (Frictionless)</h2>
 <p class="{% if structural.valid %}ok{% else %}bad{% endif %}">
