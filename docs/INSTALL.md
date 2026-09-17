@@ -45,5 +45,5 @@ traceback when it is missing.
 python -m pytest -q
 ```
 
-Expect `150 passed`. The suite covers the frozen core plus every new layer, and
+Expect `223 passed`. The suite covers the frozen core plus every new layer, and
 runs in a couple of seconds — there is no reason not to run it before a commit.

@@ -89,6 +89,51 @@ def test_timeliness_is_100_with_no_date_columns():
     assert dimensions.timeliness(pd.DataFrame({"notes": ["a", "b"]})) == 100.0
 
 
+def test_timeliness_defaults_to_a_rolling_window_and_penalises_old_dates():
+    """Without an explicit window, timeliness must not be pinned at 100.
+
+    Dates from 2019 (long stale), 2023 (just outside the 24-month window) and
+    2026 (fresh) must average below 100, and the 2019 row must drag it down
+    more than the 2023 one.
+    """
+    frame = pd.DataFrame({"date": ["2019-01-01", "2023-06-15", "2026-05-01"]})
+    score = dimensions.timeliness(frame, today="2026-09-17")
+
+    assert score < 100
+    assert score > 0
+    # The stale date is penalised harder than the merely-out-of-window date.
+    old_only = dimensions.timeliness(pd.DataFrame({"date": ["2019-01-01"]}), today="2026-09-17")
+    recent_only = dimensions.timeliness(pd.DataFrame({"date": ["2023-06-15"]}), today="2026-09-17")
+    fresh_only = dimensions.timeliness(pd.DataFrame({"date": ["2026-05-01"]}), today="2026-09-17")
+    assert old_only < recent_only < fresh_only == 100.0
+    assert old_only < score < fresh_only
+
+
+def test_timeliness_penalises_future_dates():
+    """A date ahead of the window loses points in proportion to the gap."""
+    # Six months ahead of the window end: roughly half credit.
+    six_months = pd.DataFrame({"date": ["2027-03-17"]})
+    assert dimensions.timeliness(six_months, today="2026-09-17") == pytest.approx(50.0, abs=1.0)
+
+    # A full year ahead scores zero — almost always a mistyped year.
+    a_year = pd.DataFrame({"date": ["2027-09-17"]})
+    assert dimensions.timeliness(a_year, today="2026-09-17") == 0.0
+
+    # A date inside the window is unaffected.
+    assert dimensions.timeliness(pd.DataFrame({"date": ["2026-09-17"]}), today="2026-09-17") == 100.0
+
+
+def test_timeliness_window_moves_with_the_reference_date():
+    """The same data scores better as 'today' advances past it.
+
+    This is the property the old data-derived window could not have: the score
+    has to respond to the clock, otherwise it is decorative.
+    """
+    frame = pd.DataFrame({"date": ["2024-01-01"]})
+    assert dimensions.timeliness(frame, today="2025-01-01") == 100.0
+    assert dimensions.timeliness(frame, today="2028-01-01") < 100.0
+
+
 # ------------------------------------------------------------ overall profiler
 def test_profile_returns_all_five_scores_in_range():
     frame = pd.DataFrame(
@@ -110,6 +155,35 @@ def test_profile_scores_an_empty_frame_as_zero():
     assert all(value == 0.0 for value in result.scores.values())
     assert result.overall == 0.0
     assert result.row_count == 0
+
+
+def test_profile_of_a_blank_frame_does_not_score_respectably():
+    """A frame of blank cells must not look usable.
+
+    Every cell being empty means validity, consistency and timeliness have
+    nothing to judge, so they return 100 by default. Averaging those in let an
+    unusable frame score ~60. Dimensions with no input must be excluded.
+    """
+    blank = pd.DataFrame(
+        {"email": ["", "", ""], "phone": ["", "", ""], "createdate": ["", "", ""]}
+    )
+    result = profile(blank)
+
+    assert result.overall < 20
+    assert result.applicable == {"completeness", "uniqueness"}
+    # The raw scores still report honestly; only the average excludes them.
+    assert result.scores["validity"] == 100.0
+    assert result.scores["completeness"] == 0.0
+
+
+def test_a_dimension_without_input_is_not_counted_in_the_overall():
+    """Dropping a dimension must reweight the rest, not dilute the score."""
+    with_phone = pd.DataFrame({"email": ["a@x.com", "b@x.com"]})
+    result = profile(with_phone)
+
+    assert "validity" in result.applicable
+    assert result.applicable <= set(DIMENSION_NAMES)
+    assert 0.0 <= result.overall <= 100.0
 
 
 def test_profile_quality_degrades_with_dirty_data(clean_frame: pd.DataFrame):

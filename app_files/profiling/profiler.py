@@ -43,15 +43,26 @@ class Profile:
     column_count: int = 0
     column_scores: dict[str, dict[str, float]] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
+    applicable: set[str] = field(default_factory=set)
 
     @property
     def overall(self) -> float:
-        """Weighted overall score, 0-100."""
+        """Weighted overall score, 0-100.
+
+        Only dimensions that had something to evaluate are counted. A score of
+        100 for "no invalid emails" on a frame with no emails is true but
+        vacuous, and averaging it in would let an unusable frame look
+        respectable — a frame of blank cells scores ~60 that way. Dimensions
+        with no input are dropped from the average instead.
+        """
         if not self.scores:
             return 0.0
-        total_weight = sum(_WEIGHTS.get(name, 0) for name in self.scores) or 1.0
+        counted = self.applicable or set(self.scores)
+        total_weight = sum(_WEIGHTS.get(name, 0) for name in counted) or 0.0
+        if total_weight == 0:
+            return 0.0
         weighted = sum(
-            score * _WEIGHTS.get(name, 0) for name, score in self.scores.items()
+            self.scores.get(name, 0.0) * _WEIGHTS.get(name, 0) for name in counted
         )
         return round(weighted / total_weight, 1)
 
@@ -89,6 +100,7 @@ def profile(
     date_columns: list[str] | None = None,
     date_format: str = "%Y-%m-%d",
     timeliness_window: tuple[Any, Any] | None = None,
+    today: Any = None,
 ) -> Profile:
     """Compute all five quality scores for ``frame``.
 
@@ -96,7 +108,10 @@ def profile(
         frame: any DataFrame (raw or cleaned).
         email_columns / phone_columns / date_columns: override auto-detection.
         date_format: the canonical date format consistency is measured against.
-        timeliness_window: optional ``(start, end)``; defaults to the data range.
+        timeliness_window: optional ``(start, end)``. When omitted, timeliness
+            scores each date for freshness against a rolling 24-month window.
+        today: reference date for that rolling window; defaults to the real
+            current date. Injectable so results are reproducible in tests.
     """
     if frame is None or frame.empty:
         return Profile(
@@ -113,7 +128,7 @@ def profile(
         "uniqueness": dimensions.uniqueness(frame),
         "validity": dimensions.validity(frame, email_columns, phone_columns),
         "consistency": dimensions.consistency(frame, date_columns, None, date_format),
-        "timeliness": dimensions.timeliness(frame, date_columns, start, end),
+        "timeliness": dimensions.timeliness(frame, date_columns, start, end, today),
     }
 
     notes: list[str] = []
@@ -131,6 +146,9 @@ def profile(
         column_count=len(frame.columns),
         column_scores=_column_completeness(frame),
         notes=notes,
+        applicable=dimensions.evaluable_dimensions(
+            frame, email_columns, phone_columns, date_columns
+        ),
     )
 
 

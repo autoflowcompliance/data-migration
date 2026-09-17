@@ -27,6 +27,10 @@ _EMAIL_HINT = "email"
 _PHONE_HINT = "phone"
 _DATE_HINT = "date"
 
+# Rolling window used by ``timeliness`` when the caller names no window.
+_DEFAULT_WINDOW_MONTHS = 24
+_DAYS_PER_YEAR = 365.0
+
 
 def _columns(frame: pd.DataFrame, hints: tuple[str, ...]) -> list[str]:
     return [name for name in frame.columns if any(hint in str(name).lower() for hint in hints)]
@@ -189,19 +193,47 @@ def consistency(
     return _score(passed, total)
 
 
+def _freshness(value: pd.Timestamp, start_ts: pd.Timestamp, end_ts: pd.Timestamp) -> float:
+    """How fresh a single date is against the rolling window, as 0.0-1.0.
+
+    A date inside the window is fully fresh. A date before the window loses
+    points in proportion to how far it has aged — something just outside the
+    window is nearly fresh, a five-year-old date is not. A future date loses
+    points in proportion to how far ahead it sits, reaching zero a year out.
+    """
+    if start_ts <= value <= end_ts:
+        return 1.0
+    if value > end_ts:
+        ahead_days = (value - end_ts).days
+        return max(0.0, 1.0 - ahead_days / _DAYS_PER_YEAR)
+    window_days = max((end_ts - start_ts).days, 1)
+    stale_days = (start_ts - value).days
+    return max(0.0, 1.0 - stale_days / window_days)
+
+
 def timeliness(
     frame: pd.DataFrame,
     date_columns: list[str] | None = None,
     start: Any = None,
     end: Any = None,
+    today: Any = None,
 ) -> float:
-    """Percentage of dates falling inside the expected [start, end] window.
+    """How recent the dates in ``frame`` are, 0-100.
 
-    When no window is supplied, the window is derived from the data itself
-    (min..max of the parseable dates). That makes the dimension meaningful on
-    an arbitrary file: it measures how tightly clustered the dates are around
-    the range they define — a single severe outlier drops the score, which is
-    exactly the signal worth surfacing.
+    Two modes, and the difference matters:
+
+    * An explicit ``start``/``end`` window is a statement of intent — "these
+      dates are acceptable, those are not" — so the score is the plain
+      percentage of dates inside it.
+    * With no window, the window is a rolling 24 months ending ``today``
+      (injectable so tests are not clock-dependent) and each date is scored on
+      its freshness, so an old date degrades the score gradually rather than
+      falling off a cliff.
+
+    The earlier default compared the data against its own min/max, which meant
+    every date was inside the window by construction and the score could never
+    move off 100. A frame with no parseable dates scores 100: there is nothing
+    to be stale.
     """
     dates = date_columns if date_columns is not None else _columns(frame, (_DATE_HINT,))
     parsed: list[pd.Timestamp] = []
@@ -215,16 +247,78 @@ def timeliness(
     if not parsed:
         return 100.0
 
-    if start is None:
-        start = min(parsed)
-    if end is None:
-        end = max(parsed)
-    start_ts = pd.to_datetime(start, errors="coerce")
-    end_ts = pd.to_datetime(end, errors="coerce")
-    if pd.isna(start_ts) or pd.isna(end_ts):
+    if start is not None or end is not None:
+        start_ts = pd.to_datetime(start, errors="coerce") if start is not None else min(parsed)
+        end_ts = pd.to_datetime(end, errors="coerce") if end is not None else max(parsed)
+        if pd.isna(start_ts) or pd.isna(end_ts):
+            return 100.0
+        inside = sum(1 for value in parsed if start_ts <= value <= end_ts)
+        return _score(inside, len(parsed))
+
+    reference = pd.Timestamp(today) if today is not None else pd.Timestamp(date.today())
+    if pd.isna(reference):
         return 100.0
-    inside = sum(1 for value in parsed if start_ts <= value <= end_ts)
-    return _score(inside, len(parsed))
+    end_ts = reference
+    start_ts = reference - pd.DateOffset(months=_DEFAULT_WINDOW_MONTHS)
+    freshness = sum(_freshness(value, start_ts, end_ts) for value in parsed)
+    return round(freshness / len(parsed) * 100, 1)
+
+
+def evaluable_dimensions(
+    frame: pd.DataFrame,
+    email_columns: list[str] | None = None,
+    phone_columns: list[str] | None = None,
+    date_columns: list[str] | None = None,
+) -> set[str]:
+    """Which of the five dimensions had actual input to score.
+
+    A dimension with no input returns 100 ("nothing failed"), which is true but
+    vacuous. ``Profile.overall`` excludes those so an empty or blank frame
+    cannot score well by absence of evidence.
+    """
+    applicable: set[str] = set()
+    if frame is None or frame.empty or frame.size == 0:
+        return applicable
+
+    applicable.add("completeness")
+    if len(frame) > 0:
+        applicable.add("uniqueness")
+
+    emails = email_columns if email_columns is not None else _columns(frame, (_EMAIL_HINT,))
+    phones = phone_columns if phone_columns is not None else _columns(frame, (_PHONE_HINT,))
+    format_cells = sum(
+        1
+        for column in [*emails, *phones]
+        for value in frame.get(column, pd.Series(dtype=object))
+        if not is_missing(value)
+    )
+    if format_cells:
+        applicable.add("validity")
+
+    dates = date_columns if date_columns is not None else _columns(frame, (_DATE_HINT,))
+    date_set = set(dates)
+    parseable_dates = sum(
+        1
+        for column in dates
+        for value in frame.get(column, pd.Series(dtype=object))
+        if not is_missing(value) and not pd.isna(pd.to_datetime(value, errors="coerce"))
+    )
+    if parseable_dates:
+        applicable.add("timeliness")
+
+    # Mirrors ``consistency``: every non-date column with free text is judged,
+    # plus the date columns themselves.
+    checkable_text = 0
+    for column in [c for c in frame.columns if c not in date_set]:
+        for value in frame.get(column, pd.Series(dtype=object)):
+            if is_missing(value):
+                continue
+            if any(char.isalpha() for char in str(value)):
+                checkable_text += 1
+    if checkable_text or parseable_dates:
+        applicable.add("consistency")
+
+    return applicable
 
 
 DIMENSIONS = {

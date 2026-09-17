@@ -1,6 +1,6 @@
 """Profiling layer: five-dimension data quality scoring."""
 
-from app_files.profiling.dimensions import DIMENSIONS
+from app_files.profiling.dimensions import DIMENSIONS, evaluable_dimensions
 from app_files.profiling.profiler import (
     DIMENSION_NAMES,
     Profile,
@@ -16,6 +16,7 @@ __all__ = [
     "DIMENSIONS",
     "DIMENSION_NAMES",
     "Profile",
+    "evaluable_dimensions",
     "profile",
     "profile_and_render",
     "render_qa_report_with_profile",

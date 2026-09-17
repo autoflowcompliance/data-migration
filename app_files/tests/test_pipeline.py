@@ -14,7 +14,8 @@ def test_pipeline_produces_import_ready_output():
 
     assert list(result.clean_frame.columns) == [f.name for f in result.mapping_config.fields]
     assert result.summary()["duplicates_removed"] == 1
-    assert result.clean_frame.iloc[0]["phone"] == "+15551234567"
+    # John's raw "(617) 498-3000" is normalized to E.164.
+    assert result.clean_frame.iloc[0]["phone"] == "+16174983000"
     assert result.clean_frame.iloc[0]["createdate"] == "2024-12-31"
     assert "<h1>Data Migration QA Report</h1>" in result.qa_report_html
     assert any(issue.field == "email" for issue in result.validation.errors)
