@@ -3,10 +3,10 @@ FROM python:3.10-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    STREAMLIT_SERVER_PORT=8501 \
-    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
-    STREAMLIT_SERVER_HEADLESS=true \
-    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    DATAREADY_HOST=0.0.0.0 \
+    DATAREADY_PORT=8080 \
+    DATAREADY_SHOW=0 \
+    DATAREADY_RELOAD=0
 
 WORKDIR /app
 
@@ -21,14 +21,17 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app_files ./app_files
-COPY app.py ./
+COPY configs ./configs
+COPY site ./site
+COPY main.py ./
 
-# Outputs are written here; mounted in docker-compose so they survive restarts.
+# Batch output and downloads land here; mounted in docker-compose so they
+# survive restarts.
 RUN mkdir -p /app/output
 
-EXPOSE 8501
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import urllib.request,sys; urllib.request.urlopen('http://localhost:8501/_stcore/health'); sys.exit(0)" || exit 1
+    CMD python -c "import urllib.request,sys; urllib.request.urlopen('http://localhost:8080/'); sys.exit(0)" || exit 1
 
-ENTRYPOINT ["streamlit", "run", "app_files/interface/web/app.py"]
+ENTRYPOINT ["python", "main.py"]

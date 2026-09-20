@@ -1,4 +1,9 @@
-"""Command line entry point: ``python -m app_files.cli``."""
+"""Command line entry point: ``python -m app_files.cli``.
+
+Two modes: the flat flags below process a single file, and ``batch``
+(``python -m app_files.cli batch --in … --template … --out …``) processes a
+whole folder.
+"""
 
 from __future__ import annotations
 
@@ -47,7 +52,72 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_batch_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m app_files.cli batch",
+        description="Process every supported file in a folder in one pass.",
+    )
+    parser.add_argument("--in", dest="input_dir", required=True, type=Path,
+                        help="folder of source files")
+    parser.add_argument("--template", required=True,
+                        help=f"target config ({', '.join(available_crms())})")
+    parser.add_argument("--out", dest="output_dir", required=True, type=Path,
+                        help="folder for per-file output, summary.csv and dashboard.html")
+    parser.add_argument("--format", default="csv",
+                        choices=["csv", "excel", "json", "sql"],
+                        help="clean-data format for each file")
+    parser.add_argument("--project", default="Batch run")
+    return parser
+
+
+def run_batch_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli batch …``.
+
+    Imported at call time so the single-file path never pays for the batch
+    layer's imports.
+    """
+    from app_files.batch import run_batch
+
+    args = build_batch_parser().parse_args(argv)
+    if not args.input_dir.is_dir():
+        print(f"Input folder not found: {args.input_dir}", file=sys.stderr)
+        return 2
+
+    def report(index: int, total: int, name: str) -> None:
+        print(f"[{index}/{total}] {name}")
+
+    result = run_batch(
+        args.input_dir,
+        template=args.template,
+        output_dir=args.output_dir,
+        output_format=args.format,
+        project_name=args.project,
+        on_progress=report,
+    )
+
+    for item in result.items:
+        if item.ok:
+            print(
+                f"  ok    {item.file}: {item.rows_in} in, {item.rows_out} out, "
+                f"score {item.score}%"
+            )
+        else:
+            print(f"  FAIL  {item.file}: {item.error}", file=sys.stderr)
+
+    print(
+        f"\n{result.succeeded} of {result.processed} file(s) processed, "
+        f"average score {result.average_score}%"
+    )
+    print(f"Summary:   {Path(result.output_dir) / 'summary.csv'}")
+    print(f"Dashboard: {Path(result.output_dir) / 'dashboard.html'}")
+    return 1 if result.failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "batch":
+        return run_batch_command(argv[1:])
+
     args = build_parser().parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)
 

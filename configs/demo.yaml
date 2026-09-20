@@ -1,0 +1,24 @@
+# Demo mode: the restrictions applied to the hosted demo and to any client
+# install without a licence. Mirrors app_files/licensing/limits.py DEMO_LIMITS
+# so a deployment can be inspected without reading Python.
+
+mode: demo
+limits:
+  max_rows: 500
+  max_file_size_mb: 5
+  output_formats:
+    - csv
+  watermark: true
+  lineage: false
+  batch: false
+  branding: false
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  reload: false
+  show: false
+
+# Demo sessions are stateless and expire with the browser tab; nothing is
+# written to disk on the server beyond the request itself.
+session_ttl_minutes: 60

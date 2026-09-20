@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DataReady — your data, ready for whatever comes next</title>
+<meta name="description" content="Clean, map, validate and profile CRM exports, bank statements and ledgers. One tool, any format, runs on your machine.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #4F46E5;
+    --primary-dark: #4338CA;
+    --ink: #111827;
+    --muted: #6B7280;
+    --line: #E5E7EB;
+    --bg: #F9FAFB;
+    --ok: #047857;
+    --warn: #D97706;
+    --bad: #DC2626;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: Inter, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: #fff; margin: 0; line-height: 1.6;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; }
+  header.hero { background: var(--bg); border-bottom: 1px solid var(--line); }
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .nav .brand { font-weight: 800; font-size: 19px; letter-spacing: -.01em; }
+  .nav .brand span { color: var(--primary); }
+  .nav nav a { color: var(--muted); text-decoration: none; margin-left: 22px; font-size: 14px; font-weight: 500; }
+  .nav nav a:hover { color: var(--ink); }
+  .hero-inner { padding: 72px 0 80px; max-width: 720px; }
+  h1 { font-size: 52px; line-height: 1.08; letter-spacing: -.025em; margin: 0 0 18px; font-weight: 800; }
+  .lede { font-size: 19px; color: var(--muted); margin: 0 0 14px; }
+  .sub-lede { font-size: 16px; color: var(--muted); margin: 0 0 30px; }
+  .cta-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .cta-primary, .cta-secondary {
+    display: inline-block; text-decoration: none; border-radius: 8px;
+    padding: 13px 24px; font-weight: 600; font-size: 15px;
+  }
+  .cta-primary { background: var(--primary); color: #fff; }
+  .cta-primary:hover { background: var(--primary-dark); }
+  .cta-secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .cta-secondary:hover { border-color: var(--muted); }
+  section { padding: 72px 0; }
+  section.alt { background: var(--bg); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  h2 { font-size: 32px; letter-spacing: -.02em; margin: 0 0 10px; font-weight: 700; }
+  .section-lede { color: var(--muted); font-size: 16px; margin: 0 0 36px; max-width: 640px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+  .card .icon { font-size: 22px; }
+  .card h3 { font-size: 17px; margin: 10px 0 6px; font-weight: 600; }
+  .card p { color: var(--muted); font-size: 14px; margin: 0; }
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .shot { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+  .shot .bar { height: 30px; background: #F3F4F6; border-bottom: 1px solid var(--line);
+               display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+  .shot .dot { width: 9px; height: 9px; border-radius: 50%; background: #D1D5DB; }
+  .shot .body { padding: 18px; }
+  .shot .body h4 { margin: 0 0 14px; font-size: 14px; color: var(--muted); font-weight: 600;
+                   text-transform: uppercase; letter-spacing: .05em; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; font-size: 13px; }
+  .bar-row .name { flex: 0 0 110px; color: var(--muted); }
+  .track { flex: 1; background: #F3F4F6; border-radius: 5px; height: 10px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 5px; }
+  .val { flex: 0 0 34px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  table.diff { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.diff td { padding: 6px 0; border-bottom: 1px solid var(--line); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  table.diff td.was { color: var(--bad); }
+  table.diff td.now { color: var(--ok); }
+  .trust { background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 12px;
+           padding: 28px; text-align: center; }
+  .trust strong { color: #065F46; font-size: 20px; display: block; margin-bottom: 6px; }
+  .trust p { color: #047857; margin: 0; font-size: 15px; }
+  .price-card { max-width: 440px; margin: 0 auto; background: #fff;
+                border: 2px solid var(--primary); border-radius: 16px; padding: 32px; }
+  .price-card h3 { margin: 0 0 4px; font-size: 20px; }
+  .price { font-size: 46px; font-weight: 800; letter-spacing: -.03em; margin: 8px 0 20px; }
+  .price small { font-size: 15px; color: var(--muted); font-weight: 500; }
+  .price-card ul { list-style: none; padding: 0; margin: 0 0 26px; }
+  .price-card li { padding: 7px 0 7px 26px; position: relative; font-size: 15px; }
+  .price-card li:before { content: "✓"; position: absolute; left: 0; color: var(--ok); font-weight: 700; }
+  .price-card .cta-primary { display: block; text-align: center; }
+  .guarantee { text-align: center; color: var(--muted); font-size: 13px; margin-top: 16px; }
+  footer { border-top: 1px solid var(--line); padding: 36px 0; color: var(--muted); font-size: 14px; }
+  footer .foot-row { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer a { color: var(--muted); text-decoration: none; margin-left: 18px; }
+  footer a:hover { color: var(--ink); }
+  @media (max-width: 620px) {
+    h1 { font-size: 36px; }
+    .hero-inner { padding: 48px 0 56px; }
+    section { padding: 52px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand">Data<span>Ready</span></div>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="#screenshots">Screenshots</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+    </div>
+    <div class="hero-inner">
+      <h1>Your data, ready for whatever comes next.</h1>
+      <p class="lede">One tool. Any format. Runs on your machine.</p>
+      <p class="sub-lede">Clean, map, validate and profile CRM exports, bank statements,
+        ledgers and invoices — then hand over a report your client actually understands.</p>
+      <div class="cta-row">
+        <a href="https://demo.dataready.io" class="cta-primary">Try the demo</a>
+        <a href="#pricing" class="cta-secondary">Buy — $2,000</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Six things it does well</h2>
+    <p class="section-lede">Built for the people who get handed a spreadsheet and asked to
+      make it somebody else's problem.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="icon">🧹</div>
+        <h3>Cleaning that says what it did</h3>
+        <p>Whitespace trimmed, casing normalised, phone numbers standardised, duplicates
+          removed — every change recorded in a log you can hand over.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🌳</div>
+        <h3>Row-level lineage</h3>
+        <p>Any value in the output traces back to the exact source row and the transform
+          that produced it. No more "where did this number come from?".</p>
+      </div>
+      <div class="card">
+        <div class="icon">✅</div>
+        <h3>Validation with an opinion</h3>
+        <p>Required fields, unique keys, types, ranges and list membership, plus your own
+          YAML rules per target system.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📊</div>
+        <h3>Five quality scores</h3>
+        <p>Completeness, uniqueness, validity, consistency and timeliness, each scored
+          independently so a problem cannot hide behind a good average.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📄</div>
+        <h3>Reports clients understand</h3>
+        <p>A QA report, an issue list and a clean file — branded with your own company name
+          and logo.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📁</div>
+        <h3>Whole folders at once</h3>
+        <p>Point it at an inbox and get one clean folder per file, plus a combined summary
+          and dashboard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots" class="alt">
+  <div class="wrap">
+    <h2>What you get back</h2>
+    <p class="section-lede">Three of the outputs, shown with the sample data that ships
+      in the box.</p>
+    <div class="shots">
+      <div class="shot">
+        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="body">
+          <h4>Quality scorecard</h4>
+          <div class="bar-row"><span class="name">Completeness</span>
+            <span class="track"><span class="fill" style="width:93%;background:var(--ok)"></span></span>
+            <span class="val">93</span></div>
+          <div class="bar-row"><span class="name">Uniqueness</span>
+            <span class="track"><span class="fill" style="width:100%;background:var(--ok)"></span></span>
+            <span class="val">100</span></div>
+          <div class="bar-row"><span class="name">Validity</span>
+            <span class="track"><span class="fill" style="width:82%;background:var(--warn)"></span></span>
+            <span class="val">82</span></div>
+          <div class="bar-row"><span class="name">Consistency</span>
+            <span class="track"><span class="fill" style="width:71%;background:var(--warn)"></span></span>
+            <span class="val">71</span></div>
+          <div class="bar-row"><span class="name">Timeliness</span>
+            <span class="track"><span class="fill" style="width:64%;background:var(--bad)"></span></span>
+            <span class="val">64</span></div>
+        </div>
+      </div>
+
+      <div class="shot">
+        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="body">
+          <h4>What changed, row by row</h4>
+          <table class="diff">
+            <tr><td class="was">" JOHN "@</td><td class="now">"John"</td></tr>
+            <tr><td class="was">JOHN@Email.com</td><td class="now">john@email.com</td></tr>
+            <tr><td class="was">(617) 498-3000</td><td class="now">+16174983000</td></tr>
+            <tr><td class="was">4.05E+14</td><td class="now">405000000000000</td></tr>
+            <tr><td class="was">12/31/24</td><td class="now">2024-12-31</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="shot">
+        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="body">
+          <h4>Bank reconciliation</h4>
+          <table class="diff">
+            <tr><td>Matched</td><td class="now">41 transactions</td></tr>
+            <tr><td>Bank only</td><td class="was">3 transactions</td></tr>
+            <tr><td>Ledger only</td><td class="was">2 transactions</td></tr>
+            <tr><td>Unmatched sum</td><td>R 4,120.00</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="trust">
+  <div class="wrap">
+    <div class="trust">
+      <strong>Runs on your machine. Your data never leaves your computer.</strong>
+      <p>No upload to a third party, no retention, no phone-home. The licence check is
+        offline. Point it at a client's file with the network unplugged and it still works.</p>
+    </div>
+  </div>
+</section>
+
+<section id="pricing" class="alt">
+  <div class="wrap">
+    <h2 style="text-align:center">Pricing</h2>
+    <p class="section-lede" style="text-align:center;margin-left:auto;margin-right:auto">
+      One licence, one machine. No subscription, no per-file cost.</p>
+    <div class="price-card">
+      <h3>Single License</h3>
+      <div class="price">$2,000 <small>one-off</small></div>
+      <ul>
+        <li>Unlimited files</li>
+        <li>All output formats — CSV, Excel, JSON, SQL</li>
+        <li>White-label reports</li>
+        <li>Batch folder processing</li>
+        <li>Row-level lineage</li>
+        <li>30 days support</li>
+      </ul>
+      <a href="https://buy.stripe.com/" class="cta-primary">Buy now</a>
+    </div>
+    <p class="guarantee">Works offline. No account required. Runs on Windows, macOS and Linux.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <p class="section-lede">The things people ask before buying.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Does my data go anywhere?</h3>
+        <p>No. The desktop build runs entirely on your machine and never contacts a server.
+          The hosted demo is separate and clearly marked as a demo.</p>
+      </div>
+      <div class="card">
+        <h3>What if my file is a mess?</h3>
+        <p>That is the point. Ragged headers, mixed date formats, phone numbers in six
+          shapes and a stray total row at the bottom are all normal inputs.</p>
+      </div>
+      <div class="card">
+        <h3>Can I use it for clients?</h3>
+        <p>Yes. Put your own company name and logo on every report you deliver and
+          process a whole folder per client in one pass.</p>
+      </div>
+      <div class="card">
+        <h3>Do I need internet access?</h3>
+        <p>Not after installation. The licence is verified offline.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-row">
+      <div>DataReady — your data, ready for whatever comes next.</div>
+      <div>
+        <a href="mailto:hello@dataready.io">Contact</a>
+        <a href="#pricing">Buy</a>
+      </div>
+    </div>
+    <div class="foot-row" style="margin-top:16px">
+      <div>© <span id="year">2025</span> DataReady</div>
+      <div><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
