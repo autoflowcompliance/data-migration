@@ -1,0 +1,44 @@
+crm: HubSpot
+version: "1.0"
+description: Clean, standardise and deduplicate a HubSpot contact export.
+fields:
+  - name: firstname
+    required: true
+    transform: split_full_name_first
+    aliases: ["First Name", "Given Name", "Full Name"]
+  - name: lastname
+    required: true
+    transform: split_full_name_last
+    aliases: ["Last Name", "Surname", "Family Name", "Full Name"]
+  - name: email
+    required: true
+    unique: true
+    transform: email_lowercase
+    aliases: ["Email Address", "E-mail", "Primary Email", "Work Email"]
+  - name: phone
+    transform: phone_e164
+    aliases: ["Phone 1", "Phone Number", "Telephone", "Mobile"]
+  - name: company
+    aliases: ["Company Name", "Organisation", "Organization", "Employer"]
+  - name: jobtitle
+    aliases: ["Title", "Job Title", "Position"]
+  - name: city
+    transform: title_case
+    aliases: ["Town", "Mailing City", "Billing City"]
+  - name: country
+    transform: title_case
+    aliases: ["Nation", "Mailing Country"]
+  - name: createdate
+    transform: date_iso
+    aliases: ["Created Date", "Date Created", "Created At"]
+rules:
+  - name: lastname_required
+    field: lastname
+    type: required
+    severity: error
+  - name: phone_e164_format
+    field: phone
+    type: regex
+    pattern: "^\\+[1-9]\\d{6,14}$"
+    severity: warning
+    message: "Phone is not in E.164 form (e.g. +15551234567)"

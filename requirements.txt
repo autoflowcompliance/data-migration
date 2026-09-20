@@ -20,6 +20,19 @@ PyYAML>=6.0
 
 # Reporting
 Jinja2>=3.1.2
+# PDF export (utility 8: "export to any format"). Pure Python, no system libs.
+reportlab>=4.0.0
+
+# S3 connector (distribution layer). Optional at runtime: the connector raises a
+# clear "pip install boto3" message, but it is listed so an S3 user is not
+# surprised. The other four connectors use plain HTTP and need nothing extra.
+boto3>=1.34.0
 
 # Web framework - Streamlit
 streamlit>=1.40.0,<2.0.0
+
+# REST API (distribution layer) - FastAPI serves the /validate /clean /profile
+# /reconcile endpoints, with uvicorn as the server and multipart for uploads.
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9

@@ -1,0 +1,17 @@
+name: required_fields
+title: Required fields
+summary: The identifying fields are never blank.
+expects:
+  - email
+  - phone
+rules:
+  - name: email_required
+    field: email
+    type: required
+    severity: error
+    message: email must not be empty
+  - name: phone_required
+    field: phone
+    type: required
+    severity: warning
+    message: phone must not be empty

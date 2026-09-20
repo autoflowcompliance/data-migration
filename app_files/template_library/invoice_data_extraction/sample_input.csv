@@ -1,0 +1,5 @@
+Invoice No,Invoice Date,Bill To,Description,Qty,Unit Price,Total,CCY
+INV-1001,03/01/2024,acme supplies,A4 paper (box),10,24.50,245.00,usd
+INV-1001,03/01/2024,acme supplies,Toner cartridge,2,89.99,179.98,usd
+INV-1002,05/01/2024,globex corp,Consulting hours,8,150.00,1200.00,usd
+INV-1003,06/01/2024,initech ltd,Software licence,1,499.00,,gbp

@@ -1,0 +1,5 @@
+sku,product_name,price,category,brand,stock,upc
+ABC-1,Blue Widget,19.99,Widgets,Acme,120,012345678905
+ABC-2,Red Widget,24.99,Widgets,Acme,0,012345678912
+GX-9,Gizmo Pro,,Gadgets,Globex,8,4006381333931
+X,Mystery Item,5.00,Misc,Unknown,3,

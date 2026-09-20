@@ -1,0 +1,17 @@
+name: date_range
+title: Date range
+summary: Dates are ISO 8601 and within a plausible window.
+expects:
+  - createdate
+rules:
+  - name: date_required
+    field: createdate
+    type: required
+    severity: error
+    message: createdate must not be empty
+  - name: date_iso
+    field: createdate
+    type: regex
+    pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+    severity: warning
+    message: createdate should be ISO 8601 (YYYY-MM-DD)

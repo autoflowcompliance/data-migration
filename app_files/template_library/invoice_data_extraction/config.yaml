@@ -1,0 +1,34 @@
+crm: Invoice Lines
+version: "1.0"
+description: Normalise invoice line items pulled from invoice PDFs or CSVs.
+fields:
+  - name: invoice_number
+    required: true
+    aliases: ["Invoice", "Invoice No", "Invoice Number", "Inv #", "Document"]
+  - name: invoice_date
+    transform: date_iso
+    aliases: ["Date", "Invoice Date", "Issued", "Doc Date"]
+  - name: customer
+    transform: title_case
+    aliases: ["Customer", "Bill To", "Client", "Account"]
+  - name: description
+    aliases: ["Description", "Item", "Details", "Line Item", "Product"]
+  - name: quantity
+    aliases: ["Qty", "Quantity", "Units"]
+  - name: unit_price
+    aliases: ["Unit Price", "Price", "Rate", "Each"]
+  - name: line_total
+    aliases: ["Total", "Line Total", "Amount", "Extended"]
+  - name: currency
+    transform: upper_case
+    aliases: ["Currency", "CCY", "Cur"]
+rules:
+  - name: invoice_number_required
+    field: invoice_number
+    type: required
+    severity: error
+  - name: line_total_required
+    field: line_total
+    type: required
+    severity: warning
+    message: "Line has no total - check the invoice scanned cleanly"

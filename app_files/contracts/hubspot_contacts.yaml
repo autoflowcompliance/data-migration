@@ -1,0 +1,24 @@
+contract: hubspot_contacts
+version: "1.0"
+description: >
+  What "good data" means for a HubSpot contact import. Write it once and the
+  tool enforces it on every run, so a regression cannot slip through unnoticed.
+fields:
+  email:
+    required: true
+    format: email
+    unique: true
+    message: "Every contact needs a unique, valid email address"
+  phone:
+    format: e164
+    message: "Phone must be a real, dialable number in E.164 form, e.g. +14155552671"
+  createdate:
+    format: iso8601
+    max_age_days: 730
+    message: "Created date must be an ISO 8601 date within the last two years"
+  lastname:
+    required: true
+    min_length: 1
+  country:
+    allowed: [USA, France, UK, Germany, Canada, Australia]
+    message: "Country must be one of the supported markets"

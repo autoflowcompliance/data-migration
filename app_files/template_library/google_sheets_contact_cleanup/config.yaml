@@ -1,0 +1,26 @@
+crm: Google Sheets Contacts
+version: "1.0"
+description: Clean a contacts sheet exported from Google Sheets.
+fields:
+  - name: name
+    aliases: ["Name", "Full Name", "Contact"]
+  - name: first_name
+    transform: split_full_name_first
+    aliases: ["First Name", "Given Name", "Full Name", "Name"]
+  - name: last_name
+    transform: split_full_name_last
+    aliases: ["Last Name", "Surname", "Family Name", "Full Name", "Name"]
+  - name: email
+    transform: email_lowercase
+    aliases: ["Email", "Email Address", "E-mail", "Gmail"]
+  - name: phone
+    transform: phone_e164
+    aliases: ["Phone", "Phone Number", "Mobile", "Telephone"]
+  - name: notes
+    aliases: ["Notes", "Comments", "Comment"]
+rules:
+  - name: email_present
+    field: email
+    type: required
+    severity: warning
+    message: "Contact has no email - fine for a phone-only contact, but worth a look"

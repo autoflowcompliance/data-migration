@@ -1,0 +1,18 @@
+name: country_list
+title: Country list
+summary: Country is one of the supported values.
+expects:
+  - country
+rules:
+  - name: country_allowed
+    field: country
+    type: list_of_values
+    values:
+      - USA
+      - France
+      - UK
+      - Germany
+      - Canada
+    case_sensitive: false
+    severity: warning
+    message: country must be one of the supported values

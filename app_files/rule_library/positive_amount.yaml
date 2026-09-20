@@ -1,0 +1,12 @@
+name: positive_amount
+title: Positive amounts
+summary: Amounts are numbers greater than zero.
+expects:
+  - amount
+rules:
+  - name: amount_positive
+    field: amount
+    type: range
+    min: 0.01
+    severity: error
+    message: amount must be greater than zero

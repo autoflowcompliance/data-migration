@@ -1,0 +1,17 @@
+name: phone_validation
+title: Phone validation
+summary: Phone numbers are present and in international (E.164) format.
+expects:
+  - phone
+rules:
+  - name: phone_required
+    field: phone
+    type: required
+    severity: error
+    message: phone must not be empty
+  - name: phone_e164
+    field: phone
+    type: regex
+    pattern: "^\\+[1-9]\\d{6,14}$"
+    severity: warning
+    message: phone should be in E.164 format, e.g. +15551234567

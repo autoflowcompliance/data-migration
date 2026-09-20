@@ -42,6 +42,11 @@ def contacts_json(samples_dir: Path) -> Path:
 
 
 @pytest.fixture
+def contacts_xlsx(samples_dir: Path) -> Path:
+    return samples_dir / "messy_contacts.xlsx"
+
+
+@pytest.fixture
 def contacts_frame(contacts_csv: Path) -> pd.DataFrame:
     return pd.read_csv(contacts_csv, dtype=str, keep_default_na=False)
 

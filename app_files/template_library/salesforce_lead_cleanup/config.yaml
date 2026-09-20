@@ -1,0 +1,39 @@
+crm: Salesforce
+version: "1.0"
+description: Map, validate and deduplicate leads before a Salesforce import.
+fields:
+  - name: FirstName
+    required: true
+    transform: split_full_name_first
+    aliases: ["First Name", "Given Name", "Full Name"]
+  - name: LastName
+    required: true
+    transform: split_full_name_last
+    aliases: ["Last Name", "Surname", "Family Name", "Full Name"]
+  - name: Email
+    required: true
+    unique: true
+    transform: email_lowercase
+    aliases: ["Email Address", "E-mail", "Primary Email"]
+  - name: Phone
+    transform: phone_e164
+    aliases: ["Phone 1", "Phone Number", "Telephone"]
+  - name: AccountName
+    aliases: ["Company", "Company Name", "Organisation", "Employer"]
+  - name: Title
+    aliases: ["Job Title", "Position", "Role"]
+  - name: MailingCity
+    transform: title_case
+    aliases: ["City", "Town"]
+  - name: MailingCountry
+    transform: title_case
+    aliases: ["Country", "Nation"]
+rules:
+  - name: lastname_required
+    field: LastName
+    type: required
+    severity: error
+  - name: email_present
+    field: Email
+    type: required
+    severity: error

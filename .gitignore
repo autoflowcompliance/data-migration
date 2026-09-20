@@ -14,3 +14,15 @@ lineage_report.csv
 # Generated deliverables (write_deliverables defaults to ./output). Anchored so
 # it never matches the app_files/output/ source package.
 /output/
+
+# PyInstaller desktop build output
+/build/
+/dist/
+
+# Runtime-generated audit records and reports
+/audit/
+/audit_orders/
+
+# Client workspaces (per-client configs, samples, outputs)
+/workspaces/
+/workspace/

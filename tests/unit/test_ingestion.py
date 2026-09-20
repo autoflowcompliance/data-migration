@@ -76,6 +76,14 @@ def test_excel_adapter_round_trip(clean_frame: pd.DataFrame):
     assert "firstname" in frame.columns
 
 
+def test_excel_adapter_reads_sample_workbook(contacts_xlsx: Path, contacts_csv: Path):
+    """A real .xlsx on disk, not just a written-and-read round trip."""
+    from_xlsx = read_any(contacts_xlsx)
+    from_csv = read_any(contacts_csv)
+    assert len(from_xlsx) == len(from_csv) == 7
+    assert set(from_csv.columns) <= set(from_xlsx.columns)
+
+
 def test_adapters_agree_across_formats(
     bank_csv: Path, bank_pdf: Path
 ):

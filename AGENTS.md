@@ -16,6 +16,8 @@ app_files/
 ├── validators/ auditors/ reporters/  # LAYER 1 — frozen
 ├── ingestion/                # LAYER 2 — csv/excel/pdf/json adapters
 ├── rules/                    # LAYER 3 — YAML-driven validation
+│   ├── builder.py            # deterministic form -> YAML (no AI, no network)
+│   └── execution.py          # run built rules + merge into the QA report
 ├── profiling/                # LAYER 4 — 5-dimension quality scores
 ├── lineage/                  # LAYER 5 — row-level transformation log
 ├── output/                   # LAYER 6 — csv/excel/json/sql writers
@@ -31,10 +33,11 @@ HTML afterwards. Verify the base report is unpolluted with
 ## Commands
 
 ```bash
-python -m pytest -q                 # full suite, 204 tests, ~2s
+python -m pytest -q                 # full suite, 291 tests, ~3s
 python -m pytest app_files/tests/   # the original 25 pre-existing tests
 python -m streamlit run app_files/app.py                          # CRM tool
 python -m streamlit run app_files/interface/web/app.py            # new web UI
+python -m streamlit run app_files/interface/web/pages/rules.py    # rule builder
 python -m streamlit run app_files/pages/bank_reconciliation_page.py
 ```
 
@@ -59,11 +62,33 @@ green** — that silently deletes the only thing protecting the frozen core.
 
 - `run_pipeline(source, crm=..., lineage_tracker=LineageTracker())` — lineage
   is opt-in via a tracker instance, not a `track_lineage=` flag.
+- `run_reconciliation` takes **raw CSV bytes plus four explicit column names**
+  (`bank_date_col`, `bank_amount_col`, `ledger_date_col`, `ledger_amount_col`)
+  and an optional `date_tolerance_days`. Calling it with just two byte strings
+  raises `TypeError`.
+- Paths that hold runtime state must respect `AUTOFLOW_HOME`: audit trail,
+  anomaly baselines, workspaces, and hosted-audit orders/reports all resolve
+  under it. A new state-writing layer that hardcodes a path under the repo root
+  will litter the working tree and fail the portability tests in
+  `tests/unit/test_market_layers.py` (`test_orders_storage_honours_autoflow_home`).
+- `run_pipeline` does **not** execute the config's `rules:` block. It validates
+  the mapped frame only. Rules are run separately by the caller with
+  `run_rules_for(frame, crm)`. A config passed as `crm` whose rules never get
+  run reports `quality_score: 100` and zero issues — which reads as "your data
+  is fine". Never conclude a rule set works without checking `rules_run`.
+- Rules are written against **source** column names (`Email Address`) but run
+  against the **mapped** frame (`email`). `app_files/rules/execution.py`
+  translates between them via `field_map` / `resolve_rules`. Skip that and the
+  rule matches no column, runs nothing, and reports zero failures. Rules that
+  cannot be resolved are surfaced as `unmatched_rules`, not silently dropped.
 - `MappingConfig.fields` is a **list** of `TargetField`; field names are
   `{f.name for f in config.fields}`.
 - Lineage `action` values are `clean` (bare, no `clean:` prefix),
   `map:<transform>`, and `removed_duplicate`.
-- `run_reconciliation` takes **raw CSV bytes**, not paths and not a DataFrame.
+- `run_reconciliation` takes **raw CSV bytes** plus four column-name arguments
+  (`bank_bytes, ledger_bytes, bank_date_col, bank_amount_col, ledger_date_col,
+  ledger_amount_col`, optional `date_tolerance_days=2`) — not paths and not a
+  DataFrame. It returns a dict; the counts are under `result["summary"]`.
   To reconcile a PDF, ingest it with `read_any` and call
   `reconcile_transactions` on the frame.
 - `read_any` needs `filename=` when given bytes, since the extension selects

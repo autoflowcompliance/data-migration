@@ -1,0 +1,5 @@
+invoice_number,invoice_date,customer,description,quantity,unit_price,line_total,currency
+INV-1001,2024-03-01,Acme Supplies,A4 paper (box),10,24.50,245.00,USD
+INV-1001,2024-03-01,Acme Supplies,Toner cartridge,2,89.99,179.98,USD
+INV-1002,2024-05-01,Globex Corp,Consulting hours,8,150.00,1200.00,USD
+INV-1003,2024-06-01,Initech Ltd,Software licence,1,499.00,,GBP

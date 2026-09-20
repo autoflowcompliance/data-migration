@@ -1,0 +1,32 @@
+crm: AI Readiness
+version: "1.0"
+description: Score any export for AI readiness before starting a project.
+fields:
+  - name: record_id
+    aliases: ["ID", "Id", "Record ID", "Key", "Customer ID"]
+  - name: name
+    aliases: ["Name", "Full Name", "Customer", "Contact", "Title"]
+  - name: email
+    transform: email_lowercase
+    aliases: ["Email", "Email Address", "E-mail"]
+  - name: phone
+    transform: phone_e164
+    aliases: ["Phone", "Phone Number", "Mobile", "Telephone"]
+  - name: created_at
+    transform: date_iso
+    aliases: ["Created", "Created At", "Created Date", "Date", "Signup Date"]
+  - name: category
+    aliases: ["Category", "Segment", "Type", "Group", "Status"]
+  - name: amount
+    aliases: ["Amount", "Value", "Total", "Spend", "Revenue"]
+rules:
+  - name: email_required
+    field: email
+    type: required
+    severity: warning
+    message: "Record has no email - a common blocker for AI/CRM projects"
+  - name: created_at_required
+    field: created_at
+    type: required
+    severity: info
+    message: "Record has no date - limits any time-based model"

@@ -1,0 +1,18 @@
+contract: bank_transactions
+version: "1.0"
+description: >
+  Expectations for a cleaned bank statement before it is reconciled. Catches
+  the two problems that break reconciliation: no date and no amount.
+fields:
+  date:
+    required: true
+    format: iso8601
+  description:
+    required: false
+    min_length: 3
+    message: "A statement line with a very short description is usually a parsing error"
+  amount:
+    required: true
+    format: number
+    min: -1000000
+    max: 1000000

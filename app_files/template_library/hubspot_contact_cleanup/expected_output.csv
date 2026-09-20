@@ -1,0 +1,5 @@
+firstname,lastname,email,phone,company,jobtitle,city,country,createdate
+John,Smith,john@email.com,+16174983000,Acme Inc,CEO,Boston,Usa,2024-12-31
+Jane,Doe,jane.doe@example.com,+15128765432,Globex,CTO,Austin,Usa,2024-11-05
+Émile,Müller,emile@ex-ample.fr,+33142685300,Initech,Analyst,Paris,France,2024-12-31
+Carlos,Diaz,,12345,Vehement Capital,Director,Miami,Usa,2024-11-05

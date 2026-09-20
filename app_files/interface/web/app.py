@@ -23,6 +23,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from app_files.ingestion import read_any, UnsupportedFormatError
+from app_files.interface.web.display import arrow_safe, show
 from app_files.lineage import LineageTracker
 from app_files.mappers import available_crms
 from app_files.output import FORMATS
@@ -30,44 +31,6 @@ from app_files.output.inmemory import to_bytes
 from app_files.pipeline import run_pipeline
 from app_files.profiling import profile, render_qa_report_with_profile
 from app_files.rules import RuleConfigError, run_rules_for
-
-
-def show(frame: pd.DataFrame, **kwargs) -> None:
-    """``st.dataframe`` with object columns coerced so Arrow can always serialize.
-
-    The core mapper emits a ``confidence`` column holding floats *and* blank
-    strings. Arrow cannot represent that in one column and Streamlit logs a
-    full traceback before silently coercing it. Fixing the type here — in the
-    display layer — avoids touching the frozen mapper while keeping the UI
-    console clean.
-    """
-    st.dataframe(_arrow_safe(frame), width="stretch", **kwargs)
-
-
-def _arrow_safe(frame: pd.DataFrame) -> pd.DataFrame:
-    safe = frame.copy()
-    for column in safe.columns:
-        if safe[column].dtype != object:
-            continue
-        blank = safe[column].map(_is_blank)
-        non_blank = safe[column][~blank]
-        if non_blank.empty:
-            continue
-        numeric = pd.to_numeric(non_blank, errors="coerce").notna()
-        # Arrow rejects a column that mixes numbers with blanks or with
-        # non-numeric text. Stringifying the whole column is lossless for
-        # display and always serializes.
-        if (numeric.any() and (blank.any() or not numeric.all())):
-            safe[column] = safe[column].map(lambda v: "" if _is_blank(v) else str(v))
-    return safe
-
-
-def _is_blank(value) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, float) and value != value:
-        return True
-    return str(value).strip() == ""
 
 
 st.set_page_config(page_title="AutoFlow — Data Migration", page_icon="⇄", layout="wide")
@@ -103,6 +66,13 @@ with st.sidebar:
         help="Runs the 'rules:' block from the selected config and adds failures to the issues list.",
     )
     project_name = st.text_input("Project name", value="Data migration")
+    st.divider()
+    st.page_link(
+        "pages/rules.py",
+        label="Build validation rules",
+        icon="✅",
+        help="Turn dropdowns into rules — no YAML, no patterns, no network call.",
+    )
 
 uploaded = st.file_uploader(
     "Upload your source file",

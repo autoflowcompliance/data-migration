@@ -1,0 +1,17 @@
+name: email_validation
+title: Email validation
+summary: Every email is present and shaped like an email address.
+expects:
+  - email
+rules:
+  - name: email_required
+    field: email
+    type: required
+    severity: error
+    message: email must not be empty
+  - name: email_format
+    field: email
+    type: regex
+    pattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    severity: error
+    message: email must be a valid address

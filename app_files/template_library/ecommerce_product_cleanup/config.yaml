@@ -1,0 +1,41 @@
+crm: E-commerce Catalogue
+version: "1.0"
+description: Normalise SKUs, prices and categories for a product catalogue.
+fields:
+  - name: sku
+    required: true
+    unique: true
+    transform: upper_case
+    aliases: ["SKU", "Sku", "Product Code", "Item Code", "Code"]
+  - name: product_name
+    transform: trim
+    aliases: ["Name", "Product Name", "Title", "Item"]
+  - name: price
+    aliases: ["Price", "Retail Price", "Unit Price", "Sell Price"]
+  - name: category
+    transform: title_case
+    aliases: ["Category", "Collection", "Department", "Type"]
+  - name: brand
+    transform: title_case
+    aliases: ["Brand", "Maker", "Vendor", "Manufacturer"]
+  - name: stock
+    aliases: ["Stock", "Qty", "Quantity", "Inventory"]
+  - name: upc
+    transform: digits_only
+    aliases: ["UPC", "Barcode", "EAN", "GTIN"]
+rules:
+  - name: sku_required
+    field: sku
+    type: required
+    severity: error
+    message: "Product has no SKU, so it cannot be listed"
+  - name: sku_length
+    field: sku
+    type: length
+    min_length: 3
+    severity: warning
+    message: "SKU looks too short - check for a truncated code"
+  - name: price_present
+    field: price
+    type: required
+    severity: warning

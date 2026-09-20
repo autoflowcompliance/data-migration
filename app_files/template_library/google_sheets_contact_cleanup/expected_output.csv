@@ -1,0 +1,5 @@
+name,first_name,last_name,email,phone,notes
+Mary Jones,Mary,Jones,mary@example.com,+16174983000,met at conference
+Peter O'Neil,Peter,O'Neil,peter@example.com,+15128765432,
+Ana Silva,Ana,Silva,ana@example.com,+351211234567,referred by Mary
+Tom Blake,Tom,Blake,,+15550100,phone only

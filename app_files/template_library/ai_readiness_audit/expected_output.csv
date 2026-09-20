@@ -1,0 +1,7 @@
+record_id,name,email,phone,created_at,category,amount
+1,Acme Ltd,sales@acme.com,+16174983000,2024-12-31,enterprise,15000
+2,Globex,info@globex.com,+15128765432,2024-11-05,smb,3200
+3,Globex,info@globex.com,+15128765432,2024-11-05,smb,3200
+4,Initech,,12345,2024-12-31,enterprise,
+5,Umbrella,hello@umbrella.co,+442079460958,,smb,780
+6,Stark Industries,contact@stark.com,,2023-01-15,enterprise,99000
