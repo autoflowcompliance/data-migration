@@ -1,0 +1,46 @@
+# Fly.io deployment for the hosted demo.
+#
+#   fly launch --no-deploy
+#   fly secrets set DATAREADY_SECRET_KEY=...
+#   fly deploy
+#
+# The demo deliberately runs without a licence, so the demo limits in
+# app_files/licensing/limits.py apply: 500 rows, 5 MB, CSV only, watermarked.
+
+app = "dataready-demo"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  DATAREADY_HOST = "0.0.0.0"
+  DATAREADY_PORT = "8080"
+  DATAREADY_SHOW = "0"
+  DATAREADY_RELOAD = "0"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 50
+    soft_limit = 25
+
+[[vm]]
+  # The demo is single-file, in-memory work; a shared 1x CPU is plenty.
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[checks]
+  [checks.web]
+    type = "http"
+    port = 8080
+    path = "/"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"

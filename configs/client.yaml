@@ -1,0 +1,26 @@
+# Client mode: a licensed local install. No limits of any kind.
+
+mode: client
+limits:
+  max_rows: null
+  max_file_size_mb: null
+  output_formats:
+    - csv
+    - excel
+    - json
+    - sql
+  watermark: false
+  lineage: true
+  batch: true
+  branding: true
+
+server:
+  # Localhost only. The app is not meant to be reachable from the network on a
+  # buyer's machine, and binding 0.0.0.0 would expose their data to the LAN.
+  host: 127.0.0.1
+  port: 8080
+  reload: false
+  show: true
+
+# Where batch output and downloads default to; relative to the install folder.
+output_dir: output
