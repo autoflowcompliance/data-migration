@@ -31,7 +31,10 @@ RUN mkdir -p /app/output
 
 EXPOSE 8080
 
+# Probe the port actually bound, resolved the same way main.py does, so a
+# platform-injected PORT (Render, Heroku) does not leave the check probing a
+# dead 8080 while the app is healthy elsewhere.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import urllib.request,sys; urllib.request.urlopen('http://localhost:8080/'); sys.exit(0)" || exit 1
+    CMD python -c "import os,urllib.request,sys; p=os.getenv('PORT') or os.getenv('DATAREADY_PORT') or '8080'; urllib.request.urlopen(f'http://localhost:{p}/'); sys.exit(0)" || exit 1
 
 ENTRYPOINT ["python", "main.py"]

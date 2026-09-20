@@ -1,0 +1,51 @@
+# Render Blueprint — deploys the DataReady (NiceGUI) web app as a Docker web service.
+#
+#   1. Push this repo to GitHub/GitLab.
+#   2. Render Dashboard -> New + -> Blueprint -> pick the repo.
+#   3. Render reads this file and creates the service below.
+#
+# You may want to change:
+#   - `plan`: Render applies its default plan unless you set one here; pick
+#     whatever tier suits you (a small shared instance is plenty for this app).
+#   - `region`: defaults to your workspace's region; e.g. `frankfurt`, `oregon`.
+#
+# The app is unlicensed by default, so the demo limits in
+# app_files/licensing/limits.py apply (500 rows, 5 MB, CSV only, watermarked).
+# Add a licence via DATAREADY_HOME in the dashboard for the full tool.
+
+services:
+  - type: web
+    name: dataready
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # Bind on all interfaces — required: Render forwards traffic to the
+      # container's 0.0.0.0:$PORT.
+      - key: DATAREADY_HOST
+        value: 0.0.0.0
+      # Headless and single-process in the container.
+      - key: DATAREADY_SHOW
+        value: "0"
+      - key: DATAREADY_RELOAD
+        value: "0"
+      # Sign the client session cookie. Generated once and stored by Render;
+      # without a stable value every deploy would invalidate open sessions.
+      - key: DATAREADY_STORAGE_SECRET
+        generateValue: true
+      # Where licence / branding state is written. Render's filesystem is
+      # ephemeral, so this resets on redeploy — mount a persistent disk at
+      # this path if that state must outlive a deploy.
+      - key: DATAREADY_HOME
+        value: /app/run_config
+      # The collaboration / audit layers read AUTOFLOW_HOME (a separate var
+      # from DATAREADY_HOME). Pointing both under /app keeps every runtime
+      # state file inside the container instead of scattering it in the repo.
+      - key: AUTOFLOW_HOME
+        value: /app/run_config
+
+# Deliberately NOT setting DATAREADY_PORT or PORT. Render injects PORT (its
+# default is 10000) and routes traffic only there; main.py's resolve_port()
+# gives PORT precedence so the app binds the port Render actually scans.

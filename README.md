@@ -16,13 +16,14 @@ Three commands, from the repository root:
 ```bash
 pip install -r requirements.txt
 python -m pytest -q
-python -m streamlit run app_files/interface/web/app.py
+python main.py
 ```
 
-Then open <http://localhost:8501>, upload a file, pick a target config and an
+Then open <http://localhost:8080>, upload a file, pick a target config and an
 output format, and download the results. See [docs/INSTALL.md](docs/INSTALL.md)
-for Docker, and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) to add your own
-target format.
+for Docker and Render, and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) to add
+your own target format. The older Streamlit interface still ships and still
+works (`python -m streamlit run app_files/interface/web/app.py`, port 8501).
 
 ## What it does
 
@@ -148,9 +149,16 @@ Wrote deliverables to output
 docker compose up --build
 ```
 
-The app is at <http://localhost:8501>. `configs/`, `samples/` and `output/` are
+The app is at <http://localhost:8080>. `configs/`, `samples/` and `output/` are
 mounted from the host, so dropping a new YAML into `app_files/configs/` appears
 in the config selector without a rebuild. The image includes a healthcheck.
+
+### Render
+
+The repo ships a `render.yaml` Blueprint. Push to GitHub/GitLab, then in the
+Render Dashboard choose **New + → Blueprint** and pick the repo. Render builds
+the `Dockerfile` and starts the app on the port it injects via `PORT`. See
+[docs/INSTALL.md](docs/INSTALL.md#render) for the details that matter.
 
 ## Demo data
 
@@ -203,7 +211,7 @@ judgments.
 python -m pytest -q
 ```
 
-Expect `223 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `465 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, config-schema validation, golden-file regression fixtures, and
 malformed-input error handling. It runs in about two seconds, so there is no

@@ -14,15 +14,15 @@ pip install -r requirements.txt
 python -m pytest -q
 ```
 
-Expect `223 passed`. The suite takes about two seconds.
+Expect `465 passed`. The suite takes a few seconds.
 
 ## 3. Run it
 
 ```bash
-python -m streamlit run app_files/interface/web/app.py
+python main.py
 ```
 
-Open <http://localhost:8501>.
+Open <http://localhost:8080>.
 
 ## 4. Process a file
 
@@ -45,7 +45,13 @@ a clean bill of health:
 docker compose up --build
 ```
 
-The app is at <http://localhost:8501>.
+The app is at <http://localhost:8080>.
+
+## Hosted on Render instead
+
+The repo ships a `render.yaml` Blueprint. Push to GitHub/GitLab, then in the
+Render Dashboard choose **New + → Blueprint** and pick the repo. Render builds
+the `Dockerfile` and binds the port it injects via `PORT`.
 
 ## Next
 

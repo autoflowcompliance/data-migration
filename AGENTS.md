@@ -33,16 +33,35 @@ HTML afterwards. Verify the base report is unpolluted with
 ## Commands
 
 ```bash
-python -m pytest -q                 # full suite, 291 tests, ~3s
+python -m pytest -q                 # full suite, 465 tests, ~11s
 python -m pytest app_files/tests/   # the original 25 pre-existing tests
+python main.py                                                    # DataReady (NiceGUI) — port 8080
 python -m streamlit run app_files/app.py                          # CRM tool
-python -m streamlit run app_files/interface/web/app.py            # new web UI
+python -m streamlit run app_files/interface/web/app.py            # legacy Streamlit UI — port 8501
 python -m streamlit run app_files/interface/web/pages/rules.py    # rule builder
 python -m streamlit run app_files/pages/bank_reconciliation_page.py
 ```
 
 Use `python -m streamlit` rather than the bare `streamlit` script — the console
 script is not always on `PATH`.
+
+## Deployment (Render)
+
+`render.yaml` deploys the NiceGUI app as a Docker web service off `Dockerfile` /
+`main.py`.
+
+- **Port precedence is `PORT` > `DATAREADY_PORT` > 8080.** Render injects `PORT`
+  (default 10000) and routes traffic only there. The Dockerfile bakes
+  `DATAREADY_PORT=8080`, so the old `getenv("DATAREADY_PORT", getenv("PORT"))`
+  order made the container bind 8080 while Render scanned 10000 → the deploy
+  fails with *no open ports detected*. `resolve_port()` in
+  `app_files/interface/web/main.py` encodes the correct order; the Dockerfile
+  HEALTHCHECK resolves the port the same way so it does not probe a dead 8080.
+  Pinned by `tests/unit/test_deployment.py`. Do not set `PORT` in `render.yaml`.
+- **Two state-home env vars, not one.** The licensing/branding layers read
+  `DATAREADY_HOME`; the collaboration/audit/anomaly layers read
+  `AUTOFLOW_HOME`. Set both (the blueprint points them at `/app/run_config`).
+  Setting only one leaves the other writing into the repo.
 
 ## Layout of the tests
 

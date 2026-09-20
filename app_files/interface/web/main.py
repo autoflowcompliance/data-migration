@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -23,13 +24,32 @@ from app_files.licensing import current_mode  # noqa: E402
 
 FAVICON = Path(__file__).resolve().parent / "assets" / "favicon.png"
 
+DEFAULT_PORT = 8080
+
+
+def resolve_port(env: Mapping[str, str] | None = None) -> int:
+    """The TCP port to bind, in precedence order.
+
+    ``PORT`` first, because PaaS platforms (Render, Heroku, Fly via its
+    fallback) inject it and route traffic only to that port — ignoring it
+    makes the platform fail the deploy with "no open ports detected". Then
+    ``DATAREADY_PORT`` for an explicit local/container setting, then the
+    built-in default.
+    """
+    env = os.environ if env is None else env
+    raw = env.get("PORT") or env.get("DATAREADY_PORT") or ""
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_PORT
+
 
 def main() -> None:
     """Start the server, honouring the environment the deployment provides."""
     register_report_route()
     licence, limits = current_mode()
     host = os.getenv("DATAREADY_HOST", "0.0.0.0")
-    port = int(os.getenv("DATAREADY_PORT", os.getenv("PORT", "8080")))
+    port = resolve_port()
     reload_enabled = os.getenv("DATAREADY_RELOAD", "0") == "1"
     show = os.getenv("DATAREADY_SHOW", "1") == "1"
 
