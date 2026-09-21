@@ -51,3 +51,37 @@ def test_pipedrive_combines_name_columns(source):
 def test_unknown_crm_raises():
     with pytest.raises(FileNotFoundError):
         load_mapping_config("zoho-does-not-exist")
+
+
+def test_exact_match_beats_an_earlier_fields_near_miss():
+    """A column must go to the field that names it best, not the field listed first.
+
+    HubSpot's `state` (aliases include `County`) fuzzy-matches a `Country`
+    column at 0.923, clearing the 0.82 threshold. Mapping fields in config
+    order let `state` claim it, which both filled `state` with country values
+    and left `country` — an exact 1.0 match — with nothing.
+    """
+    frame = pd.DataFrame(
+        {
+            "First Name": ["John"],
+            "Last Name": ["Smith"],
+            "City": ["Boston"],
+            "Country": ["USA"],
+        }
+    )
+    result = map_data(frame, load_mapping_config("hubspot"))
+    assert result.frame.iloc[0]["country"] == "USA"
+    assert result.frame.iloc[0]["state"] is None
+    assert "Country" not in result.unmapped_sources
+
+
+def test_auto_mapping_never_assigns_one_column_twice():
+    """Each source column feeds at most one target field."""
+    frame = pd.DataFrame({"First Name": ["John"], "Company": ["Acme"]})
+    result = map_data(frame, load_mapping_config("hubspot"))
+    origins = [
+        entry["source_column"]
+        for entry in result.mappings
+        if entry["match"] == "auto"
+    ]
+    assert len(origins) == len(set(origins))

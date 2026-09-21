@@ -51,6 +51,21 @@ def test_contacts_golden_output_is_unchanged():
     assert produced.to_dict("records") == expected.to_dict("records")
 
 
+def test_state_does_not_capture_the_country_column():
+    """`state` must not be filled from a `Country` column.
+
+    HubSpot's `state` field aliases `County`, which fuzzy-matches `Country` at
+    0.923 — above the 0.82 threshold — so the state slot used to swallow the
+    country values (the golden file previously recorded `state=USA`, `zip=`,
+    `country=USA`). Mapping now claims columns in descending confidence order,
+    so `country` takes `Country` at 1.0 and `state` is left empty.
+    """
+    source = read_any(GOLDEN / "contacts" / "input.csv")
+    frame = run_pipeline(source, crm="hubspot").clean_frame
+    assert all(value is None or value == "" for value in frame["state"])
+    assert frame.iloc[0]["country"] == "USA"
+
+
 def test_bank_statement_golden_bank_only_is_unchanged():
     bank = GOLDEN / "bank_statement" / "input.csv"
     ledger = GOLDEN / "ledger" / "input.csv"

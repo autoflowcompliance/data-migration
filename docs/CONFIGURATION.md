@@ -121,8 +121,8 @@ The ingestion layer picks an adapter from the file extension:
 
 | Extension | Adapter | Notes |
 | --- | --- | --- |
-| `.csv`, `.txt`, `.tsv` | `csv_adapter` | Encoding auto-detected with `chardet`; delimiter sniffed. |
-| `.xlsx`, `.xlsm`, `.xls` | `excel_adapter` | Reads the first sheet with `openpyxl`. |
+| `.csv`, `.txt`, `.tsv` | `csv_adapter` | Encoding auto-detected; delimiter follows the extension (`.tsv` is tab-separated). |
+| `.xlsx`, `.xlsm`, `.xls` | `excel_adapter` | Reads the first sheet. `.xlsx`/`.xlsm` use `openpyxl`; legacy `.xls` uses `xlrd`. |
 | `.json` | `json_adapter` | Nested objects are flattened to dotted columns (`address.city`). |
 | `.pdf` | `pdf_adapter` | Extracts the transaction table; multi-page aware. Needs `pdfplumber`. |
 

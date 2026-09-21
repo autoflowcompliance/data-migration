@@ -38,8 +38,8 @@ reader, so no format logic leaks into the rest of the pipeline.
 
 | Format | Extensions | Notes |
 | --- | --- | --- |
-| CSV | `.csv`, `.tsv`, `.txt` | Encoding detected automatically with chardet |
-| Excel | `.xlsx`, `.xlsm`, `.xls` | Read with openpyxl |
+| CSV | `.csv`, `.tsv`, `.txt` | Encoding detected automatically; separator follows the extension |
+| Excel | `.xlsx`, `.xlsm`, `.xls` | Openpyxl for `.xlsx`/`.xlsm`, xlrd for legacy `.xls` |
 | PDF | `.pdf` | Bank statement tables, multi-page, standard US and UK layouts |
 | JSON | `.json` | Nested objects flattened to dotted column names |
 

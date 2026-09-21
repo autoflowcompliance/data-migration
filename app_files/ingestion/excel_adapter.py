@@ -24,12 +24,15 @@ class ExcelAdapter(Adapter):
     extensions = (".xlsx", ".xlsm", ".xls")
 
     def read(
-        self, source: str | Path | BinaryIO | bytes, sheet: str | int | None = None
+        self,
+        source: str | Path | BinaryIO | bytes,
+        sheet: str | int | None = None,
+        extension: str | None = None,
     ) -> pd.DataFrame:
         raw = self._as_bytes(source)
         if not raw.strip():
             return pd.DataFrame()
-        suffix = Path(str(source)).suffix.lower()
+        suffix = self._extension_of(source, extension)
         if suffix == ".xls":
             return self._read_legacy_xls(raw, sheet)
         return self._read_openpyxl(raw, sheet)
@@ -61,10 +64,12 @@ class ExcelAdapter(Adapter):
             raise UnsupportedFormatError(f"Could not read .xls file: {exc}") from exc
         return self._stringify(frame)
 
-    def sheet_names(self, source: str | Path | BinaryIO | bytes) -> list[str]:
-        """List worksheets in an .xlsx workbook (empty for legacy .xls)."""
+    def sheet_names(
+        self, source: str | Path | BinaryIO | bytes, extension: str | None = None
+    ) -> list[str]:
+        """List worksheets in a workbook (empty for a legacy .xls that won't open)."""
         raw = self._as_bytes(source)
-        if Path(str(source)).suffix.lower() == ".xls":
+        if self._extension_of(source, extension) == ".xls":
             try:
                 import xlrd
 

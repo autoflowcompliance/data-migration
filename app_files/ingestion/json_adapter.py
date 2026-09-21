@@ -55,7 +55,9 @@ class JSONAdapter(Adapter):
     name = "json"
     extensions = (".json",)
 
-    def read(self, source: str | Path | BinaryIO | bytes) -> pd.DataFrame:
+    def read(
+        self, source: str | Path | BinaryIO | bytes, extension: str | None = None
+    ) -> pd.DataFrame:
         raw = self._as_bytes(source)
         if not raw.strip():
             return pd.DataFrame()

@@ -133,7 +133,9 @@ class PDFAdapter(Adapter):
     name = "pdf"
     extensions = (".pdf",)
 
-    def read(self, source: str | Path | BinaryIO | bytes) -> pd.DataFrame:
+    def read(
+        self, source: str | Path | BinaryIO | bytes, extension: str | None = None
+    ) -> pd.DataFrame:
         raw = self._as_bytes(source)
         if not raw.strip():
             return pd.DataFrame()

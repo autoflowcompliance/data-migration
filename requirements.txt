@@ -11,6 +11,12 @@ chardet>=5.0.0
 
 # Excel file support
 openpyxl>=3.1.0
+# Legacy binary .xls (BIFF). xlrd>=2 reads .xls only, which is exactly the gap
+# openpyxl leaves; without it a .xls upload fails with a clear install hint.
+xlrd>=2.0.1
+# Writes the legacy .xls fixtures the ingestion tests read back. Test-only, but
+# listed here so the suite runs from this file alone; the tests skip if absent.
+xlwt>=1.3.0
 
 # PDF bank statement extraction (ingestion layer)
 pdfplumber>=0.11.0

@@ -37,6 +37,28 @@ def test_templates_on_disk_lists_the_shipped_configs():
     assert "bank_reconciliation" in templates
 
 
+def test_upload_routing_accepts_the_legacy_and_tsv_extensions():
+    """The extensions added to ingestion must be offered to the user.
+
+    ``read_upload`` rejects anything outside ``available_extensions()``, so a
+    working adapter for ``.xls`` or ``.tsv`` is invisible unless the extension
+    list grows with it.
+    """
+    from app_files.ingestion import available_extensions
+
+    assert {".xls", ".tsv"} <= set(available_extensions())
+    # And the UI's own pre-check agrees, so an upload is not rejected up front.
+    frame = state.read_upload(b"name\tcity\nJohn\tBoston\n", "contacts.tsv")
+    assert frame.iloc[0]["city"] == "Boston"
+
+
+def test_read_upload_decodes_a_cp1252_upload(isolated_home):
+    """An accented Windows-1252 CSV survives the whole upload path."""
+    frame = state.read_upload("name,note\nJosé,café naïve\n".encode("cp1252"), "contacts.csv")
+    assert frame["name"].tolist() == ["José"]
+    assert frame["note"].tolist() == ["café naïve"]
+
+
 def test_available_samples_only_lists_files_that_exist():
     samples = state.available_samples()
     assert samples

@@ -235,6 +235,11 @@ def test_headers_are_preserved_in_every_format(tmp_path: Path, clean_frame: pd.D
         (["1", "abc"], "TEXT"),
         (["", None], "TEXT"),
         (["1,234"], "TEXT"),
+        # Decimal parses these as float specials, but they are text here.
+        (["nan", "nan"], "TEXT"),
+        (["NaN", "NaN"], "TEXT"),
+        (["inf", "-inf"], "TEXT"),
+        (["Infinity", "infinity"], "TEXT"),
     ],
 )
 def test_sql_column_type_selection(values, expected):

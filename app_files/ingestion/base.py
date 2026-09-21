@@ -32,11 +32,17 @@ class Adapter(ABC):
     name: str = "adapter"
 
     @abstractmethod
-    def read(self, source: str | Path | BinaryIO | bytes) -> pd.DataFrame:
+    def read(
+        self, source: str | Path | BinaryIO | bytes, extension: str | None = None
+    ) -> pd.DataFrame:
         """Return the file contents as a DataFrame.
 
         Implementations must return ``dtype=str``-like frames (all values
         stringified) so downstream cleaning behaves identically per format.
+
+        ``extension`` is the caller-declared suffix (e.g. from an upload's
+        ``filename=``). It matters only for formats that share one adapter and
+        branch on the suffix; see :meth:`_extension_of`.
         """
 
     # -- helpers shared by concrete adapters -----------------------------
@@ -65,5 +71,13 @@ class Adapter(ABC):
         return frame
 
     @staticmethod
-    def _extension_of(source: str | Path | BinaryIO | bytes) -> str:
+    def _extension_of(source: str | Path | BinaryIO | bytes, declared: str | None = None) -> str:
+        """The suffix to dispatch on: the caller's declaration wins, else the path.
+
+        Raw bytes carry no suffix, so an upload that arrives as
+        ``read_any(data, filename="x.xls")`` must pass the name down or the
+        adapter cannot tell ``.xls`` from ``.xlsx``, or ``.tsv`` from ``.csv``.
+        """
+        if declared:
+            return declared if declared.startswith(".") else f".{declared}"
         return Path(str(source)).suffix.lower() if isinstance(source, (str, Path)) else ""

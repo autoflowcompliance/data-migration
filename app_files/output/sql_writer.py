@@ -60,9 +60,11 @@ def _is_numeric_literal(text: str) -> bool:
     * a leading zero (account/zip codes: ``01234``)
     * thousands separators, spaces, or underscores
 
-    Everything else must actually parse as a number. Without that final check a
+    Everything else must parse as a *finite* number. Without the final parse a
     plain word such as ``John`` would be treated as numeric just for lacking a
-    ``+``, a leading zero, or punctuation.
+    ``+``, a leading zero, or punctuation. The finiteness check matters because
+    ``Decimal`` happily parses ``nan``, ``inf`` and ``infinity``, which are text
+    values here, not numbers SQL should coerce.
     """
     if text != text.strip():
         return False
@@ -73,10 +75,10 @@ def _is_numeric_literal(text: str) -> bool:
     if "_" in text or "," in text or " " in text:
         return False
     try:
-        Decimal(text)
+        value = Decimal(text)
     except InvalidOperation:
         return False
-    return True
+    return value.is_finite()
 
 
 def _column_type(series: pd.Series) -> str:

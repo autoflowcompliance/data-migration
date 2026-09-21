@@ -56,17 +56,19 @@ def read_any(
         filename: required when ``source`` is raw bytes, so the format is known.
     """
     if isinstance(source, (str, Path)):
-        return get_adapter(source).read(source)
+        return get_adapter(source).read(source, extension=Path(str(source)).suffix.lower())
     if isinstance(source, bytes):
         if not filename:
             raise UnsupportedFormatError(
                 "filename= is required when passing raw bytes so the format can be detected."
             )
-        return get_adapter(filename).read(source)
+        extension = Path(filename).suffix.lower()
+        return get_adapter(filename).read(source, extension=extension)
     # File-like object: prefer its name, fall back to a 'type' attribute.
     name = filename or getattr(source, "name", None) or getattr(source, "type", None)
     if not name:
         raise UnsupportedFormatError(
             "Cannot detect the file format from this object. Pass filename= explicitly."
         )
-    return get_adapter(str(name)).read(source)
+    extension = Path(str(name)).suffix.lower()
+    return get_adapter(str(name)).read(source, extension=extension)
