@@ -15,7 +15,7 @@ Two vocabularies are kept deliberately separate:
 :data:`KIND_TO_ENGINE` maps one onto the other, and :data:`COMMON_PATTERNS`
 lets "Email" be a dropdown choice rather than a regex someone has to type.
 
-Everything in this module is pure: no Streamlit, no file writes, no I/O. That
+Everything in this module is pure: no UI import, no file writes, no I/O. That
 is what makes the builder testable without a browser and what keeps the frozen
 rule engine untouched.
 """

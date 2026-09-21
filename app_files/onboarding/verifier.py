@@ -179,7 +179,7 @@ def _check_port(port: int = 8501) -> Check:
             False,
             f"something is already listening on {port}",
             f"Close the other app, or start the tool with a different port: "
-            f"python -m streamlit run app_files/interface/web/app.py --server.port 8502",
+            f"DATAREADY_PORT=8502 python main.py",
         )
     return Check(f"Port {port} available", True, "free")
 

@@ -1,9 +1,8 @@
-"""Server settings shared by every UI.
+"""Server settings for the launcher.
 
-Stdlib only, and no import of either UI framework. The launcher must be able
-to decide which interface to start — and on which port — before either
-framework is importable, so a checkout that installed just one of them still
-starts cleanly.
+Stdlib only, and no import of the web framework. The launcher must be able to
+decide which port to bind before the framework is importable, so a checkout
+mid-install still starts cleanly.
 """
 
 from __future__ import annotations
@@ -13,11 +12,6 @@ from collections.abc import Mapping
 
 DEFAULT_PORT = 8080
 DEFAULT_HOST = "0.0.0.0"
-
-NICEGUI_UI = "nicegui"
-DATAFLOW_UI = "dataflow"
-DEFAULT_UI = DATAFLOW_UI
-AVAILABLE_UIS = (DATAFLOW_UI, NICEGUI_UI)
 
 
 def resolve_port(env: Mapping[str, str] | None = None) -> int:
@@ -40,15 +34,3 @@ def resolve_port(env: Mapping[str, str] | None = None) -> int:
 def resolve_host(env: Mapping[str, str] | None = None) -> str:
     env = os.environ if env is None else env
     return env.get("DATAREADY_HOST") or DEFAULT_HOST
-
-
-def resolve_ui(env: Mapping[str, str] | None = None) -> str:
-    """Which interface to launch.
-
-    Defaults to DataFlow. An unrecognised value falls back to the default
-    rather than failing the boot — a typo in DATAREADY_UI should not take a
-    hosted demo down.
-    """
-    env = os.environ if env is None else env
-    requested = (env.get("DATAREADY_UI") or "").strip().lower()
-    return requested if requested in AVAILABLE_UIS else DEFAULT_UI

@@ -93,7 +93,7 @@ def branding_page() -> None:
             auto_upload=True,
             label="Upload a logo (PNG, JPG or SVG)",
             max_file_size=2_000_000,
-        ).classes("w-full")
+        ).classes("dr-dropzone w-full")
 
         def save() -> None:
             updated = Branding(
@@ -113,8 +113,8 @@ def branding_page() -> None:
             ui.navigate.to("/branding")
 
         with ui.row().classes("gap-3 mt-2"):
-            ui.button("Save branding", on_click=save).props("unelevated no-caps")
-            ui.button("Reset to default", on_click=reset).props("outline no-caps")
+            theme.button("Save branding", on_click=save)
+            theme.download_button("Reset to default", on_click=reset)
 
         c.section("Where this appears")
         ui.label(

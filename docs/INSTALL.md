@@ -10,17 +10,6 @@ python main.py
 
 Then open <http://localhost:8080>.
 
-## Why `python -m streamlit` instead of `streamlit`
-
-On some systems the `streamlit` console script is not on `PATH` even though the
-package is installed. `python -m streamlit` always resolves to the interpreter
-you installed into, so it is the more reliable invocation. This matters for the
-legacy Streamlit interface, which still ships:
-
-```bash
-python -m streamlit run app_files/interface/web/app.py   # port 8501
-```
-
 ## Docker
 
 ```bash
@@ -57,8 +46,8 @@ Two things are worth knowing about how it binds:
 
 - **The port comes from `PORT`, not `DATAREADY_PORT`.** Render injects `PORT`
   (default `10000`) and routes traffic only to that port. `resolve_port()` in
-  `app_files/interface/web/main.py` gives `PORT` precedence for exactly this
-  reason; binding anywhere else fails the deploy with *no open ports detected*.
+  `app_files/settings.py` gives `PORT` precedence for exactly this reason;
+  binding anywhere else fails the deploy with *no open ports detected*.
 - **`AUTOFLOW_HOME` and `DATAREADY_HOME` are both set to `/app/run_config`.**
   Two different state layers read those two names, so setting only one leaves
   the other writing into the repo. Render's filesystem is ephemeral, so that

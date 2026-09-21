@@ -1,7 +1,13 @@
 """Reusable NiceGUI widgets.
 
 Every page composes these rather than re-styling raw elements, so a change to
-the visual language happens in one file.
+the visual language happens in one file. The specs implemented here — metric
+card, step indicator, download card, score badge, empty state, unavailable note
+— were designed against the tokens in :mod:`app_files.interface.web.theme`.
+
+Widgets render through ``ui.html`` with escaped values rather than f-string
+interpolation of user data, because a filename or a CRM name can contain
+characters that would otherwise break the markup.
 """
 
 from __future__ import annotations
@@ -15,6 +21,9 @@ from nicegui import ui
 from app_files.interface.web import theme
 
 
+# ---------------------------------------------------------------------------
+# Page furniture
+# ---------------------------------------------------------------------------
 def page_header(title: str, subtitle: str = "") -> None:
     """Standard page title block."""
     ui.html(f'<h1 class="dr-page-title">{escape(title)}</h1>')
@@ -22,8 +31,28 @@ def page_header(title: str, subtitle: str = "") -> None:
         ui.html(f'<p class="dr-page-sub">{escape(subtitle)}</p>')
 
 
+def section(title: str, subtitle: str = "") -> None:
+    ui.html(f'<h2 class="dr-section-title">{escape(title)}</h2>')
+    if subtitle:
+        ui.html(f'<p class="dr-page-sub" style="margin-bottom:12px">{escape(subtitle)}</p>')
+
+
+def nav_bar(links: Sequence[tuple[str, str]], active: str = "") -> None:
+    """Top navigation. Each entry is ``(label, route)``."""
+    with ui.row().classes("dr-nav w-full items-center gap-1"):
+        ui.html('<span class="dr-brand">DataReady</span>')
+        for label, route in links:
+            element = theme.button(label, on_click=lambda r=route: ui.navigate.to(r))
+            element.classes("dr-nav-btn")
+            if route == active:
+                element.classes("dr-active")
+
+
+# ---------------------------------------------------------------------------
+# Spec'd components
+# ---------------------------------------------------------------------------
 def metric_card(value, label: str, colour: str | None = None) -> None:
-    """A single metric card."""
+    """One metric: mono value over an uppercase label."""
     style = f" style='color:{colour}'" if colour else ""
     ui.html(
         f'<div class="dr-card"><div class="dr-value"{style}>{escape(str(value))}</div>'
@@ -46,16 +75,106 @@ def metric_row(cards: Sequence[tuple]) -> None:
 
 
 def score_badge(score: float, suffix: str = "") -> None:
-    """Colour-coded score badge: green 90+, amber 70-89, red below."""
+    """Colour-coded badge: teal at 90+, amber 70-89, danger below."""
     band = theme.score_band(score)
-    text = f"{score}{suffix}"
-    ui.html(f'<span class="dr-badge {band}">{escape(str(text))}</span>')
+    ui.html(f'<span class="dr-badge {band}">{escape(f"{score}{suffix}")}</span>')
 
 
 def demo_badge(text: str = "Demo mode") -> None:
     ui.html(f'<span class="dr-badge demo">{escape(text)}</span>')
 
 
+def step_indicator(steps: Sequence[str], current: int) -> None:
+    """Horizontal stepper. ``current`` is 0-indexed.
+
+    A completed step is teal with a check, the current step amber, and every
+    step still ahead is drawn in the line colour.
+    """
+    parts = []
+    for index, label in enumerate(steps):
+        if index < current:
+            colour, marker, text = theme.TEAL, "✓", theme.SURFACE
+        elif index == current:
+            colour, marker, text = theme.AMBER, str(index + 1), theme.SURFACE
+        else:
+            colour, marker, text = theme.LINE, str(index + 1), theme.SLATE
+        label_colour = theme.INK if index == current else theme.SLATE
+        weight = "600" if index == current else "400"
+        parts.append(
+            '<div class="dr-step">'
+            f'<div class="dr-step-dot" style="background:{colour};color:{text}">{marker}</div>'
+            f'<span class="dr-step-label" style="color:{label_colour};font-weight:{weight}">'
+            f"{escape(label)}</span></div>"
+        )
+        if index < len(steps) - 1:
+            parts.append('<div class="dr-step-connector"></div>')
+    ui.html(f'<div class="dr-steps">{"".join(parts)}</div>')
+
+
+def icon(name: str) -> str:
+    """Render an icon, accepting either an emoji or a Material icon name.
+
+    Call sites predate the redesign and pass Material names such as
+    ``table_view``; newer ones pass emoji. Detecting which is which here keeps
+    both rendering correctly without touching every caller.
+    """
+    if name.isascii() and name.replace("_", "").isalnum() and name.islower():
+        return f'<span class="material-icons" style="font-size:1.4rem">{escape(name)}</span>'
+    return escape(name)
+
+
+def download_card(
+    label: str,
+    icon_name: str,
+    on_click: Callable[[], None],
+    description: str = "",
+) -> None:
+    """A centred icon-and-label card with a download button beneath."""
+    with ui.column().classes("w-full items-stretch gap-0"):
+        ui.html(
+            f'<div class="dr-download-card"><div class="dr-download-icon">'
+            f'{icon(icon_name)}</div>'
+            f'<div class="dr-download-label">{escape(label)}</div></div>'
+        )
+        if description:
+            ui.label(description).classes("text-xs text-center mb-1").style(
+                f"color:{theme.SLATE}"
+            )
+        theme.download_button(f"Download {label}", on_click=on_click).classes("w-full")
+
+
+def empty_state(
+    icon_name: str,
+    title: str,
+    message: str,
+    action_label: str | None = None,
+    on_action: Callable[[], None] | None = None,
+) -> None:
+    """A pleasant empty state, optionally with a call to action."""
+    with ui.column().classes("dr-empty w-full items-center"):
+        ui.html(f'<div style="font-size:2.2rem">{icon(icon_name)}</div>')
+        ui.html(f'<div class="dr-empty-title">{escape(title)}</div>')
+        ui.html(f'<p class="dr-empty-msg">{escape(message)}</p>')
+        if action_label and on_action:
+            theme.button(action_label, on_click=on_action)
+
+
+def unavailable_note(feature_name: str) -> None:
+    """Shown when a backend call is missing, instead of crashing the page.
+
+    Same visual language as :func:`empty_state` but distinct enough to signal
+    "not wired up" rather than "no data yet".
+    """
+    ui.html(
+        '<div class="dr-note"><span>🔧</span><div>'
+        f"<b>{escape(feature_name)}</b> isn't wired up in this build yet — "
+        "the rest of DataReady works normally.</div></div>"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Data display
+# ---------------------------------------------------------------------------
 def scorecard(scores: dict[str, float]) -> None:
     """Vertical bars, one per quality dimension."""
     rows = ""
@@ -67,7 +186,7 @@ def scorecard(scores: dict[str, float]) -> None:
             '<div class="dr-track" style="flex:1">'
             f'<div class="dr-fill" style="width:{width}%;background:{theme.score_colour(score)}"></div>'
             "</div>"
-            f'<div class="dr-scorecard-value">{score}</div></div>'
+            f'<div class="dr-scorecard-value">{escape(str(score))}</div></div>'
         )
     ui.html(rows)
 
@@ -89,38 +208,6 @@ def progress_checklist(steps: Iterable[str], current: int) -> None:
         marker = "✓" if index < current else "•"
         items += f'<li class="{state}"><span>{marker}</span><span>{escape(step)}</span></li>'
     ui.html(f'<ul class="dr-checklist">{items}</ul>')
-
-
-def download_card(
-    label: str,
-    icon: str,
-    on_click: Callable[[], None],
-    description: str = "",
-) -> None:
-    """A row with a label on the left and a download button on the right."""
-    with ui.row().classes("dr-download items-center w-full"):
-        with ui.column().classes("gap-0"):
-            ui.label(label).classes("dr-download-label")
-            if description:
-                ui.label(description).classes("text-xs text-gray-500")
-        ui.space()
-        ui.button(icon=icon, on_click=on_click).props("flat round")
-
-
-def empty_state(
-    icon: str,
-    title: str,
-    message: str,
-    action_label: str | None = None,
-    on_action: Callable[[], None] | None = None,
-) -> None:
-    """A pleasant empty state, optionally with a call to action."""
-    with ui.column().classes("dr-empty w-full items-center"):
-        ui.icon(icon).classes("text-4xl text-gray-400")
-        ui.html(f'<div class="dr-empty-title">{escape(title)}</div>')
-        ui.label(message).classes("text-sm text-gray-500 text-center")
-        if action_label and on_action:
-            ui.button(action_label, on_click=on_action).props("unelevated no-caps")
 
 
 def file_table(frame, columns: Sequence[str] | None = None, limit: int = 200) -> None:
@@ -166,23 +253,3 @@ def is_blank(value) -> bool:
     if isinstance(value, float) and value != value:
         return True
     return str(value).strip() == ""
-
-
-def nav_bar(links: Sequence[tuple[str, str]], active: str = "") -> None:
-    """Top navigation. Each entry is ``(label, route)``."""
-    with ui.row().classes("items-center gap-1 w-full").style(
-        f"background:{theme.SIDEBAR};padding:10px 24px;"
-    ):
-        ui.label("DataReady").classes("text-white font-bold text-lg mr-6")
-        for label, route in links:
-            colour = theme.PRIMARY if route == active else "transparent"
-            ui.button(label, on_click=lambda r=route: ui.navigate.to(r)).props(
-                "flat no-caps"
-            ).style(f"color:#fff;background:{colour}")
-
-
-def section(title: str, subtitle: str = "") -> None:
-    ui.html(
-        f'<h2 style="font-size:19px;font-weight:600;margin:28px 0 4px">{escape(title)}</h2>'
-        + (f'<p class="dr-page-sub" style="margin-bottom:12px">{escape(subtitle)}</p>' if subtitle else "")
-    )

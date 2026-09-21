@@ -35,20 +35,20 @@ def home_page() -> None:
                 "own machine.</p>"
             )
             with ui.row().classes("gap-3"):
-                ui.button(
+                theme.button(
                     "Upload a file", on_click=lambda: ui.navigate.to("/upload")
-                ).props("unelevated no-caps size=lg")
-                ui.button(
+                ).props("size=lg")
+                theme.download_button(
                     "Try the samples", on_click=lambda: ui.navigate.to("/upload")
-                ).props("outline no-caps size=lg")
+                ).props("size=lg")
 
         c.section("What you get")
         with ui.element("div").classes("dr-feature-grid"):
-            for icon, title, body in _FEATURES:
+            for icon_name, title, body in _FEATURES:
                 with ui.element("div").classes("dr-card"):
-                    ui.icon(icon).classes("text-2xl").style(f"color:{theme.PRIMARY}")
+                    ui.icon(icon_name).classes("text-2xl").style(f"color:{theme.AMBER}")
                     ui.label(title).classes("font-semibold mt-1")
-                    ui.label(body).classes("text-sm text-gray-500")
+                    ui.label(body).classes("text-sm").style(f"color:{theme.SLATE}")
 
         c.section("How it works")
         c.progress_checklist(

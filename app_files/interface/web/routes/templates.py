@@ -103,6 +103,6 @@ def _sample_for(template: str, samples, limits) -> None:
         session_store.set_outcome(outcome)
         ui.navigate.to("/results")
 
-    ui.button(f"Try with {match['file']}", on_click=run_sample).props(
+    theme.button(f"Try with {match['file']}", on_click=run_sample).props(
         "outline no-caps dense"
     )

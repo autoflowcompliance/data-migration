@@ -28,9 +28,6 @@ reportlab>=4.0.0
 # surprised. The other four connectors use plain HTTP and need nothing extra.
 boto3>=1.34.0
 
-# Web framework - Streamlit (legacy interfaces, still supported)
-streamlit>=1.40.0,<2.0.0
-
 # Web framework - NiceGUI (the DataReady interface)
 nicegui>=3.0.0,<4.0.0
 

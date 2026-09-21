@@ -9,8 +9,6 @@ is the single rule that matters most in this repo.
 
 ```
 app_files/
-├── app.py, admin.py          # Streamlit entrypoints — do not modify
-├── pages/                    # Streamlit native multipage (auto-discovered)
 ├── services/                 # self-contained features (bank reconciliation)
 ├── cleaners/ mappers/        # LAYER 1 — frozen
 ├── validators/ auditors/ reporters/  # LAYER 1 — frozen
@@ -21,7 +19,11 @@ app_files/
 ├── profiling/                # LAYER 4 — 5-dimension quality scores
 ├── lineage/                  # LAYER 5 — row-level transformation log
 ├── output/                   # LAYER 6 — csv/excel/json/sql writers
-├── interface/web/app.py      # LAYER 7 — the web UI
+├── interface/web/main.py     # LAYER 7 — the web UI entry (NiceGUI)
+│   ├── routes/               # one module per page; import registers the route
+│   ├── theme.py              # LAYER 7 — design tokens + stylesheet
+│   ├── components.py         # LAYER 7 — shared widgets
+│   └── state.py              # LAYER 7 — page logic (where the tests point)
 └── configs/                  # one YAML per target system
 ```
 
@@ -35,15 +37,14 @@ HTML afterwards. Verify the base report is unpolluted with
 ```bash
 python -m pytest -q                 # full suite, 465 tests, ~11s
 python -m pytest app_files/tests/   # the original 25 pre-existing tests
-python main.py                                                    # DataReady (NiceGUI) — port 8080
-python -m streamlit run app_files/app.py                          # CRM tool
-python -m streamlit run app_files/interface/web/app.py            # legacy Streamlit UI — port 8501
-python -m streamlit run app_files/interface/web/pages/rules.py    # rule builder
-python -m streamlit run app_files/pages/bank_reconciliation_page.py
+python main.py                      # DataReady (NiceGUI) — port 8080
+python build_desktop.py --check     # packaged desktop target
 ```
 
-Use `python -m streamlit` rather than the bare `streamlit` script — the console
-script is not always on `PATH`.
+One UI ships. There is no second entry point and no `DATAREADY_UI` setting —
+`main.py`, the container and the desktop launcher all reach
+`app_files/interface/web/main.py:run_server`, so there is one server to reason
+about. **Rule builder UI is a follow-up feature — not yet in NiceGUI.**
 
 ## Deployment (Render)
 
@@ -55,7 +56,7 @@ script is not always on `PATH`.
   `DATAREADY_PORT=8080`, so the old `getenv("DATAREADY_PORT", getenv("PORT"))`
   order made the container bind 8080 while Render scanned 10000 → the deploy
   fails with *no open ports detected*. `resolve_port()` in
-  `app_files/interface/web/main.py` encodes the correct order; the Dockerfile
+  `app_files/settings.py` encodes the correct order; the Dockerfile
   HEALTHCHECK resolves the port the same way so it does not probe a dead 8080.
   Pinned by `tests/unit/test_deployment.py`. Do not set `PORT` in `render.yaml`.
 - **Two state-home env vars, not one.** The licensing/branding layers read

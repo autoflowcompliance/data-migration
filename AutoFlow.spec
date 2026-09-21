@@ -2,15 +2,14 @@
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.utils.hooks import copy_metadata
 
-datas = [('app_files/configs', 'app_files/configs'), ('app_files/samples', 'app_files/samples'), ('app_files/template_library', 'app_files/template_library'), ('app_files/contracts', 'app_files/contracts'), ('app_files/rule_library', 'app_files/rule_library'), ('app_files/docs', 'app_files/docs'), ('app_files/interface', 'app_files/interface'), ('app_files/pages', 'app_files/pages')]
+datas = [('app_files/configs', 'app_files/configs'), ('app_files/samples', 'app_files/samples'), ('app_files/template_library', 'app_files/template_library'), ('app_files/contracts', 'app_files/contracts'), ('app_files/rule_library', 'app_files/rule_library'), ('app_files/docs', 'app_files/docs'), ('app_files/interface', 'app_files/interface'), ('main.py', 'main.py')]
 binaries = []
 hiddenimports = ['app_files', 'app_files.onboarding', 'app_files.ingestion', 'app_files.rules', 'app_files.profiling', 'app_files.lineage', 'app_files.output', 'app_files.services.bank_reconciliation']
-datas += copy_metadata('streamlit')
-datas += copy_metadata('altair')
+datas += copy_metadata('nicegui')
 datas += copy_metadata('pandas')
 datas += copy_metadata('numpy')
 datas += copy_metadata('pyarrow')
-tmp_ret = collect_all('streamlit')
+tmp_ret = collect_all('nicegui')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 

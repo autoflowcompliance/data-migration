@@ -247,8 +247,8 @@ export TOOL_NAME="Migration Engine"
 export LOGO_URL="https://your-logo-url.png"
 ```
 
-**For Streamlit Cloud:**
-1. Go to your app settings on share.streamlit.io
+**For the web UI:**
+1. Set the branding from the Branding page, or via environment variables
 2. Navigate to "Secrets"
 3. Add environment variables:
    ```

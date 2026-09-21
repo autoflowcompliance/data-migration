@@ -91,7 +91,7 @@ def settings_page() -> None:
             ui.notify(f"Licence activated. Saved to {path}", type="positive")
             ui.navigate.to("/settings")
 
-        ui.button("Activate", on_click=activate).props("unelevated no-caps").mark(
+        theme.button("Activate", on_click=activate).mark(
             "activate-licence"
         )
 

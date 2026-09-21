@@ -24,15 +24,10 @@ output format, and download the results. See [docs/INSTALL.md](docs/INSTALL.md)
 for Docker and Render, and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) to add
 your own target format.
 
-Two interfaces ship in this checkout, and `python main.py` serves the first:
-
-| `DATAREADY_UI` | Interface | How it runs |
-| --- | --- | --- |
-| `dataflow` (default) | **DataFlow** — the current web UI (Streamlit) | `python main.py`, or `python -m streamlit run app_files/dataflow/app.py` |
-| `nicegui` | **DataReady** — the NiceGUI interface | `DATAREADY_UI=nicegui python main.py` |
-
-Both read the same frozen core, the same target configs and the same licence
-file, so they differ only in presentation.
+One interface ships: **DataReady**, the NiceGUI web app, served by
+`python main.py`. It reads the frozen core, the target configs and the licence
+file, and the same command serves the hosted demo and the packaged desktop
+build.
 
 ## What it does
 
@@ -135,21 +130,18 @@ SQL's numeric affinity and silently rewritten.
 
 ## Web UI
 
-DataFlow is the shipped interface, and it walks four steps: **Upload →
-Configure → Process → Review**. Pick a CRM export or a bank reconciliation,
-upload the file, choose the target config, then download what you need.
+DataReady is the shipped interface: **Upload → Verify → Results**, plus
+Templates, Batch, Branding and Settings. Upload a file, pick a target config,
+run the migration, then download the clean data, the QA report and the mapping
+log — and, when lineage tracking is on, the row-level lineage log. Unlicensed
+installs run under the demo limits (500 rows, 5 MB, CSV output, watermarked
+report), and the page says so rather than failing silently.
 
-Review offers the clean data, the QA report, the mapping log and — when
-lineage tracking is on — the row-level lineage log. Unlicensed installs run
-under the demo limits (500 rows, 5 MB, CSV output, watermarked report), and
-the page says so rather than failing silently.
-
-The page itself is thin: it builds widgets and delegates every decision to
-`app_files/dataflow/state.py`, which is where the tests point. Logic added to
-the page is logic the tests do not see.
-
-The NiceGUI interface under `app_files/interface/web/` covers the same ground
-and remains available via `DATAREADY_UI=nicegui`.
+Routes live in `app_files/interface/web/routes/`, one module per page, and each
+is registered by importing the package. Widgets come from
+`app_files/interface/web/components.py` and the palette from `theme.py`, so a
+visual change happens in one place. The decision logic sits in
+`app_files/interface/web/state.py`, which is where the tests point.
 
 ## Command line
 

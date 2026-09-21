@@ -1,7 +1,7 @@
 """Guided setup wizard: five steps, no YAML, no terminal.
 
 The wizard is a small state machine so the logic is testable without a browser.
-The Streamlit page renders it; this module owns the steps, the validation and
+The web interface renders it; this module owns the steps, the validation and
 the persisted "setup complete" flag.
 
 State file: ``~/.autoflow/setup.json`` (override with ``AUTOFLOW_HOME``). The

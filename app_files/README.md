@@ -15,7 +15,7 @@ python -m venv .venv && source .venv/bin/activate  # On Windows: .venv\Scripts\a
 pip install -r requirements.txt
 
 # Web interface
-streamlit run app.py
+python main.py          # run from the repository root
 
 # Command line
 python -m app_files.cli \
@@ -121,24 +121,20 @@ This version includes several critical fixes for production use:
 3. **Scientific Notation Fix**: Restored `expand_scientific_notation` transform to prevent Excel corruption of numeric IDs
 4. **Frictionless Framework**: Fully integrated Frictionless for structural validation and schema checking
 5. **Report Generation**: Fixed Jinja2 template rendering for standalone QA reports
-6. **White-Label Branding**: Added customizable branding via environment variables/Streamlit secrets
+6. **White-Label Branding**: Customisable branding, set on the Branding page or via environment variables
 
 ## White-Label Branding
 
-The tool supports custom branding for agencies:
+The tool supports custom branding for agencies. Set it on the **Branding**
+page in the web UI, or via environment variables:
 
-1. Go to your app dashboard on share.streamlit.io
-2. Click the "Settings" gear icon
-3. Scroll to "Secrets" 
-4. Add the following environment variables:
-   ```
-   BRAND_NAME = "Your Agency Name"
-   TOOL_NAME = "Migration Engine"
-   LOGO_URL = "https://your-logo-url.png"  # Optional
-   ```
+```
+BRAND_NAME = "Your Agency Name"
+TOOL_NAME = "Migration Engine"
+LOGO_URL = "https://your-logo-url.png"  # Optional
+```
 
-This allows agencies to white-label the tool for their clients with their own branding.
-
+A licensed install can apply per-client branding in the delivered report.
 ## Development
 
 ```bash

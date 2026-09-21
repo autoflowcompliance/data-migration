@@ -145,7 +145,7 @@ def verify_page() -> None:
                         f"{passed} of {len(results)} checks passed.", type="warning"
                     )
 
-        ui.button("Run checks", on_click=refresh).props("unelevated no-caps").mark(
+        theme.button("Run checks", on_click=refresh).mark(
             "run-verify"
         )
         refresh()

@@ -138,14 +138,14 @@ def upload_page() -> None:
                 max_file_size=int((limits.max_file_size_mb or 1024) * 1024 * 1024),
                 auto_upload=True,
                 label="Drop a file here or click to choose",
-            ).classes("w-full")
+            ).classes("dr-dropzone w-full")
 
         ui.separator().classes("my-4")
         with ui.row().classes("items-center gap-3"):
             ui.label("No file handy?").classes("text-sm text-gray-500")
-            ui.button(
+            theme.download_button(
                 "Try it with sample data", on_click=load_sample
-            ).props("outline no-caps").mark("sample-button")
+            ).mark("sample-button")
 
         if limits.demo:
             ui.html(

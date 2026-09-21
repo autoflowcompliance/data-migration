@@ -1,7 +1,7 @@
 """Registry: pick the right adapter for a file and read it.
 
 Detection is by file extension. ``read_any`` accepts a path, an open file
-object (Streamlit's ``UploadedFile`` behaves like one) or raw bytes; when raw
+object (an upload widget's file-like object, for instance) or raw bytes; when raw
 bytes are passed the caller must supply ``filename=`` so the extension is known.
 """
 

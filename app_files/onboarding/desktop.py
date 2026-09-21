@@ -1,14 +1,15 @@
 """Desktop launcher: start the tool without a terminal.
 
 This is the module the packaged executable runs. It finds a free port, starts
-the Streamlit server in a subprocess, waits until the health endpoint answers,
-opens the browser, and keeps running until the user closes it (or Ctrl-C).
+the NiceGUI server in a subprocess, waits until the page answers, opens the
+browser, and keeps running until the user closes it (or Ctrl-C).
 
-It is a launcher, not a rewrite: the app it starts is exactly the same
-``app_files/interface/web/app.py`` a developer runs from the command line. That
-is what keeps the desktop build honest — there is no second code path to drift.
+It is a launcher, not a rewrite: the server it starts is exactly the one
+``python main.py`` starts from the command line. That is what keeps the desktop
+build honest — there is no second code path to drift, and a change to the web
+UI reaches the packaged client without touching this file.
 
-Everything here is importable and testable without packaging: the wait-for-health
+Everything here is importable and testable without packaging: the wait-for-page
 loop, the free-port search and the command construction are plain functions.
 """
 
@@ -25,16 +26,20 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-APP_ENTRY = Path("app_files") / "interface" / "web" / "app.py"
-DEFAULT_PORT = 8501
+# The launcher starts the same entry point a developer runs, so the desktop
+# build and the hosted demo cannot disagree about which UI they are serving.
+APP_ENTRY = Path("main.py")
+DEFAULT_PORT = 8080
 DEFAULT_HOST = "127.0.0.1"
 
-# Marker the packaged app passes to itself to mean "become the Streamlit server".
-STREAMLIT_INTERNAL_FLAG = "--streamlit-run"
+# Marker the packaged app passes to itself to mean "become the web server".
+# A frozen build has no ``python`` on disk to run main.py with, so it
+# re-invokes its own executable and hands off to the server in the child.
+UI_INTERNAL_FLAG = "--ui-run"
 
 
 def project_root() -> Path:
-    """The folder holding ``app_files/``.
+    """The folder holding ``main.py`` and ``app_files/``.
 
     Three cases:
 
@@ -84,56 +89,61 @@ def is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+def server_env(port: int, root: Path, base: dict[str, str] | None = None) -> dict[str, str]:
+    """The environment the child server needs to bind the chosen port.
+
+    ``DATAREADY_PORT`` (not ``PORT``) because the launcher wants a setting a
+    developer's own ``PORT`` cannot silently override; ``resolve_port`` gives
+    ``PORT`` precedence, which is right for a PaaS and wrong for a desktop app
+    picking its own free port.
+
+    ``DATAREADY_SHOW=0`` suppresses NiceGUI's own browser launch — this module
+    opens the browser itself, once the page actually answers, so the user never
+    stares at a connection error during startup.
+    """
+    env = dict(os.environ if base is None else base)
+    env["DATAREADY_PORT"] = str(port)
+    env["DATAREADY_HOST"] = DEFAULT_HOST
+    env["DATAREADY_SHOW"] = "0"
+    env["DATAREADY_RELOAD"] = "0"
+    env.setdefault("PYTHONPATH", str(root))
+    return env
+
+
 def build_command(port: int, root: Path | None = None) -> list[str]:
     """The exact command that starts the web UI.
 
-    From source this is ``python -m streamlit`` rather than the ``streamlit``
-    console script, because the script is not always on ``PATH``.
-
-    When frozen, ``sys.executable`` is the application itself, so the launcher
-    re-invokes itself with an internal marker and hands off to Streamlit in the
-    child process (see :func:`run_streamlit`). Without this, the child would
-    re-enter this launcher and argparse would reject Streamlit's arguments.
+    From source this is ``python main.py``. When frozen, ``sys.executable`` is
+    the application itself, so the launcher re-invokes it with an internal
+    marker and hands off to the server in the child process (see
+    :func:`run_server`). Without this, the child would re-enter this launcher
+    and argparse would reject the launcher's own arguments.
     """
-    streamlit_args = [
-        "run",
-        str(app_path(root)),
-        "--server.port",
-        str(port),
-        "--server.address",
-        DEFAULT_HOST,
-        "--server.headless",
-        "true",
-        "--browser.gatherUsageStats",
-        "false",
-    ]
+    root = root or project_root()
     if is_frozen():
-        return [sys.executable, STREAMLIT_INTERNAL_FLAG, *streamlit_args]
-    return [sys.executable, "-m", "streamlit", *streamlit_args]
+        return [sys.executable, UI_INTERNAL_FLAG]
+    return [sys.executable, str(app_path(root))]
 
 
-def run_streamlit(argv: list[str]) -> int:
-    """Run Streamlit's CLI in-process, as ``python -m streamlit`` would.
+def run_server(host: str, port: int) -> int:
+    """Run the NiceGUI server in-process.
 
-    Called only in the re-invoked child of a frozen build.
+    Called from ``main.py`` for a normal launch and from the re-invoked child of
+    a frozen build, so there is one server implementation rather than two.
     """
     try:
-        from streamlit.web import cli as streamlit_cli
+        from app_files.interface.web.main import run_server as serve
     except ImportError as exc:  # pragma: no cover - only when the bundle is broken
         raise RuntimeError(
-            "Streamlit is missing from this build, so the tool cannot start."
+            "The web interface is missing from this build, so the tool cannot start."
         ) from exc
 
-    sys.argv = ["streamlit", *argv]
-    try:
-        streamlit_cli.main()
-    except SystemExit as exc:  # the CLI exits with a code of its own
-        return int(exc.code or 0)
+    serve(host=host, port=port)
     return 0
 
 
 def health_url(port: int, host: str = DEFAULT_HOST) -> str:
-    return f"http://{host}:{port}/_stcore/health"
+    return f"http://{host}:{port}/"
 
 
 def wait_for_health(
@@ -142,14 +152,19 @@ def wait_for_health(
     interval: float = 0.5,
     host: str = DEFAULT_HOST,
 ) -> bool:
-    """Block until the server answers its health check, or ``timeout`` passes."""
+    """Block until the server returns the page, or ``timeout`` passes.
+
+    NiceGUI exposes no dedicated health endpoint, so the readiness signal is a
+    200 on the root page — which is exactly the request the browser is about to
+    make, so "ready" means the first paint will succeed rather than merely that
+    a socket is listening.
+    """
     deadline = time.monotonic() + timeout
     url = health_url(port, host)
     while time.monotonic() < deadline:
         try:
             with urllib.request.urlopen(url, timeout=2) as response:
-                body = response.read().decode("utf-8", errors="replace").strip()
-                if response.status == 200 and body == "ok":
+                if response.status == 200:
                     return True
         except (urllib.error.URLError, OSError, TimeoutError):
             time.sleep(interval)
@@ -177,13 +192,7 @@ def launch(
 
     chosen = port or find_free_port()
     command = build_command(chosen, root)
-    env = dict(os.environ)
-    env.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
-    env.setdefault("PYTHONPATH", str(root))
-    # Streamlit treats a frozen bundle as a development install (there is no
-    # __init__.py beside the script) and then refuses --server.port. A packaged
-    # app is a production install, so say so.
-    env.setdefault("STREAMLIT_GLOBAL_DEVELOPMENT_MODE", "false")
+    env = server_env(chosen, root)
 
     process = subprocess.Popen(command, cwd=str(root), env=env)
 
@@ -205,16 +214,16 @@ def launch(
 
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - launcher shim
     raw = list(sys.argv[1:] if argv is None else argv)
-    if STREAMLIT_INTERNAL_FLAG in raw:
-        return run_streamlit(raw[raw.index(STREAMLIT_INTERNAL_FLAG) + 1:])
+    if UI_INTERNAL_FLAG in raw:
+        return run_server(DEFAULT_HOST, int(os.environ.get("DATAREADY_PORT", DEFAULT_PORT)))
 
-    parser = argparse.ArgumentParser(description="Start the AutoFlow data migration tool.")
-    parser.add_argument("--port", type=int, default=None, help="preferred port (default: first free from 8501)")
+    parser = argparse.ArgumentParser(description="Start the DataReady data migration tool.")
+    parser.add_argument("--port", type=int, default=None, help="preferred port (default: first free from 8080)")
     parser.add_argument("--no-browser", action="store_true", help="do not open a browser window")
     parser.add_argument("--timeout", type=float, default=60.0, help="seconds to wait for startup")
     args = parser.parse_args(argv)
 
-    print("Starting AutoFlow…")
+    print("Starting DataReady…")
     try:
         result = launch(port=args.port, open_browser=not args.no_browser, timeout=args.timeout)
     except (FileNotFoundError, RuntimeError) as exc:

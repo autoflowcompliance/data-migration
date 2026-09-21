@@ -29,15 +29,16 @@ DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 
 # Data files the app needs at runtime, as (source, destination-folder) pairs.
-# The launcher starts the Streamlit script from disk, and Streamlit's multipage
-# discovery scans app_files/pages — so `interface` and `pages` must be present
-# as real files, not just as importable modules.
+# The launcher starts main.py from disk, so it must be bundled alongside the
+# package. `interface` holds the NiceGUI routes; the rest are the library
+# folders the layers read at runtime.
 #
 # PyInstaller copies the *contents* of a source directory into the destination,
 # so the destination must repeat the leaf folder name. Bundling
-# "app_files/interface" into "app_files" would bury web/app.py at
-# app_files/web/app.py, and the launcher would report the app folder missing.
+# "app_files/interface" into "app_files" would bury web/main.py at
+# app_files/web/main.py, and the launcher would report the app folder missing.
 DATA_DIRS = [
+    ("main.py", "main.py"),
     ("app_files/configs", "app_files/configs"),
     ("app_files/samples", "app_files/samples"),
     ("app_files/template_library", "app_files/template_library"),
@@ -45,7 +46,6 @@ DATA_DIRS = [
     ("app_files/rule_library", "app_files/rule_library"),
     ("app_files/docs", "app_files/docs"),
     ("app_files/interface", "app_files/interface"),
-    ("app_files/pages", "app_files/pages"),
 ]
 
 BUNDLED_MODULES = [
@@ -60,20 +60,19 @@ BUNDLED_MODULES = [
 ]
 
 # Packages whose data files PyInstaller's import analysis does not pick up.
-# Streamlit serves its browser frontend from `streamlit/static`, reached by
-# path at runtime rather than imported, so without --collect-all the server
-# starts and answers /_stcore/health but returns 404 for the app itself.
+# NiceGUI serves its browser frontend and its Vue components from files reached
+# by path at runtime rather than by import, so without --collect-all the server
+# starts and then returns 404 for the assets the page needs.
 COLLECT_ALL = [
-    "streamlit",
+    "nicegui",
 ]
 
 # Packages that read their own version through importlib.metadata at import
-# time. PyInstaller does not copy *.dist-info by default, so without these
-# Streamlit raises "No package metadata was found for streamlit" inside the
-# bundle even though the module itself imported fine.
+# time. PyInstaller does not copy *.dist-info by default, so without these they
+# raise "No package metadata was found for ..." inside the bundle even though
+# the module itself imported fine.
 COPY_METADATA = [
-    "streamlit",
-    "altair",
+    "nicegui",
     "pandas",
     "numpy",
     "pyarrow",

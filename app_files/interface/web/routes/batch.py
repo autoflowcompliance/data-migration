@@ -125,7 +125,7 @@ def batch_page() -> None:
                 )
                 c.file_table(_summary_frame(result))
 
-        ui.button("Run batch", on_click=start_batch).props("unelevated no-caps").mark(
+        theme.button("Run batch", on_click=start_batch).mark(
             "run-batch"
         )
 

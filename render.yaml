@@ -1,4 +1,4 @@
-# Render Blueprint — deploys the DataFlow web UI as a Docker web service.
+# Render Blueprint — deploys the DataReady web UI as a Docker web service.
 #
 #   1. Push this repo to GitHub/GitLab.
 #   2. Render Dashboard -> New + -> Blueprint -> pick the repo.
@@ -26,11 +26,6 @@ services:
       # container's 0.0.0.0:$PORT.
       - key: DATAREADY_HOST
         value: 0.0.0.0
-      # Which UI to serve: `dataflow` (the Streamlit web UI) or `nicegui`.
-      # Both ship in the image; see main.py. The default is dataflow, so this
-      # is set explicitly to make the choice visible in the dashboard.
-      - key: DATAREADY_UI
-        value: dataflow
       # Headless and single-process in the container.
       - key: DATAREADY_SHOW
         value: "0"

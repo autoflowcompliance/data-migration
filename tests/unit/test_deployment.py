@@ -53,16 +53,17 @@ def test_host_can_be_overridden():
     assert resolve_host({"DATAREADY_HOST": "127.0.0.1"}) == "127.0.0.1"
 
 
-def test_dataflow_is_the_default_interface():
-    from app_files.settings import DATAFLOW_UI, resolve_ui
+def test_there_is_no_interface_switch_any_more():
+    """One UI ships now, so no setting may select a second one.
 
-    assert resolve_ui({}) == DATAFLOW_UI
+    The switch was the only reason ``resolve_ui`` existed; a leftover name
+    would invite someone to reintroduce a branch that no longer has an
+    implementation behind it.
+    """
+    import app_files.settings as settings
 
-
-def test_an_unknown_interface_falls_back_rather_than_crashing():
-    from app_files.settings import DATAFLOW_UI, resolve_ui
-
-    assert resolve_ui({"DATAREADY_UI": "nope"}) == DATAFLOW_UI
+    assert not hasattr(settings, "resolve_ui")
+    assert not hasattr(settings, "DATAFLOW_UI")
 
 
 def test_the_dockerfile_does_not_pin_a_port_render_will_override():
