@@ -125,3 +125,99 @@ def test_form_helpers_exist_for_every_control_the_routes_need():
 def test_notice_helpers_exist_for_the_demo_states():
     for name in ("info_note", "demo_banner", "runs_exhausted_note", "report_embed"):
         assert callable(getattr(c, name)), f"components.{name} is missing"
+
+
+# ------------------------------------------------ Quasar brand colour override
+def test_quasar_brand_colours_are_repointed_at_the_palette():
+    """Quasar derives most of its own colours from ``--q-primary``.
+
+    Without this the components styled individually look right while
+    everything else — progress bars, spinners, spinners, ``.text-primary`` —
+    renders in Quasar's stock blue. That is the bug that reached the deployed
+    site, so the override is pinned here rather than trusted.
+    """
+    sheet = theme.STYLESHEET
+    assert "--q-primary:" in sheet
+    assert f"--q-primary: {theme.INK}" in sheet
+    assert f"--q-positive: {theme.TEAL}" in sheet
+    assert f"--q-accent: {theme.AMBER}" in sheet
+
+
+# ------------------------------------------------------- spec class coverage
+@pytest.mark.parametrize(
+    "spec_class",
+    [".nav-bar", ".nav-btn", ".download-btn", ".q-btn.nav-btn.active"],
+)
+def test_the_specs_class_names_are_styled(spec_class):
+    """The brief styles these exact selectors, so they must exist verbatim."""
+    assert spec_class in theme.STYLESHEET
+
+
+def test_nav_bar_emits_the_spec_class_names():
+    """A nav bar rendered with only ``dr-*`` classes would not match the spec.
+
+    Asserted against the source because the classes are applied at build time;
+    ``nav_bar`` needs a running NiceGUI context to call.
+    """
+    import inspect
+
+    source = inspect.getsource(c.nav_bar)
+    for name in ("nav-bar", "logo", "nav-btn", "active"):
+        assert name in source, f"nav_bar does not emit the spec class {name!r}"
+    assert "DataFlow" in source
+
+
+def test_the_step_indicator_is_actually_used_by_a_route():
+    """A spec'd component nobody calls is a component that does not ship.
+
+    ``step_indicator`` was defined but no route rendered it, so the teal/amber/
+    line stepper never appeared in the browser. This pins the wiring.
+    """
+    import inspect
+
+    from app_files.interface.web.routes import upload
+
+    assert upload.WORKFLOW_STEPS == ["Upload", "Configure", "Process", "Review"]
+    source = inspect.getsource(upload)
+    assert "step_indicator" in source, "the upload route no longer renders the stepper"
+
+
+def test_brand_buttons_do_not_ask_for_a_quasar_colour():
+    """A Quasar ``color`` prop defeats the stylesheet, so the helpers must not set one.
+
+    NiceGUI defaults a button to Quasar's ``primary`` colour, which makes
+    Quasar apply its ``bg-primary``/``text-white`` utilities. Those live in
+    Quasar's ``quasar_importants`` cascade layer and CSS *reverses* layer
+    precedence for ``!important`` declarations, so the layered utility wins
+    over our unlayered ``!important`` rule regardless of specificity. The
+    visible symptom was a nav button whose ``.active`` amber background never
+    painted. Asserting on the component's props catches a regression without a
+    browser.
+    """
+    import inspect
+
+    for helper in (theme.button, theme.download_button):
+        source = inspect.getsource(helper)
+        assert 'kwargs.setdefault("color", None)' in source, (
+            f"{helper.__name__} lets Quasar's colour prop win over the stylesheet"
+        )
+
+
+def test_quasar_brand_config_is_repointed_at_the_palette():
+    """Quasar's JS-level brand colours must match the CSS variables.
+
+    ``theme.STYLESHEET`` sets the ``--q-*`` custom properties, but Quasar also
+    serialises a brand config that JavaScript-side styling reads. Leaving it
+    alone served the stock blue (``#5898d4``) in ``window.vue_config`` even
+    though the CSS was warm.
+    """
+    import inspect
+
+    source = inspect.getsource(theme.apply_quasar_brand)
+    for token in ("primary=INK", "accent=AMBER", "positive=TEAL", "negative=DANGER"):
+        assert token in source, f"the Quasar brand config is not set from {token}"
+    assert "app.colors(" in source
+
+    # It has to run on every page build, not only from the launcher, or a route
+    # rendered by another entry point serves the stock palette.
+    assert "apply_quasar_brand()" in inspect.getsource(theme.inject_theme)

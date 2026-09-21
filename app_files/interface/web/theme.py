@@ -389,7 +389,181 @@ h1, h2, h3, h4, .dr-title {{
 
 /* Scrollbars, so a long issue table does not break the palette. */
 * {{ scrollbar-color: var(--line) transparent; }}
+
+/* ---------------------------------------------------------------- *
+ * Quasar brand colours.
+ *
+ * This is the load-bearing block. Quasar ships a stock blue primary colour
+ * and derives a great many of its own colours from it — progress bars,
+ * spinners, tab ink, ``.text-primary``/``.bg-primary``, the
+ * uploader's add button, focus rings. Overriding individual components (as
+ * everything above does) leaves whichever ones nobody listed still blue, which
+ * is exactly why the deployed app kept rendering blue controls no matter how
+ * many component rules were added.
+ *
+ * Quasar reads its palette from these custom properties, so setting them once
+ * here re-points *every* primary-derived colour at the Warm Editorial ink, and
+ * any component we have not explicitly styled inherits the palette instead of
+ * Quasar's default.
+ * ---------------------------------------------------------------- */
+:root, body.body--light, .q-app {{
+  --q-primary: {INK} !important;
+  --q-secondary: {SLATE} !important;
+  --q-accent: {AMBER} !important;
+  --q-dark: {INK} !important;
+  --q-positive: {TEAL} !important;
+  --q-negative: {DANGER} !important;
+  --q-info: {SLATE} !important;
+  --q-warning: {AMBER} !important;
+}}
+
+/* ---------------------------------------------------------------- *
+ * The design spec's own rules, verbatim.
+ *
+ * The components emit the spec's class names (``nav-bar``, ``logo``,
+ * ``nav-btn``, ``active``, ``download-btn``) alongside the ``dr-*`` ones, so
+ * these rules apply exactly as written in the brief.
+ * ---------------------------------------------------------------- */
+
+/* Primary buttons — every q-btn that is not a download or nav button. */
+.q-btn.bg-primary,
+.q-btn[color="primary"],
+.q-btn:not(.download-btn):not(.nav-btn) {{
+  background: var(--ink) !important;
+  color: var(--surface) !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  padding: 0.55rem 1.4rem !important;
+  transition: background 0.15s ease;
+  text-transform: none !important;
+}}
+.q-btn.bg-primary:hover,
+.q-btn[color="primary"]:hover,
+.q-btn:not(.download-btn):not(.nav-btn):hover {{
+  background: var(--amber) !important;
+  color: var(--ink) !important;
+}}
+
+/* Download buttons. */
+.q-btn.download-btn {{
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+}}
+.q-btn.download-btn:hover {{
+  border-color: var(--teal) !important;
+  color: var(--teal) !important;
+}}
+
+/* Nav bar. */
+.nav-bar {{
+  background: var(--ink) !important;
+  border-bottom: 4px solid var(--amber) !important;
+  padding: 12px 24px;
+}}
+.nav-bar .logo {{
+  font-family: var(--serif);
+  color: var(--surface);
+  font-weight: 600;
+  font-size: 1.4rem;
+}}
+.q-btn.nav-btn {{
+  background: transparent !important;
+  color: var(--slate-light) !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  padding: 0.5rem 1.2rem !important;
+  text-transform: none !important;
+}}
+.q-btn.nav-btn:hover {{
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+}}
+.q-btn.nav-btn.active {{
+  background: var(--amber) !important;
+  color: var(--ink) !important;
+}}
+
+/* File upload drop zone. */
+.q-uploader {{
+  background: var(--surface) !important;
+  border: 1.5px dashed var(--slate-light) !important;
+  border-radius: 8px !important;
+}}
+.q-uploader:hover {{ border-color: var(--amber) !important; }}
+
+/* Cards. */
+.q-card, .card {{
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 8px !important;
+}}
+
+/* Form fields. */
+.q-field__control {{
+  background: var(--surface) !important;
+  border-radius: 6px !important;
+}}
+.q-field--outlined .q-field__control:before {{ border-color: var(--line) !important; }}
+.q-field--focused .q-field__control:after {{ border-color: var(--teal) !important; }}
+
+/* Tabs. */
+.q-tab--active .q-tab__label {{
+  color: var(--ink) !important;
+  font-weight: 600 !important;
+}}
+.q-tab__indicator {{ background: var(--amber) !important; }}
+
+/* Headings, spelled out for Quasar's own heading utility classes. */
+h1, h2, h3, h4, .text-h1, .text-h2, .text-h3, .text-h4 {{
+  font-family: var(--serif) !important;
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+}}
+
+/* The spec's drawer rule, in addition to the dr-sidebar one above. */
+.q-drawer, .q-drawer__content {{
+  background: var(--surface) !important;
+  border-right: 1px solid var(--line) !important;
+}}
+.q-drawer .q-item, .q-drawer .q-item__label {{ color: var(--ink) !important; }}
+
+/* Catch-all: anything still carrying Quasar's primary colour as a utility. */
+.text-primary {{ color: var(--ink) !important; }}
+.bg-primary {{ background: var(--ink) !important; }}
+.text-secondary {{ color: var(--slate) !important; }}
+.q-linear-progress__model, .q-linear-progress__track {{ color: var(--amber) !important; }}
+.q-spinner {{ color: var(--amber) !important; }}
 """
+
+
+def apply_quasar_brand() -> None:
+    """Point Quasar's own JS-level theme at the Warm Editorial palette.
+
+    The stylesheet sets the ``--q-*`` custom properties, which covers anything
+    Quasar styles from CSS. This covers the rest: Quasar also serialises a
+    brand config that components resolving a colour in JavaScript read, and
+    that config defaults to Quasar's stock blue. Called on every page build so
+    no entry point — including a test harness calling ``ui.run`` directly —
+    can serve the stock palette.
+    """
+    from nicegui import app
+
+    app.colors(
+        primary=INK,
+        secondary=SLATE,
+        accent=AMBER,
+        dark=INK,
+        positive=TEAL,
+        negative=DANGER,
+        info=SLATE,
+        warning=AMBER,
+    )
 
 
 def inject_theme() -> None:
@@ -400,19 +574,39 @@ def inject_theme() -> None:
     """
     from nicegui import ui
 
+    apply_quasar_brand()
     ui.add_head_html(FONT_LINK)
     ui.add_head_html(f"<style>{STYLESHEET}</style>")
 
 
 def button(label: str = "", **kwargs):
-    """A primary button in the house style."""
+    """A primary button in the house style.
+
+    The spec's ``.q-btn:not(.download-btn):not(.nav-btn)`` rule styles this by
+    default, so it needs no marker class of its own — only the two exclusions
+    to opt *out* of.
+
+    ``color=None`` is deliberate. NiceGUI defaults a button to Quasar's
+    ``primary`` colour, which makes Quasar apply its ``bg-primary`` and
+    ``text-white`` utilities. Those live in Quasar's ``quasar_importants``
+    cascade layer, and CSS reverses layer precedence for ``!important``
+    declarations — so a layered ``!important`` utility beats our unlayered
+    ``!important`` rule no matter how specific it is. Leaving the prop off
+    removes the competing declarations entirely and lets the stylesheet win.
+    """
     from nicegui import ui
 
-    return ui.button(label, **kwargs).classes("dr-btn").props("unelevated no-caps")
+    kwargs.setdefault("color", None)
+    return ui.button(label, **kwargs).props("unelevated no-caps")
 
 
 def download_button(label: str = "", **kwargs):
-    """A download button in the house style."""
+    """A download button in the house style, matched by ``.download-btn``.
+
+    ``color=None`` for the same reason as :func:`button`: a Quasar colour prop
+    would attach a layered ``!important`` utility that outranks this rule.
+    """
     from nicegui import ui
 
-    return ui.button(label, **kwargs).classes("dr-btn-download").props("unelevated no-caps")
+    kwargs.setdefault("color", None)
+    return ui.button(label, **kwargs).classes("download-btn").props("unelevated no-caps")

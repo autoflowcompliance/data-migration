@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 import sys
 
 import httpx
@@ -56,11 +57,92 @@ async def app_user():
         os.environ.pop("NICEGUI_USER_SIMULATION", None)
 
 
+@pytest.fixture
+async def raw_http():
+    """A plain HTTP client on the same in-process app.
+
+    Separate from ``app_user`` because the simulated ``User`` only sees
+    elements that arrive over the websocket. The design tokens travel in the
+    initial HTML response's ``<head>``, so verifying them needs a real GET.
+    """
+    for name in list(sys.modules):
+        if name.startswith(ROUTES):
+            del sys.modules[name]
+
+    os.environ["NICEGUI_USER_SIMULATION"] = "true"
+    try:
+        with nicegui_reset_globals():
+            prepare_simulation()
+            ui.run(storage_secret="test secret", reload=False, show=False)
+            importlib.import_module(ROUTES)
+            async with core.app.router.lifespan_context(core.app):
+                transport = httpx.ASGITransport(core.app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                    yield client
+    finally:
+        os.environ.pop("NICEGUI_USER_SIMULATION", None)
+
+
 async def test_every_route_renders_the_app_shell(app_user):
     for path in ["/", "/upload", "/results", "/templates", "/settings",
                  "/batch", "/branding", "/verify"]:
         await app_user.open(path)
-        assert app_user.find("DataReady").elements, f"{path} did not render the shell"
+        assert app_user.find("DataFlow").elements, f"{path} did not render the shell"
+
+
+async def test_the_served_html_carries_the_design_tokens(raw_http):
+    """The tokens must be in the *response body*, not just in the source.
+
+    A previous port added every component rule yet the deployed page still
+    rendered Quasar blue, because nothing asserted on the bytes a browser
+    actually receives. This checks the served HTML for the palette and the
+    Quasar brand override, on every route.
+    """
+    for path in ["/", "/upload", "/results", "/templates", "/settings",
+                 "/batch", "/branding", "/verify"]:
+        response = await raw_http.get(path)
+        assert response.status_code == 200, f"{path} returned {response.status_code}"
+        html = response.text
+        for needle in (
+            "DataFlow",
+            "--ink: #2B2420",
+            "--paper: #F5F0E6",
+            "--amber: #C97A2E",
+            "--teal: #2C7A6B",
+            "Fraunces",
+            "--q-primary: #2B2420",
+        ):
+            assert needle in html, f"{needle!r} missing from the served {path}"
+        assert "DataReady" not in html, f"the old product name is still served on {path}"
+
+
+async def test_the_nav_bar_carries_the_spec_classes(raw_http):
+    """The bar and its buttons must reach the browser with the spec's classes."""
+    html = (await raw_http.get("/")).text
+    for class_name in ("nav-bar", "nav-btn", "logo"):
+        assert class_name in html, f"the served nav bar is missing .{class_name} class"
+
+
+async def test_the_served_html_carries_no_stock_quasar_blue(raw_http):
+    """The stock Quasar blue must not reach the browser by any route.
+
+    Two independent leaks put it there once: the bg-primary utility Quasar
+    attaches to any button given a color prop, and the default brand config
+    serialised into window.vue_config. Both are visible in the served HTML,
+    so both are checked here rather than trusting the screenshot.
+    """
+    for path in ["/", "/upload", "/settings", "/branding"]:
+        html = (await raw_http.get(path)).text
+        for stock in ("#5898d4", "#26a69a", "#9c27b0"):
+            assert stock not in html, f"stock Quasar colour {stock} is served on {path}"
+        # A button carrying color="primary" makes Quasar attach the layered
+        # bg-primary utility, which outranks the stylesheet. Quasar's own
+        # loading-bar config legitimately names "primary", so match a button's
+        # own props rather than the bare string.
+        for props in re.findall(r'"tag":"q-btn","class":\[[^\]]*\],"props":\{[^}]*\}', html):
+            assert '"color":"primary"' not in props, (
+                f"a button on {path} still asks Quasar for its primary colour"
+            )
 
 
 async def test_a_crm_sample_run_reaches_the_results_page(app_user):

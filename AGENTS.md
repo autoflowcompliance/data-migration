@@ -37,7 +37,7 @@ HTML afterwards. Verify the base report is unpolluted with
 ```bash
 python -m pytest -q                 # full suite, 536 tests, ~12s
 python -m pytest app_files/tests/   # the original 25 pre-existing tests
-python main.py                      # DataReady (NiceGUI) — port 8080
+python main.py                      # DataFlow (NiceGUI) — port 8080
 python build_desktop.py --check     # packaged desktop target
 ```
 
@@ -95,6 +95,23 @@ token and asserts each Quasar control the app uses has an override. The design
 source of truth is `theme.py` (palette, `STYLESHEET`) and `components.py` (the
 skinned widgets). Routes must reach for the `components` helpers rather than raw
 `ui.input`/`ui.select`, and render markup through `ui.html`.
+
+### Never give a button a Quasar `color`
+
+NiceGUI defaults a button to Quasar's `primary` colour, which makes Quasar
+attach the `bg-primary` and `text-white` utilities. Those ship inside Quasar's
+`quasar_importants` cascade layer, and **CSS reverses layer precedence for
+`!important` declarations** — so a layered `!important` utility beats our
+unlayered `!important` rule even when ours is more specific. The symptom is a
+hidden `.active` state: a nav button whose amber background never painted, and
+no blue pixels anywhere to explain why.
+
+`theme.button`/`theme.download_button` therefore force `color=None`. Any new
+widget helper that wraps a Quasar control with a colour prop needs the same
+treatment. The `inject_theme` call also repoints Quasar's JS-level brand config
+(`app.colors`) at the palette, because Quasar serialises a second copy that CSS
+variables do not reach. `tests/integration/test_ui_end_to_end.py` pins both the
+stock-blue absence and the button-props invariant on the served HTML.
 
 The demo is a run allowance (`DEMO_RUNS_PER_SESSION`), not a feature cut:
 lineage, batch and branding are all on, and the only real difference is the
