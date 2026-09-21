@@ -55,8 +55,8 @@ Two things are worth knowing about how it binds:
   if a licence, branding, or audit history must survive a redeploy.
 
 The deployed app is unlicensed by default and runs under the demo limits in
-`app_files/licensing/limits.py` (500 rows, 5 MB, CSV only, watermarked). Add a
-licence through `DATAREADY_HOME` for the full tool.
+`app_files/licensing/limits.py` (a few runs per session, with a watermarked QA
+report). Add a licence through `DATAREADY_HOME` for the full tool.
 
 ## Verifying the install
 

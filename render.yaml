@@ -10,8 +10,10 @@
 #   - `region`: defaults to your workspace's region; e.g. `frankfurt`, `oregon`.
 #
 # The app is unlicensed by default, so the demo limits in
-# app_files/licensing/limits.py apply (500 rows, 5 MB, CSV only, watermarked).
-# Add a licence via DATAREADY_HOME in the dashboard for the full tool.
+# app_files/licensing/limits.py apply (a few runs per session, with the QA
+# report watermarked). Everything else — lineage, batch, branding and every
+# output format — works. Add a licence via DATAREADY_HOME in the dashboard
+# to lift the run allowance and drop the watermark.
 
 services:
   - type: web

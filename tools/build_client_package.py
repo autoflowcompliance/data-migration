@@ -92,8 +92,10 @@ combined `summary.csv` and `dashboard.html` are written at the top level.
 
 ## Without a licence
 
-The app runs in demo mode: 500 rows, 5 MB per file, CSV output only, watermarked
-reports, and batch/branding/lineage disabled. Everything else works.
+The app runs in demo mode: three runs per browser session, with a watermarked QA
+report. Lineage, batch processing, branding and every output format work, so you
+can judge the real tool. Paste a licence in **Settings** to lift the run limit
+and remove the watermark.
 """
 
 

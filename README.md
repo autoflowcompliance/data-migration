@@ -134,8 +134,8 @@ DataReady is the shipped interface: **Upload → Verify → Results**, plus
 Templates, Batch, Branding and Settings. Upload a file, pick a target config,
 run the migration, then download the clean data, the QA report and the mapping
 log — and, when lineage tracking is on, the row-level lineage log. Unlicensed
-installs run under the demo limits (500 rows, 5 MB, CSV output, watermarked
-report), and the page says so rather than failing silently.
+installs run under the demo limits (a few runs per session, with a watermarked
+QA report), and the page says so rather than failing silently.
 
 Routes live in `app_files/interface/web/routes/`, one module per page, and each
 is registered by importing the package. Widgets come from
