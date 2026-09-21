@@ -43,9 +43,9 @@ def batch_page() -> None:
         if not limits.batch:
             c.empty_state(
                 "lock",
-                "Batch processing is a licensed feature",
-                "The demo runs one file at a time. A licence unlocks folder "
-                "processing, every output format and unbounded row counts.",
+                "Batch processing is not enabled in this mode",
+                "Folder processing needs a licence. A licence also unlocks every "
+                "output format and unbounded row counts.",
                 "See the licence options",
                 lambda: ui.navigate.to("/settings"),
             )
@@ -78,8 +78,8 @@ def batch_page() -> None:
                 found.text = "No supported files in that folder."
                 return
             if allowance is not None and len(files) > allowance:
-                # Say so up front rather than silently processing three of
-                # forty files and leaving the user to notice.
+                # Say so up front rather than silently processing a subset and
+                # leaving the user to notice.
                 found.text = (
                     f"{len(files)} supported file(s) found — the demo processes "
                     f"the first {allowance}."

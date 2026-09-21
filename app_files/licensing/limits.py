@@ -25,8 +25,14 @@ import pandas as pd
 DEMO_RUNS_PER_SESSION = 3
 """Runs an unlicensed visitor may start before the demo asks them to buy."""
 
-DEMO_BATCH_MAX_FILES = 3
-"""A demo batch is a taste, so a folder run is capped rather than disabled."""
+DEMO_BATCH_MAX_FILES: int | None = None
+"""No cap on a demo batch.
+
+An earlier revision stopped a demo folder run after three files, which meant a
+prospect with a twenty-client inbox could not judge the feature on their own
+data — the moment they would otherwise decide to buy. The per-session run
+allowance already bounds demo use, so the folder job is left whole.
+"""
 
 DEMO_LIMITS: dict[str, Any] = {
     "max_rows": None,

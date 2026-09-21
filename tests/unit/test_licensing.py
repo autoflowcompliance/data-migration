@@ -136,10 +136,10 @@ def test_current_mode_reflects_disk_state():
 def test_demo_limits_hide_nothing_but_the_run_count():
     """The demo sells the product, so it must not switch features off.
 
-    An earlier revision capped rows at 500, files at 5 MB, output to CSV and
-    disabled lineage, batch and branding — a prospect evaluating the product
-    saw a crippled tool. The only thing the demo now limits is how many runs a
-    session may start.
+    An earlier revision capped rows at 500, files at 5 MB, output to CSV,
+    disabled lineage, batch and branding, and stopped a folder run after three
+    files — a prospect evaluating the product saw a crippled tool. The only
+    thing the demo limits now is how many runs a session may start.
     """
     assert DEMO_LIMITS["max_rows"] is None
     assert DEMO_LIMITS["max_file_size_mb"] is None
@@ -148,8 +148,9 @@ def test_demo_limits_hide_nothing_but_the_run_count():
     assert DEMO_LIMITS["batch"] is True
     assert DEMO_LIMITS["branding"] is True
     assert DEMO_LIMITS["max_runs_per_session"] == 3
-    # A batch is a taste rather than an unbounded folder job.
-    assert DEMO_LIMITS["batch_max_files"] == 3
+    # A demo batch runs the whole folder: the per-session run allowance is what
+    # bounds demo use, not a file count.
+    assert DEMO_LIMITS["batch_max_files"] is None
     # The watermark stays: it marks an unlicensed output without removing a
     # capability.
     assert DEMO_LIMITS["watermark"] is True
