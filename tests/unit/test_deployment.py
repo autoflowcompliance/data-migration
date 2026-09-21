@@ -9,7 +9,9 @@ resolution order that makes a Render deploy bind the right port.
 
 from __future__ import annotations
 
-from app_files.interface.web.main import DEFAULT_PORT, resolve_port
+from pathlib import Path
+
+from app_files.settings import DEFAULT_PORT, resolve_port
 
 
 def test_port_is_used_when_it_is_the_only_setting():
@@ -34,3 +36,41 @@ def test_default_applies_when_nothing_is_set():
 def test_a_blank_or_unparseable_value_falls_back():
     assert resolve_port({"PORT": ""}) == DEFAULT_PORT
     assert resolve_port({"PORT": "not-a-number"}) == DEFAULT_PORT
+
+
+# --------------------------------------------------------------------------
+# Host and interface selection
+# --------------------------------------------------------------------------
+def test_host_defaults_to_all_interfaces():
+    from app_files.settings import resolve_host
+
+    assert resolve_host({}) == "0.0.0.0"
+
+
+def test_host_can_be_overridden():
+    from app_files.settings import resolve_host
+
+    assert resolve_host({"DATAREADY_HOST": "127.0.0.1"}) == "127.0.0.1"
+
+
+def test_dataflow_is_the_default_interface():
+    from app_files.settings import DATAFLOW_UI, resolve_ui
+
+    assert resolve_ui({}) == DATAFLOW_UI
+
+
+def test_an_unknown_interface_falls_back_rather_than_crashing():
+    from app_files.settings import DATAFLOW_UI, resolve_ui
+
+    assert resolve_ui({"DATAREADY_UI": "nope"}) == DATAFLOW_UI
+
+
+def test_the_dockerfile_does_not_pin_a_port_render_will_override():
+    """DATAREADY_PORT in the image must stay non-authoritative.
+
+    It is kept as a sane local default, but it may only apply when the
+    platform has not injected PORT — otherwise the deploy binds the wrong port.
+    """
+    dockerfile = (Path(__file__).resolve().parents[2] / "Dockerfile").read_text()
+    assert "DATAREADY_PORT=8080" in dockerfile
+    assert resolve_port({"PORT": "10000", "DATAREADY_PORT": "8080"}) == 10000

@@ -22,8 +22,17 @@ python main.py
 Then open <http://localhost:8080>, upload a file, pick a target config and an
 output format, and download the results. See [docs/INSTALL.md](docs/INSTALL.md)
 for Docker and Render, and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) to add
-your own target format. The older Streamlit interface still ships and still
-works (`python -m streamlit run app_files/interface/web/app.py`, port 8501).
+your own target format.
+
+Two interfaces ship in this checkout, and `python main.py` serves the first:
+
+| `DATAREADY_UI` | Interface | How it runs |
+| --- | --- | --- |
+| `dataflow` (default) | **DataFlow** — the current web UI (Streamlit) | `python main.py`, or `python -m streamlit run app_files/dataflow/app.py` |
+| `nicegui` | **DataReady** — the NiceGUI interface | `DATAREADY_UI=nicegui python main.py` |
+
+Both read the same frozen core, the same target configs and the same licence
+file, so they differ only in presentation.
 
 ## What it does
 
@@ -126,9 +135,21 @@ SQL's numeric affinity and silently rewritten.
 
 ## Web UI
 
-The Streamlit app is the primary interface: upload, choose config and format,
-run, then download. It offers downloads for clean data, the QA report, the
-lineage report, the mapping and cleaning logs, and the issues CSV.
+DataFlow is the shipped interface, and it walks four steps: **Upload →
+Configure → Process → Review**. Pick a CRM export or a bank reconciliation,
+upload the file, choose the target config, then download what you need.
+
+Review offers the clean data, the QA report, the mapping log and — when
+lineage tracking is on — the row-level lineage log. Unlicensed installs run
+under the demo limits (500 rows, 5 MB, CSV output, watermarked report), and
+the page says so rather than failing silently.
+
+The page itself is thin: it builds widgets and delegates every decision to
+`app_files/dataflow/state.py`, which is where the tests point. Logic added to
+the page is logic the tests do not see.
+
+The NiceGUI interface under `app_files/interface/web/` covers the same ground
+and remains available via `DATAREADY_UI=nicegui`.
 
 ## Command line
 
