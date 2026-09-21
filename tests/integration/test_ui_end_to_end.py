@@ -167,3 +167,66 @@ async def test_a_reconciliation_sample_run_reaches_the_dashboard(app_user):
 
     await app_user.should_see("Matched")
     assert app_user.find("Missing from books").elements
+
+
+async def test_the_buy_form_submits_and_shows_a_unique_reference(app_user):
+    """A filled-in form must reach the confirmation page with its own code.
+
+    The buyer used to be sent to a page quoting the same static reference as
+    every other buyer, which made the incoming payment unreconcilable.
+    """
+    from app_files.interface.web.routes.buy import buy_reference
+
+    await app_user.open("/buy")
+    await app_user.should_see("Get your data cleaned")
+    app_user.find("Name *").type("Jane Doe")
+    app_user.find("Email *").type("jane@example.com")
+    app_user.find("Request an invoice").click()
+
+    await app_user.should_see("Thanks, Jane Doe.")
+    # The page must quote this buyer's own code, not the shared fallback.
+    expected = buy_reference("jane@example.com")
+    await app_user.should_see(expected)
+    assert expected != "DF-2026-001"
+
+
+async def test_a_name_with_an_ampersand_survives_the_redirect(app_user):
+    """The regression: an unencoded name truncated at the ``&``.
+
+    ``/buy/confirmed?name=A&b`` arrives as ``name=A``, so the buyer's own name
+    was cut in half on the page thanking them by name.
+    """
+    await app_user.open("/buy")
+    app_user.find("Name *").type("Smith & Wesson")
+    app_user.find("Email *").type("smith@example.com")
+    app_user.find("Request an invoice").click()
+
+    await app_user.should_see("Thanks, Smith & Wesson.")
+
+
+async def test_the_buy_form_rejects_a_missing_name_or_email(app_user):
+    await app_user.open("/buy")
+    app_user.find("Email *").type("jane@example.com")
+    app_user.find("Request an invoice").click()
+
+    await app_user.should_see("Name and email are required.")
+
+
+async def test_both_purchase_pages_load_the_theme_and_a_way_back(raw_http):
+    """The pages must not be orphans: styled like the app, and escapable.
+
+    A purchase page that renders in bare NiceGUI defaults looks like a
+    phishing page, which is the last impression a buyer should get.
+    """
+    for path in ["/buy", "/buy/confirmed"]:
+        response = await raw_http.get(path)
+        assert response.status_code == 200, f"{path} returned {response.status_code}"
+        html = response.text
+        for needle in ("DataFlow", "Fraunces", "--ink: #2B2420", "Back to DataFlow"):
+            assert needle in html, f"{needle!r} missing from the served {path}"
+
+
+async def test_the_confirmation_page_quotes_the_reference_from_the_url(raw_http):
+    response = await raw_http.get("/buy/confirmed?name=Jane&ref=DF-ABC123")
+    assert response.status_code == 200
+    assert "DF-ABC123" in response.text

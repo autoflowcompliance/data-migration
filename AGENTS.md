@@ -120,6 +120,17 @@ resolved `Limits`. The counts in the banner and the exhausted-runs notice are
 passed in from the limits rather than written into the copy, so lowering the
 constant changes the text too.
 
+The purchase pages (`routes/buy.py`) read every bank detail from `PAYMENT_*`
+environment variables. The literals in `PAYMENT_DEFAULTS` must stay
+placeholders: a real account number committed there is a permanent leak, since
+rewriting history does not un-publish it.
+`tests/unit/test_buy_route.py::test_no_real_banking_details_are_committed`
+enforces this. Each buyer gets a reference derived from their email
+(`buy_reference`) — a single shared reference makes incoming payments
+impossible to reconcile against orders. Values passed to
+`/buy/confirmed` via the query string must be `urllib.parse.quote`d; unencoded,
+a name containing `&` truncates itself and swallows the reference after it.
+
 ## API notes that are easy to get wrong
 
 - `run_pipeline(source, crm=..., lineage_tracker=LineageTracker())` — lineage

@@ -8,6 +8,7 @@ package is what registers each route, so it must stay an explicit import.
 from app_files.interface.web.routes import (  # noqa: F401
     batch,
     branding,
+    buy,
     home,
     results,
     settings,
@@ -19,6 +20,7 @@ from app_files.interface.web.routes import (  # noqa: F401
 __all__ = [
     "batch",
     "branding",
+    "buy",
     "home",
     "results",
     "settings",
