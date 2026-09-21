@@ -120,23 +120,27 @@ def build_dashboard(
 
 _DASH_STYLE = """
 body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;
-     background:#f9fafb;color:#111827;}
+     background:#F5F0E6;color:#2B2420;}
 .wrap{max-width:1100px;margin:0 auto;padding:28px;}
-h1{font-size:22px;margin:0 0 4px;}
-h2{font-size:15px;margin:26px 0 10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;}
+h1{font-size:22px;margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;}
+h2{font-size:15px;margin:26px 0 10px;text-transform:uppercase;letter-spacing:.05em;color:#6B6255;}
 .cards{display:flex;gap:12px;flex-wrap:wrap;}
-.card{border-radius:10px;padding:14px 18px;min-width:130px;color:#fff;}
+.card{border-radius:8px;padding:14px 18px;min-width:130px;color:#FDFBF7;
+      border:1px solid rgba(43,36,32,.12);}
 .card .n{font-size:26px;font-weight:800;}
 .card .l{font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.9;}
-.green{background:#059669;}.red{background:#dc2626;}.orange{background:#ea580c;}
-.yellow{background:#ca8a04;}.slate{background:#475569;}
-table{border-collapse:collapse;width:100%;background:#fff;font-size:13px;
-      border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:8px;}
-th,td{border-bottom:1px solid #eef0f3;padding:6px 8px;text-align:left;}
-th{background:#f3f4f6;font-weight:600;}
-.empty{color:#6b7280;font-size:13px;background:#fff;border:1px solid #e5e7eb;
-       border-radius:10px;padding:12px 16px;}
-.foot{margin-top:22px;font-size:12px;color:#6b7280;}
+/* Warm Editorial: amber/teal/slate from the app palette, not the old
+   green/red/orange, so an embedded dashboard matches the page around it. */
+.green{background:#2C7A6B;}.red{background:#B3392F;}.orange{background:#C97A2E;}
+.yellow{background:#C97A2E;}.slate{background:#6B6255;}
+table{border-collapse:collapse;width:100%;background:#FDFBF7;font-size:13px;
+      border:1px solid #E4DCC8;border-radius:8px;overflow:hidden;margin-bottom:8px;}
+th,td{border-bottom:1px solid #E4DCC8;padding:6px 8px;text-align:left;}
+th{background:#F5F0E6;font-weight:600;color:#2B2420;}
+td{color:#3A322B;}
+.empty{color:#6B6255;font-size:13px;background:#FDFBF7;border:1px solid #E4DCC8;
+       border-radius:8px;padding:12px 16px;}
+.foot{margin-top:22px;font-size:12px;color:#6B6255;}
 """
 
 

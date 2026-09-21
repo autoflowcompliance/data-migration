@@ -12,6 +12,7 @@ from typing import Iterator, Sequence
 from nicegui import ui
 
 from app_files.interface.web import components as c
+from app_files.interface.web import theme
 from app_files.interface.web.session import session
 
 NAV = [
@@ -42,16 +43,13 @@ def _demo_footer() -> None:
     page is built, so a user who installs a licence while the app is open sees
     the correct state the moment they navigate anywhere.
     """
-    from app_files.licensing import current_mode
+    from app_files.licensing import DEMO_RUNS_PER_SESSION, current_mode
 
     licence, limits = current_mode()
     if limits.demo:
-        with ui.row().classes("items-center gap-2 mt-6"):
-            c.demo_badge("Demo mode")
-            ui.label(
-                "Up to 500 rows, 5 MB, CSV output only. Add a licence in Settings "
-                "for the full tool."
-            ).classes("text-xs text-gray-500")
+        c.demo_banner(DEMO_RUNS_PER_SESSION)
     elif licence.email:
-        ui.label(f"Licensed to {licence.email}").classes("text-xs text-gray-400 mt-6")
+        ui.label(f"Licensed to {licence.email}").classes("text-xs mt-6").style(
+            f"color:{theme.SLATE}"
+        )
     session()  # touch the session so the store stays warm for this client

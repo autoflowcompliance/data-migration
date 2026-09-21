@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -132,14 +133,26 @@ def test_current_mode_reflects_disk_state():
 
 
 # -------------------------------------------------------------------- limits
-def test_demo_limits_match_the_documented_values():
-    assert DEMO_LIMITS["max_rows"] == 500
-    assert DEMO_LIMITS["max_file_size_mb"] == 5
-    assert DEMO_LIMITS["output_formats"] == ["csv"]
+def test_demo_limits_hide_nothing_but_the_run_count():
+    """The demo sells the product, so it must not switch features off.
+
+    An earlier revision capped rows at 500, files at 5 MB, output to CSV and
+    disabled lineage, batch and branding — a prospect evaluating the product
+    saw a crippled tool. The only thing the demo now limits is how many runs a
+    session may start.
+    """
+    assert DEMO_LIMITS["max_rows"] is None
+    assert DEMO_LIMITS["max_file_size_mb"] is None
+    assert DEMO_LIMITS["output_formats"] == ["csv", "excel", "json", "sql"]
+    assert DEMO_LIMITS["lineage"] is True
+    assert DEMO_LIMITS["batch"] is True
+    assert DEMO_LIMITS["branding"] is True
+    assert DEMO_LIMITS["max_runs_per_session"] == 3
+    # A batch is a taste rather than an unbounded folder job.
+    assert DEMO_LIMITS["batch_max_files"] == 3
+    # The watermark stays: it marks an unlicensed output without removing a
+    # capability.
     assert DEMO_LIMITS["watermark"] is True
-    assert DEMO_LIMITS["lineage"] is False
-    assert DEMO_LIMITS["batch"] is False
-    assert DEMO_LIMITS["branding"] is False
 
 
 def test_full_limits_impose_nothing():
@@ -149,20 +162,27 @@ def test_full_limits_impose_nothing():
     assert limits.max_file_size_mb is None
     assert "excel" in limits.output_formats
     assert limits.lineage and limits.batch and limits.branding
+    assert limits.max_runs_per_session is None
+    assert limits.batch_max_files is None
 
 
 def test_unlicensed_resolves_to_demo_limits():
-    assert resolve_limits(False).demo
-    assert resolve_limits(False).max_rows == 500
+    limits = resolve_limits(False)
+    assert limits.demo
+    assert limits.max_runs_per_session == 3
 
 
 def test_check_file_size_allows_a_file_within_the_limit():
     check_file_size(1_000, resolve_limits(False))
+    # The demo no longer caps size, so even a large upload passes.
+    check_file_size(500 * 1024 * 1024, resolve_limits(False))
 
 
 def test_check_file_size_rejects_an_oversized_file():
+    """Still enforced when a mode sets a cap, even though none currently does."""
+    capped = replace(resolve_limits(False), max_file_size_mb=5)
     with pytest.raises(LimitExceededError) as excinfo:
-        check_file_size(6 * 1024 * 1024, resolve_limits(False))
+        check_file_size(6 * 1024 * 1024, capped)
     assert "5 MB" in str(excinfo.value)
 
 
@@ -170,11 +190,19 @@ def test_check_file_size_is_a_no_op_when_licensed():
     check_file_size(500 * 1024 * 1024, resolve_limits(True))
 
 
-def test_apply_row_limit_truncates_to_the_demo_maximum(contacts_frame):
+def test_apply_row_limit_truncates_to_the_configured_maximum(contacts_frame):
+    capped = replace(resolve_limits(False), max_rows=2)
     frame = contacts_frame
-    result = apply_row_limit(frame, resolve_limits(False))
-    assert len(result.frame) == min(len(frame), 500)
-    assert result.truncated == (len(frame) > 500)
+    result = apply_row_limit(frame, capped)
+    assert len(result.frame) == min(len(frame), 2)
+    assert result.truncated == (len(frame) > 2)
+
+
+def test_apply_row_limit_is_a_no_op_in_the_demo(contacts_frame):
+    """No cap means no truncation, so the demo shows the whole file."""
+    result = apply_row_limit(contacts_frame, resolve_limits(False))
+    assert len(result.frame) == len(contacts_frame)
+    assert not result.truncated
 
 
 def test_apply_row_limit_keeps_everything_when_licensed():

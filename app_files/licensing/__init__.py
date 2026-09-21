@@ -6,7 +6,9 @@ interface asks this layer what it is allowed to do and passes the answer down.
 """
 
 from app_files.licensing.limits import (
+    DEMO_BATCH_MAX_FILES,
     DEMO_LIMITS,
+    DEMO_RUNS_PER_SESSION,
     FULL_LIMITS,
     LimitExceededError,
     Limits,
@@ -27,7 +29,9 @@ from app_files.licensing.loader import (
 from app_files.licensing.signing import SECRET_KEY, secret_key, sign, signature_matches
 
 __all__ = [
+    "DEMO_BATCH_MAX_FILES",
     "DEMO_LIMITS",
+    "DEMO_RUNS_PER_SESSION",
     "FULL_LIMITS",
     "SECRET_KEY",
     "License",

@@ -119,13 +119,18 @@ h1, h2, h3, h4, .dr-title {{
 
 /* Nav — a paper-on-ink bar, not the old indigo. */
 .dr-nav {{
-  background: var(--ink); border-bottom: 8px solid var(--amber);
+  background: var(--ink); border-bottom: 4px solid var(--amber);
   padding: 12px 24px; display: flex; align-items: center; gap: 4px;
   flex-wrap: wrap;
 }}
 .dr-nav .dr-brand {{
   font-family: var(--serif); color: var(--surface); font-weight: 600;
   font-size: 19px; margin-right: 20px; letter-spacing: .01em;
+}}
+/* The optional side panel some layouts use: surface on paper, ruled on the
+   right. Present so a route can adopt it without inventing its own colours. */
+.dr-sidebar {{
+  background: var(--surface); border-right: 1px solid var(--line);
 }}
 
 /* Cards and metrics. */
@@ -199,6 +204,18 @@ h1, h2, h3, h4, .dr-title {{
   border: 1px solid var(--amber); border-radius: 6px; padding: 12px 16px;
   font-size: .88rem; color: var(--ink-soft);
 }}
+/* A calm informational strip, for things that are not warnings. */
+.dr-note-info {{ background: var(--teal-soft); border-color: var(--teal); }}
+/* The demo banner: a standing state, so it is quiet rather than alarming. */
+.dr-note-demo {{
+  background: var(--amber-soft); border-color: var(--amber);
+  justify-content: space-between; flex-wrap: wrap; margin-top: 18px;
+}}
+.dr-buy {{
+  color: var(--ink); font-weight: 600; text-decoration: none;
+  border-bottom: 2px solid var(--amber); white-space: nowrap;
+}}
+.dr-buy:hover {{ color: var(--amber); }}
 
 /* Download card. */
 .dr-download-card {{
@@ -246,13 +263,132 @@ h1, h2, h3, h4, .dr-title {{
 
 /* Drop zone. */
 .dr-dropzone {{
-  background: var(--surface); border: 1.5px dashed var(--slate-light);
-  border-radius: 8px; padding: 32px;
+  background: var(--surface); border: 1.5px dashed var(--slate-light) !important;
+  border-radius: 8px; padding: 8px;
 }}
-.dr-dropzone:hover {{ border-color: var(--amber); }}
+.dr-dropzone:hover {{ border-color: var(--amber) !important; }}
+/* Quasar's uploader paints its own grey card and blue "add" strip; strip both
+   so the dashed surface shows through. */
+.dr-dropzone .q-uploader__header {{
+  background: transparent !important; color: var(--ink) !important;
+  border: none !important; height: auto !important; min-height: 0 !important;
+  padding: 8px !important;
+}}
+.dr-dropzone .q-uploader__list {{ background: var(--surface) !important; }}
+.dr-dropzone .q-uploader__header-content {{ color: var(--slate) !important; }}
+.dr-dropzone .q-btn {{ color: var(--amber) !important; }}
+
+/* ---- Quasar controls, re-skinned so nothing renders in default styling ----
+   Everything below exists because NiceGUI ships Quasar defaults (indigo
+   accents, grey borders, blue focus rings) that would otherwise ignore the
+   palette. Each rule maps one Quasar class onto a design token. */
+
+/* Text, number and textarea fields. Outlined by default, ink focus. */
+.dr-field .q-field__control,
+.q-field--outlined .q-field__control {{
+  background: var(--surface) !important;
+  border-radius: 6px !important;
+}}
+.dr-field .q-field__control:before,
+.q-field--outlined .q-field__control:before {{ border-color: var(--line) !important; }}
+.dr-field .q-field__control:hover:before,
+.q-field--outlined .q-field__control:hover:before {{ border-color: var(--slate-light) !important; }}
+.dr-field .q-field--focused .q-field__control:after,
+.q-field--outlined.q-field--focused .q-field__control:after {{
+  border-color: var(--amber) !important;
+}}
+.dr-field .q-field__label,
+.q-field__label {{ color: var(--slate) !important; }}
+.q-field__native, .q-field__input {{ color: var(--ink) !important; }}
+.q-field__marginal {{ color: var(--slate) !important; }}
+.q-placeholder {{ color: var(--slate-light) !important; }}
+.q-field__bottom {{ color: var(--slate) !important; }}
+
+/* Select menus and their popups. */
+.q-menu {{
+  background: var(--surface) !important; border: 1px solid var(--line) !important;
+  border-radius: 6px !important; box-shadow: 0 8px 24px rgba(43, 36, 32, .12) !important;
+}}
+.q-item {{ color: var(--ink) !important; }}
+.q-item.q-manual-focusable--focused, .q-item--active {{
+  background: var(--amber-soft) !important; color: var(--ink) !important;
+}}
+.q-item__label {{ color: inherit !important; }}
+
+/* Checkbox and switch. */
+.q-checkbox__inner--truthy .q-checkbox__bg,
+.q-checkbox__inner--indet .q-checkbox__bg {{ background: var(--ink) !important; }}
+.q-checkbox__inner .q-checkbox__bg {{ border-color: var(--line) !important; }}
+.q-checkbox__label, .q-toggle__label {{ color: var(--ink) !important; }}
+.q-toggle__inner--truthy .q-toggle__track {{ background: var(--teal) !important; }}
+.q-toggle__inner--truthy .q-toggle__thumb {{ color: var(--teal) !important; }}
+
+/* Radio and slider. */
+.q-radio__inner--truthy .q-radio__bg {{ color: var(--teal) !important; }}
+.q-radio__label {{ color: var(--ink) !important; }}
+/* The job-type chooser reads as a pair of options, not a bare radio group. */
+.dr-radio .q-radio {{ padding: 8px 14px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--surface); }}
+.dr-radio .q-radio + .q-radio {{ margin-left: 10px; }}
+.q-slider__track {{ color: var(--line) !important; }}
+.q-slider__selection {{ color: var(--amber) !important; }}
+.q-slider__thumb {{ color: var(--amber) !important; }}
+
+/* Tabs. */
+.dr-tabs .q-tab {{ color: var(--slate) !important; text-transform: none !important; }}
+.dr-tabs .q-tab--active {{ color: var(--ink) !important; font-weight: 600 !important; }}
+.dr-tabs .q-tab__indicator {{ background: var(--amber) !important; height: 3px !important; }}
+.dr-tabs .q-tabs__content {{ border-bottom: 1px solid var(--line) !important; }}
+
+/* Expansion panels. */
+.dr-expansion .q-expansion-item__container {{
+  border: 1px solid var(--line) !important; border-radius: 8px !important;
+  background: var(--surface) !important;
+}}
+.dr-expansion .q-item__label {{ color: var(--ink) !important; font-weight: 600 !important; }}
+.dr-expansion .q-expansion-item__toggle-icon {{ color: var(--slate) !important; }}
+.dr-expansion .q-expansion-item__content {{ color: var(--slate) !important; }}
 
 /* Tables inherit the palette rather than NiceGUI's grey. */
-.q-table__container {{ background: var(--surface); border: 1px solid var(--line); }}
+.q-table__container {{ background: var(--surface) !important; border: 1px solid var(--line) !important; }}
+.q-table th {{
+  background: var(--paper) !important; color: var(--ink) !important;
+  font-weight: 600 !important; text-transform: none !important;
+}}
+.q-table td {{ color: var(--ink-soft) !important; }}
+.q-table tbody tr:hover {{ background: var(--amber-soft) !important; }}
+.q-table__bottom {{ color: var(--slate) !important; border-top: 1px solid var(--line) !important; }}
+
+/* Separator, cards and images. */
+.q-separator {{ background: var(--line) !important; }}
+.q-card {{
+  background: var(--surface) !important; border: 1px solid var(--line) !important;
+  border-radius: 8px !important; box-shadow: none !important;
+}}
+.q-img__content > div {{ background: transparent !important; color: var(--ink) !important; }}
+
+/* Notifications (toasts) carry the palette instead of Quasar's stock colours. */
+.q-notification {{
+  background: var(--surface) !important; color: var(--ink) !important;
+  border-left: 4px solid var(--line) !important; border-radius: 6px !important;
+  box-shadow: 0 8px 24px rgba(43, 36, 32, .16) !important; font-family: var(--sans);
+}}
+.q-notification--positive {{ border-left-color: var(--teal) !important; }}
+.q-notification--negative {{ border-left-color: var(--danger) !important; }}
+.q-notification--warning {{ border-left-color: var(--amber) !important; }}
+.q-notification--info {{ border-left-color: var(--slate-light) !important; }}
+
+/* Dialogs, drawers and tooltips. */
+.q-dialog .q-card {{ background: var(--surface) !important; padding: 4px; }}
+.q-tooltip {{
+  background: var(--ink) !important; color: var(--surface) !important;
+  font-family: var(--sans); font-size: 12px;
+}}
+.q-drawer {{ background: var(--surface) !important; }}
+.q-drawer .q-item {{ color: var(--ink) !important; }}
+
+/* Scrollbars, so a long issue table does not break the palette. */
+* {{ scrollbar-color: var(--line) transparent; }}
 """
 
 

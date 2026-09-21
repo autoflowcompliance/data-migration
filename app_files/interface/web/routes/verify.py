@@ -132,11 +132,11 @@ def verify_page() -> None:
             with table:
                 for check in results:
                     with ui.row().classes("items-center gap-3 w-full"):
-                        ui.icon("check_circle" if check.passed else "error").classes(
-                            "text-green-600" if check.passed else "text-red-600"
+                        ui.icon("check_circle" if check.passed else "error").style(
+                            f"color:{theme.TEAL if check.passed else theme.DANGER}"
                         )
                         ui.label(check.name).classes("font-medium w-72")
-                        ui.label(check.detail).classes("text-sm text-gray-500")
+                        ui.label(check.detail).classes("text-sm").style(f"color:{theme.SLATE}")
                 passed = sum(1 for check in results if check.passed)
                 if passed == len(results):
                     ui.notify(f"All {passed} checks passed.", type="positive")

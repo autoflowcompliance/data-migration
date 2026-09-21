@@ -12,6 +12,7 @@ characters that would otherwise break the markup.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from html import escape
 from typing import Callable, Iterable, Sequence
 
@@ -170,6 +171,103 @@ def unavailable_note(feature_name: str) -> None:
         f"<b>{escape(feature_name)}</b> isn't wired up in this build yet — "
         "the rest of DataReady works normally.</div></div>"
     )
+
+
+# ---------------------------------------------------------------------------
+# Form controls, pre-skinned
+# ---------------------------------------------------------------------------
+# Every input in the app goes through these so Quasar's stock outlines and
+# indigo focus colour never appear. The heavy lifting is in the stylesheet; the
+# helpers exist so a call site cannot forget the class.
+def field(label: str = "", **kwargs):
+    """An outlined text field in the house style."""
+    return ui.input(label, **kwargs).classes("dr-field w-full").props("outlined dense")
+
+
+def number_field(label: str = "", **kwargs):
+    return ui.number(label, **kwargs).classes("dr-field w-full").props("outlined dense")
+
+
+def textarea(label: str = "", **kwargs):
+    return ui.textarea(label, **kwargs).classes("dr-field w-full").props("outlined")
+
+
+def select(options, label: str = "", **kwargs):
+    return ui.select(options, label=label, **kwargs).classes("dr-field").props(
+        "outlined dense"
+    )
+
+
+@contextmanager
+def tabs(names: Sequence[str]):
+    """A tab strip in the house style, yielding ``(strip, panels)``.
+
+    Usage::
+
+        with c.tabs(["One", "Two"]) as (strip, (first, second)):
+            with ui.tab_panels(strip, value=first): ...
+
+    The panels are plain ``ui.tab`` elements and the caller builds the panel
+    container, because only the caller knows what goes in each one.
+    """
+    with ui.tabs().classes("dr-tabs w-full") as strip:
+        panels = [ui.tab(name) for name in names]
+    yield strip, panels
+
+
+def expansion(title: str, **kwargs):
+    return ui.expansion(title, **kwargs).classes("dr-expansion w-full")
+
+
+# ---------------------------------------------------------------------------
+# Notices and demo messaging
+# ---------------------------------------------------------------------------
+def info_note(text: str) -> None:
+    """A calm informational strip — teal, not the amber of a warning."""
+    ui.html(f'<div class="dr-note dr-note-info">{escape(text)}</div>')
+
+
+def demo_banner(runs: int) -> None:
+    """The persistent demo strip.
+
+    Says what the demo actually is: a run allowance, with everything else
+    switched on. The old wording listed caps that no longer exist (rows, file
+    size, CSV-only), which made the product look smaller than it is — the
+    opposite of what a demo is for.
+
+    ``runs`` comes from the resolved limits rather than being hard-coded here,
+    so lowering ``DEMO_RUNS_PER_SESSION`` changes the banner too.
+    """
+    ui.html(
+        '<div class="dr-note dr-note-demo">'
+        f"<b>Demo mode</b> — {runs} runs per session. Everything else works. "
+        "The licensed version has no limit.</div>"
+    )
+
+
+def runs_exhausted_note(purchase_url: str, runs: int) -> None:
+    """Shown when the run allowance is spent, with the way to remove it."""
+    ui.html(
+        '<div class="dr-note dr-note-demo" style="align-items:center">'
+        f"<span>You've used your {runs} free demo runs. "
+        "The licensed version has no limit.</span>"
+        f'<a class="dr-buy" href="{escape(purchase_url)}" target="_blank" '
+        'rel="noopener">Get a licence →</a></div>'
+    )
+
+
+def report_embed(token: str, height: str = "75vh") -> None:
+    """Embed a published report by token.
+
+    An iframe, not ``ui.html``: a report runs to hundreds of kilobytes, which
+    exceeds the WebSocket message limit and drops the connection. Fetching it
+    over HTTP keeps the socket alive.
+    """
+    from app_files.interface.web.reports import report_url
+
+    ui.element("iframe").props(f'src="{report_url(token)}"').classes(
+        "w-full border rounded-lg"
+    ).style(f"height:{height};background:var(--surface);border-color:var(--line)")
 
 
 # ---------------------------------------------------------------------------

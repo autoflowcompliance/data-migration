@@ -34,3 +34,17 @@ def resolve_port(env: Mapping[str, str] | None = None) -> int:
 def resolve_host(env: Mapping[str, str] | None = None) -> str:
     env = os.environ if env is None else env
     return env.get("DATAREADY_HOST") or DEFAULT_HOST
+
+
+DEFAULT_PURCHASE_URL = "https://dataready.app/pricing"
+
+
+def purchase_url(env: Mapping[str, str] | None = None) -> str:
+    """Where the demo's "the licensed version has no limit" link points.
+
+    Configurable because the checkout a self-hosted buyer sees is not the one
+    the hosted demo uses; a deployment sets ``DATAREADY_PURCHASE_URL`` and both
+    the demo banner and the exhausted-runs notice follow it.
+    """
+    env = os.environ if env is None else env
+    return (env.get("DATAREADY_PURCHASE_URL") or "").strip() or DEFAULT_PURCHASE_URL

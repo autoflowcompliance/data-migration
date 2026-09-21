@@ -19,6 +19,7 @@ from typing import Any
 import pandas as pd
 
 from app_files.branding import Branding, inject_branding, inject_demo_watermark
+from app_files.collaboration.comparison import build_comparison, render_comparison_html
 from app_files.ingestion import available_extensions, read_any
 from app_files.licensing import (
     Limits,
@@ -27,10 +28,12 @@ from app_files.licensing import (
     check_file_size,
 )
 from app_files.lineage import LineageTracker
+from app_files.lineage.report import render_lineage_html
 from app_files.mappers import available_crms
 from app_files.pipeline import PipelineResult, run_pipeline
 from app_files.profiling import Profile, profile, render_qa_report_with_profile
 from app_files.rules import RuleConfigError, RuleResult, run_rules_for
+from app_files.utilities.reconciliation_dashboard import Dashboard, build_dashboard
 
 from app_files.interface.web.session import publish_report as store_report
 
@@ -89,9 +92,17 @@ class RunOutcome:
     The report is fetched over HTTP rather than embedded in the element tree,
     because a full QA report is far larger than a WebSocket message.
     """
+    diff_report_html: str = ""
+    """Before/after comparison, rendered standalone."""
+    lineage_report_html: str = ""
+    """Row-level transformation log, rendered standalone."""
+    reconciliation: Dashboard | None = None
+    """Set only for a bank-reconciliation run."""
 
     @property
     def summary(self) -> dict[str, Any]:
+        if self.pipeline is None:
+            return {}
         return self.pipeline.summary()
 
     @property
@@ -101,6 +112,8 @@ class RunOutcome:
     @property
     def issues(self) -> pd.DataFrame:
         """Validation issues plus any rule failures, in one frame."""
+        if self.pipeline is None:
+            return pd.DataFrame()
         frame = self.pipeline.validation.issues_frame()
         if self.rules is None or not self.rules.issues:
             return frame
@@ -126,8 +139,9 @@ class RunOutcome:
             notes.append(self.row_limit.note)
         if self.limits.watermark:
             notes.append(
-                "Demo mode: the report is watermarked and limited to CSV output. "
-                "A licence removes these restrictions."
+                "Demo mode: the report is watermarked. A licence removes the "
+                "watermark; everything else already works exactly as it does "
+                "in the licensed build."
             )
         return notes
 
@@ -225,11 +239,93 @@ def run_migration(
         source_name=source_name,
     )
     outcome.report_token = store_report(html)
+    if tracker is not None:
+        # Both standalone HTML views are small enough for the element tree
+        # (unlike the full QA report), so they are rendered here and embedded
+        # directly rather than published as separate documents.
+        try:
+            outcome.diff_report_html = render_comparison_html(
+                build_comparison(row_limit.frame, tracker, result.clean_frame),
+                title=f"What changed — {Path(source_name).stem}",
+            )
+        except Exception:  # noqa: BLE001 - a missing diff must not fail the run
+            outcome.diff_report_html = ""
+        outcome.lineage_report_html = render_lineage_html(tracker)
     outcome.notes.extend(outcome.warnings())
     if rules is not None and rules.total_failures:
         outcome.notes.append(
             f"{rules.total_failures} rule failure(s) across {rules.rules_run} rule(s)."
         )
+    return outcome
+
+
+def run_reconciliation_migration(
+    bank: pd.DataFrame,
+    ledger: pd.DataFrame,
+    source_name: str,
+    limits: Limits,
+    bank_date_col: str = "Date",
+    bank_amount_col: str = "Amount",
+    ledger_date_col: str = "Date",
+    ledger_amount_col: str = "Amount",
+    tolerance_days: int = 2,
+) -> RunOutcome:
+    """Reconcile a bank statement against a ledger and package the dashboard.
+
+    Bank reconciliation is not a mapping job, so it does not go through
+    ``run_pipeline``. It still returns a :class:`RunOutcome` so the results page
+    has one shape to render, with ``pipeline`` left ``None``.
+    """
+    from app_files.services.bank_reconciliation.reconciler import reconcile_transactions
+
+    for frame, label, needed in (
+        (bank, "bank statement", {bank_date_col, bank_amount_col}),
+        (ledger, "ledger", {ledger_date_col, ledger_amount_col}),
+    ):
+        missing = sorted(needed - set(frame.columns))
+        if missing:
+            raise ValueError(
+                f"The {label} has no {', '.join(repr(c) for c in missing)} column. "
+                f"Columns found: {', '.join(map(str, frame.columns))}."
+            )
+
+    result = reconcile_transactions(
+        bank,
+        ledger,
+        bank_date_col,
+        bank_amount_col,
+        ledger_date_col,
+        ledger_amount_col,
+        tolerance_days,
+    )
+    # ``build_dashboard`` reads its counts from a ``summary`` key, which only
+    # ``run_reconciliation`` adds. We came in with frames rather than bytes, so
+    # the counts are assembled here to keep the dashboard's numbers populated.
+    # The totals are the row counts as uploaded, not ``bank_total``/
+    # ``ledger_total``: those are measured after de-duplication, so using them
+    # makes a clean 7-row statement report "0 bank transactions".
+    result["summary"] = {
+        "bank_transactions": len(bank),
+        "ledger_transactions": len(ledger),
+        "matched": len(result["matches"]),
+        "missing_from_books": len(result["bank_only"]),
+        "recorded_but_never_cleared": len(result["ledger_only"]),
+        "bank_duplicates_removed": max(0, len(bank) - result["bank_total"]),
+        "ledger_duplicates_removed": max(0, len(ledger) - result["ledger_total"]),
+    }
+    dashboard = build_dashboard(result, bank_amount_col, tolerance_days=tolerance_days)
+
+    row_limit = apply_row_limit(bank, limits)
+    outcome = RunOutcome(
+        pipeline=None,  # type: ignore[arg-type]
+        profile=profile(bank),
+        limits=limits,
+        row_limit=row_limit,
+        qa_report_html="",
+        source_name=source_name,
+        reconciliation=dashboard,
+    )
+    outcome.notes.extend(outcome.warnings())
     return outcome
 
 

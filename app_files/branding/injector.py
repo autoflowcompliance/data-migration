@@ -180,23 +180,23 @@ def inject_branding_into_bytes(data: bytes, branding: Branding | dict | None = N
 
 _WATERMARK_BADGE = (
     '<div style="position:fixed;top:16px;right:16px;z-index:9999;'
-    "background:#FEF3C7;color:#92400E;border:1px solid #F59E0B;"
+    "background:#F3E3D0;color:#8A5420;border:1px solid #C97A2E;"
     "border-radius:9999px;padding:6px 14px;font:600 12px/1.4 Inter,sans-serif;"
-    'letter-spacing:.02em;">DEMO — first rows only</div>'
+    'letter-spacing:.02em;">DEMO — unlicensed output</div>'
 )
 
 
 def inject_demo_watermark(html: str, note: str = "") -> str:
     """Stamp a demo badge onto a report, plus any row-trim note.
 
-    The demo is useful only if the prospect can tell a trimmed run from a
-    complete one, so the badge is unmissable and the note states exactly how
-    much data was processed.
+    The badge marks the output as unlicensed. The optional note explains a row
+    trim in the rare mode that caps rows — the demo no longer does, so an
+    ordinary run is stamped with the badge alone.
     """
     badge = _WATERMARK_BADGE
     if note:
         badge = badge.replace(
-            "DEMO — first rows only", f"DEMO &middot; {escape(note)}"
+            "DEMO — unlicensed output", f"DEMO &middot; {escape(note)}"
         )
     if "</body>" in html:
         return html.replace("</body>", f"{badge}</body>", 1)

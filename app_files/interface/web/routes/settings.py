@@ -12,6 +12,7 @@ import json
 from nicegui import ui
 
 from app_files.interface.web import components as c
+from app_files.interface.web import session as session_store
 from app_files.interface.web import theme
 from app_files.interface.web.layout import page_shell
 from app_files.licensing import (
@@ -52,22 +53,27 @@ def settings_page() -> None:
         else:
             with ui.row().classes("items-center gap-2"):
                 c.demo_badge("Demo mode")
-                ui.label(licence.reason or "").classes("text-sm text-gray-500")
+                ui.label(licence.reason or "").classes("text-sm").style(
+                    f"color:{theme.SLATE}"
+                )
+            # The demo panel states what the demo actually grants. The run
+            # allowance is shown live, and the other rows name the feature set
+            # rather than a cap, because the demo does not cap them.
+            remaining = session_store.runs_remaining(limits.max_runs_per_session)
             c.metric_row(
                 [
-                    (limits.max_rows or "unlimited", "Row limit"),
-                    (f"{limits.max_file_size_mb:g} MB" if limits.max_file_size_mb else "unlimited",
-                     "File size limit"),
-                    (", ".join(limits.output_formats).upper(), "Output formats"),
-                    ("Off", "Lineage / Batch / Branding"),
+                    (remaining if remaining is not None else "—", "Runs remaining this session"),
+                    ("No limit", "File size"),
+                    ("CSV · Excel · JSON · SQL", "Output formats"),
+                    ("Enabled", "Lineage · Batch · Branding"),
                 ]
             )
 
         c.section("Activate a licence", "Paste the licence JSON you were sent.")
-        licence_box = ui.textarea(
+        licence_box = c.textarea(
             "Licence JSON",
             placeholder='{"email": "...", "issued": "2025-01-01", "signature": "..."}',
-        ).classes("w-full").props("outlined")
+        )
 
         def activate() -> None:
             raw = (licence_box.value or "").strip()
@@ -104,7 +110,7 @@ def settings_page() -> None:
         for label, value in rows:
             with ui.row().classes("items-center gap-3"):
                 ui.label(label).classes("text-sm font-medium w-40")
-                ui.label(value).classes("text-sm text-gray-500 font-mono")
+                ui.label(value).classes("text-sm font-mono").style(f"color:{theme.SLATE}")
 
         c.section("Feature set")
         c.file_table(
@@ -118,13 +124,17 @@ def _feature_frame(limits):
     import pandas as pd
 
     features = [
-        ("Unlimited rows", not limits.max_rows),
-        ("Unlimited file size", not limits.max_file_size_mb),
+        ("Unlimited rows", limits.max_rows is None),
+        ("Unlimited file size", limits.max_file_size_mb is None),
         ("All output formats", len(limits.output_formats) > 1),
         ("No watermark", not limits.watermark),
         ("Row-level lineage", limits.lineage),
         ("Batch folder processing", limits.batch),
         ("White-label branding", limits.branding),
+        (
+            "Unlimited runs",
+            limits.max_runs_per_session is None,
+        ),
     ]
     return pd.DataFrame(
         [

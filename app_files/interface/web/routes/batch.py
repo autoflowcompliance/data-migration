@@ -53,32 +53,39 @@ def batch_page() -> None:
 
         templates = state.templates_on_disk()
         input_state = {"dir": str(Path.cwd() / "samples")}
+        allowance = limits.batch_max_files
 
         with ui.row().classes("gap-4 items-end w-full"):
-            template_select = ui.select(
-                templates, value="hubspot" if "hubspot" in templates else templates[0],
-                label="Target config",
-            ).classes("min-w-56").props("outlined dense")
-            format_select = ui.select(
-                state.allowed_formats(limits), value="csv", label="Output format"
-            ).classes("min-w-40").props("outlined dense")
+            template_select = c.select(
+                templates,
+                "Target config",
+                value="hubspot" if "hubspot" in templates else templates[0],
+            ).classes("min-w-56")
+            format_select = c.select(
+                state.allowed_formats(limits), "Output format", value="csv"
+            ).classes("min-w-40")
 
-        dir_input = ui.input("Input folder", value=input_state["dir"]).classes("w-full").props(
-            "outlined dense"
-        )
-        out_input = ui.input(
+        dir_input = c.field("Input folder", value=input_state["dir"]).classes("w-full")
+        out_input = c.field(
             "Output folder", value=str(Path.cwd() / "batch_output")
-        ).classes("w-full").props("outlined dense")
+        ).classes("w-full")
 
-        found = ui.label("").classes("text-sm text-gray-500")
+        found = ui.label("").classes("text-sm").style(f"color:{theme.SLATE}")
 
         def refresh_count() -> None:
             files = supported_files(dir_input.value or "")
-            found.text = (
-                f"{len(files)} supported file(s) found."
-                if files
-                else "No supported files in that folder."
-            )
+            if not files:
+                found.text = "No supported files in that folder."
+                return
+            if allowance is not None and len(files) > allowance:
+                # Say so up front rather than silently processing three of
+                # forty files and leaving the user to notice.
+                found.text = (
+                    f"{len(files)} supported file(s) found — the demo processes "
+                    f"the first {allowance}."
+                )
+            else:
+                found.text = f"{len(files)} supported file(s) found."
 
         dir_input.on_value_change(lambda _: refresh_count())
         refresh_count()
@@ -90,6 +97,8 @@ def batch_page() -> None:
             if not files:
                 ui.notify("That folder has no supported files.", type="warning")
                 return
+            if allowance is not None:
+                files = files[:allowance]
             progress.clear()
             steps = [f"{path.name}" for path in files]
 
@@ -121,8 +130,8 @@ def batch_page() -> None:
                     ]
                 )
                 ui.label(f"Output written to {result.output_dir}").classes(
-                    "text-sm text-gray-500"
-                )
+                    "text-sm"
+                ).style(f"color:{theme.SLATE}")
                 c.file_table(_summary_frame(result))
 
         theme.button("Run batch", on_click=start_batch).mark(

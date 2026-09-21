@@ -219,28 +219,29 @@ def _same(left: Any, right: Any) -> bool:
 
 # ------------------------------------------------------------------- HTML
 _STYLE = """
+/* Warm Editorial, matching the app: paper page, surface cards, ink text. */
 body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-     margin:0;padding:24px;color:#111827;background:#f9fafb;}
-h1{font-size:20px;margin:0 0 4px;}
+     margin:0;padding:24px;color:#2B2420;background:#F5F0E6;}
+h1{font-size:20px;margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;}
 h2{font-size:15px;margin:24px 0 8px;}
 .wrap{max-width:1100px;margin:0 auto;}
-.note{color:#6b7280;font-size:13px;margin:0 0 16px;}
+.note{color:#6B6255;font-size:13px;margin:0 0 16px;}
 .cards{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;min-width:110px;}
+.card{background:#FDFBF7;border:1px solid #E4DCC8;border-radius:8px;padding:12px 16px;min-width:110px;}
 .card .n{font-size:22px;font-weight:700;}
-.card .l{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;}
-table{border-collapse:collapse;width:100%;background:#fff;font-size:13px;
-      border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;}
-th,td{border-bottom:1px solid #eef0f3;padding:6px 8px;text-align:left;vertical-align:top;}
-th{background:#f3f4f6;font-weight:600;position:sticky;top:0;}
-tr.removed td{background:#fee2e2;color:#7f1d1d;text-decoration:line-through;}
-tr.changed td{background:#fff;}
-td.changed{background:#fef3c7;font-weight:600;}
+.card .l{font-size:12px;color:#6B6255;text-transform:uppercase;letter-spacing:.04em;}
+table{border-collapse:collapse;width:100%;background:#FDFBF7;font-size:13px;
+      border:1px solid #E4DCC8;border-radius:8px;overflow:hidden;}
+th,td{border-bottom:1px solid #E4DCC8;padding:6px 8px;text-align:left;vertical-align:top;}
+th{background:#F5F0E6;font-weight:600;position:sticky;top:0;color:#2B2420;}
+tr.removed td{background:#F3DEDA;color:#7F2A22;text-decoration:line-through;}
+tr.changed td{background:#FDFBF7;}
+td.changed{background:#F3E3D0;font-weight:600;}
 .badge{display:inline-block;font-size:11px;padding:1px 6px;border-radius:10px;font-weight:600;}
-.b-removed{background:#fee2e2;color:#991b1b;}
-.b-changed{background:#fef3c7;color:#92400e;}
-.b-unchanged{background:#e5e7eb;color:#374151;}
-.reason{font-size:11px;color:#6b7280;}
+.b-removed{background:#F3DEDA;color:#8F362C;}
+.b-changed{background:#F3E3D0;color:#8A5420;}
+.b-unchanged{background:#E4DCC8;color:#3A322B;}
+.reason{font-size:11px;color:#6B6255;}
 """
 
 

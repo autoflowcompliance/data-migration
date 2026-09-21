@@ -39,7 +39,7 @@ def templates_page() -> None:
 
         samples = state.available_samples()
         for name in state.templates_on_disk():
-            with ui.card().classes("w-full").props("flat bordered"):
+            with ui.card().classes("w-full"):
                 with ui.row().classes("items-center w-full"):
                     ui.label(name).classes("font-semibold text-lg")
                     ui.space()
@@ -56,13 +56,13 @@ def templates_page() -> None:
                 description = _description(name)
                 ui.label(
                     description or f"Maps source columns onto {config.crm} fields."
-                ).classes("text-sm text-gray-500")
+                ).classes("text-sm").style(f"color:{theme.SLATE}")
 
                 field_names = [f.name for f in config.fields]
                 ui.label(f"{len(field_names)} target field(s)").classes(
-                    "text-xs text-gray-400"
-                )
-                with ui.expansion("Fields").classes("w-full"):
+                    "text-xs"
+                ).style(f"color:{theme.SLATE_LIGHT}")
+                with c.expansion("Fields"):
                     ui.label(", ".join(field_names)).classes("text-sm font-mono")
 
 
@@ -90,7 +90,7 @@ def _sample_for(template: str, samples, limits) -> None:
     """Render the 'try a sample' control for one template."""
     match = next((s for s in samples if s["template"] == template), None)
     if match is None:
-        ui.label("No sample bundled").classes("text-xs text-gray-400")
+        ui.label("No sample bundled").classes("text-xs").style(f"color:{theme.SLATE_LIGHT}")
         return
 
     def run_sample() -> None:
@@ -103,6 +103,4 @@ def _sample_for(template: str, samples, limits) -> None:
         session_store.set_outcome(outcome)
         ui.navigate.to("/results")
 
-    theme.button(f"Try with {match['file']}", on_click=run_sample).props(
-        "outline no-caps dense"
-    )
+    theme.download_button(f"Try with {match['file']}", on_click=run_sample)

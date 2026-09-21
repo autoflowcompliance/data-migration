@@ -51,24 +51,16 @@ def branding_page() -> None:
                 "here will be applied as soon as a licence is installed.</div>"
             )
 
-        company = ui.input("Company name", value=branding.company_name).classes(
-            "w-full"
-        ).props("outlined dense")
-        email = ui.input("Contact email", value=branding.contact_email or "").classes(
-            "w-full"
-        ).props("outlined dense")
-        website = ui.input("Website", value=branding.website or "").classes(
-            "w-full"
-        ).props("outlined dense")
-        accent = ui.input("Accent colour", value=branding.accent_color).classes(
-            "w-48"
-        ).props("outlined dense")
+        company = c.field("Company name", value=branding.company_name)
+        email = c.field("Contact email", value=branding.contact_email or "")
+        website = c.field("Website", value=branding.website or "")
+        accent = c.field("Accent colour", value=branding.accent_color).classes("w-48")
         powered = ui.switch("Show 'Powered by DataReady'", value=branding.show_powered_by)
 
         c.section("Logo")
         logo_label = ui.label(
             branding.logo_path or "No logo uploaded yet."
-        ).classes("text-sm text-gray-500")
+        ).classes("text-sm").style(f"color:{theme.SLATE}")
         upload_path = {"path": branding.logo_path}
 
         has_logo = bool(branding.logo_path) and Path(branding.logo_path or "").is_file()
@@ -120,4 +112,4 @@ def branding_page() -> None:
         ui.label(
             "The company name, logo, contact details and accent colour are "
             "substituted into every QA report and batch dashboard at render time."
-        ).classes("text-sm text-gray-500")
+        ).classes("text-sm").style(f"color:{theme.SLATE}")

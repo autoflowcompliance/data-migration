@@ -1,9 +1,18 @@
 """Demo-mode limits, and the one place that decides which features are on.
 
-The hosted demo and an unlicensed client install both run with the same
-restrictions. A licensed install resolves to :data:`FULL_LIMITS`. Nothing else
-in the codebase should hard-code "if demo" checks — call :func:`resolve_limits`
-and read the resulting :class:`Limits`.
+The demo is a sales tool, so it does **not** hide features. An earlier revision
+capped rows at 500, files at 5 MB, output to CSV and switched off lineage,
+batch and branding — which meant a prospect evaluating the product saw a
+crippled tool rather than the one being sold. What the demo limits instead is
+*volume of use*: :data:`DEMO_RUNS_PER_SESSION` runs per browser session.
+
+Everything else is identical to the licensed build. The one genuine difference
+is the report watermark, which marks an unlicensed output rather than removing
+a capability.
+
+A licensed install resolves to :data:`FULL_LIMITS`. Nothing else in the
+codebase should hard-code "if demo" checks — call :func:`resolve_limits` and
+read the resulting :class:`Limits`.
 """
 
 from __future__ import annotations
@@ -13,14 +22,22 @@ from typing import Any
 
 import pandas as pd
 
+DEMO_RUNS_PER_SESSION = 3
+"""Runs an unlicensed visitor may start before the demo asks them to buy."""
+
+DEMO_BATCH_MAX_FILES = 3
+"""A demo batch is a taste, so a folder run is capped rather than disabled."""
+
 DEMO_LIMITS: dict[str, Any] = {
-    "max_rows": 500,
-    "max_file_size_mb": 5,
-    "output_formats": ["csv"],
+    "max_rows": None,
+    "max_file_size_mb": None,
+    "output_formats": ["csv", "excel", "json", "sql"],
     "watermark": True,
-    "lineage": False,
-    "batch": False,
-    "branding": False,
+    "lineage": True,
+    "batch": True,
+    "batch_max_files": DEMO_BATCH_MAX_FILES,
+    "branding": True,
+    "max_runs_per_session": DEMO_RUNS_PER_SESSION,
 }
 
 FULL_LIMITS: dict[str, Any] = {
@@ -30,7 +47,9 @@ FULL_LIMITS: dict[str, Any] = {
     "watermark": False,
     "lineage": True,
     "batch": True,
+    "batch_max_files": None,
     "branding": True,
+    "max_runs_per_session": None,
 }
 
 
@@ -50,6 +69,8 @@ class Limits:
     lineage: bool
     batch: bool
     branding: bool
+    batch_max_files: int | None = None
+    max_runs_per_session: int | None = None
 
     def allows_format(self, output_format: str) -> bool:
         return str(output_format).strip().lower() in self.output_formats
@@ -63,7 +84,9 @@ class Limits:
             "watermark": self.watermark,
             "lineage": self.lineage,
             "batch": self.batch,
+            "batch_max_files": self.batch_max_files,
             "branding": self.branding,
+            "max_runs_per_session": self.max_runs_per_session,
         }
 
 
@@ -77,6 +100,10 @@ def _to_limits(raw: dict[str, Any], demo: bool) -> Limits:
         lineage=raw["lineage"],
         batch=raw["batch"],
         branding=raw["branding"],
+        # Read with a default so a config written before these keys existed
+        # still resolves rather than raising a KeyError.
+        batch_max_files=raw.get("batch_max_files"),
+        max_runs_per_session=raw.get("max_runs_per_session"),
     )
 
 
@@ -134,9 +161,9 @@ class RowLimitResult:
 def apply_row_limit(frame: pd.DataFrame, limits: Limits) -> RowLimitResult:
     """Trim ``frame`` to the mode's row allowance.
 
-    Truncating rather than rejecting keeps the demo usable on a real export,
-    and the accompanying note is carried into the UI and the watermarked
-    report so the prospect is never shown a score that hides the trim.
+    No current mode sets a row cap, so this is a no-op in practice; it stays
+    because it is the single place a cap would be enforced, and because
+    licensed readers of ``Limits`` can still set one.
     """
     original = len(frame)
     if limits.max_rows is None or original <= limits.max_rows:

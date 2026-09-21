@@ -35,7 +35,7 @@ HTML afterwards. Verify the base report is unpolluted with
 ## Commands
 
 ```bash
-python -m pytest -q                 # full suite, 465 tests, ~11s
+python -m pytest -q                 # full suite, 536 tests, ~12s
 python -m pytest app_files/tests/   # the original 25 pre-existing tests
 python main.py                      # DataReady (NiceGUI) — port 8080
 python build_desktop.py --check     # packaged desktop target
@@ -77,6 +77,31 @@ about. **Rule builder UI is a follow-up feature — not yet in NiceGUI.**
 must produce. If one breaks, the change is guilty until proven innocent:
 revert it or fix the bug. **Never regenerate the expected file to make the test
 green** — that silently deletes the only thing protecting the frozen core.
+
+### The UI end-to-end test has one trick worth knowing
+
+`tests/integration/test_ui_end_to_end.py` renders the real pages through
+NiceGUI's simulation. Its `app_user` fixture is not the library's `user`
+fixture, and it cannot be: NiceGUI runs `main.py` once per process and then
+drops every route it registered, so the second test in a process 404s on
+everything. The fixture purges `app_files.interface.web.routes` from
+`sys.modules` and re-imports it after the reset — the import is what re-runs the
+`@ui.page` decorators. It also sets `NICEGUI_USER_SIMULATION=true` so `ui.run`
+wires up the in-process ASGI app instead of a socket. A new route test should
+take `app_user`, not `user`.
+
+`tests/unit/test_design_port.py` is the design guard: it pins every palette
+token and asserts each Quasar control the app uses has an override. The design
+source of truth is `theme.py` (palette, `STYLESHEET`) and `components.py` (the
+skinned widgets). Routes must reach for the `components` helpers rather than raw
+`ui.input`/`ui.select`, and render markup through `ui.html`.
+
+The demo is a run allowance (`DEMO_RUNS_PER_SESSION`), not a feature cut:
+lineage, batch and branding are all on, and the only real difference is the
+report watermark. Do not reintroduce per-feature `if demo` checks — read the
+resolved `Limits`. The counts in the banner and the exhausted-runs notice are
+passed in from the limits rather than written into the copy, so lowering the
+constant changes the text too.
 
 ## API notes that are easy to get wrong
 

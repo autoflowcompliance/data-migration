@@ -27,6 +27,15 @@ class SessionData:
     output_format: str = "csv"
     batch: Any = None
     """The last :class:`~app_files.batch.runner.BatchResult`, if any."""
+    runs_used: int = 0
+    """Completed demo runs in this session, for the run allowance.
+
+    Stored on the session rather than in ``app.storage.browser`` directly
+    because that storage is a plain dict that only accepts simple values, and
+    because this keeps the counter next to the rest of the per-client state.
+    The session itself is keyed on the browser cookie, so the count survives
+    every page navigation and resets when the cookie does.
+    """
     extras: dict[str, Any] = field(default_factory=dict)
 
 
@@ -88,6 +97,34 @@ def clear(key: str | None = None) -> None:
 def reset_all() -> None:
     """Drop every session. Used by tests to keep them independent."""
     _sessions.clear()
+
+
+# -------------------------------------------------------- demo run allowance
+# The demo allows a fixed number of runs per browser session. The count lives
+# on the cookie-keyed session so it survives navigation, and is checked and
+# incremented in one place from the upload route.
+
+def runs_used(key: str | None = None) -> int:
+    """How many runs this session has already started."""
+    return session(key).runs_used
+
+
+def runs_remaining(allowance: int | None, key: str | None = None) -> int | None:
+    """Runs left, or ``None`` when the mode has no allowance."""
+    if allowance is None:
+        return None
+    return max(0, allowance - runs_used(key))
+
+
+def register_run(key: str | None = None) -> int:
+    """Record a started run and return the new count."""
+    target = session(key)
+    target.runs_used += 1
+    return target.runs_used
+
+
+def reset_runs(key: str | None = None) -> None:
+    session(key).runs_used = 0
 
 
 # --------------------------------------------------------------- report route

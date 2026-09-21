@@ -92,3 +92,50 @@ def test_reports_are_bounded_and_evict_the_oldest():
 
     assert len(session_store._reports) == session_store.MAX_REPORTS
     assert session_store.get_report(first) is None
+
+
+# ------------------------------------------------------- demo run allowance
+def test_runs_start_at_zero_and_count_up():
+    assert session_store.runs_used("browser-a") == 0
+
+    session_store.register_run("browser-a")
+    session_store.register_run("browser-a")
+
+    assert session_store.runs_used("browser-a") == 2
+
+
+def test_runs_remaining_subtracts_from_the_allowance():
+    assert session_store.runs_remaining(3, "browser-a") == 3
+    session_store.register_run("browser-a")
+    assert session_store.runs_remaining(3, "browser-a") == 2
+
+
+def test_runs_remaining_never_goes_negative():
+    for _ in range(5):
+        session_store.register_run("browser-a")
+    assert session_store.runs_remaining(3, "browser-a") == 0
+
+
+def test_no_allowance_means_no_count():
+    """A licensed install has an unlimited allowance, reported as ``None``."""
+    session_store.register_run("browser-a")
+    assert session_store.runs_remaining(None, "browser-a") is None
+
+
+def test_the_count_is_per_session():
+    session_store.register_run("browser-a")
+    session_store.register_run("browser-a")
+    session_store.register_run("browser-b")
+
+    assert session_store.runs_used("browser-a") == 2
+    assert session_store.runs_used("browser-b") == 1
+
+
+def test_reset_runs_clears_only_the_counter():
+    session_store.register_run("browser-a")
+    session_store.session("browser-a").template = "salesforce"
+
+    session_store.reset_runs("browser-a")
+
+    assert session_store.runs_used("browser-a") == 0
+    assert session_store.session("browser-a").template == "salesforce"

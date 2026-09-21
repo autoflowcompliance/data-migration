@@ -44,10 +44,13 @@ def render_lineage_html(tracker: LineageTracker, limit: int = 200) -> str:
     actions = ", ".join(f"{name}: {count}" for name, count in summary["actions"].items())
     return (
         "<html><head><meta charset='utf-8'><title>Lineage report</title>"
-        "<style>body{font-family:sans-serif;padding:24px;color:#111827;}"
-        "table{border-collapse:collapse;width:100%;font-size:13px;}"
-        "th,td{border-bottom:1px solid #e5e7eb;padding:6px 8px;text-align:left;}"
-        "th{background:#f3f4f6;}</style></head><body>"
+        "<style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;"
+        "padding:24px;color:#2B2420;background:#F5F0E6;}"
+        "h1{font-family:Georgia,'Times New Roman',serif;}"
+        "table{border-collapse:collapse;width:100%;font-size:13px;background:#FDFBF7;"
+        "border:1px solid #E4DCC8;border-radius:8px;overflow:hidden;}"
+        "th,td{border-bottom:1px solid #E4DCC8;padding:6px 8px;text-align:left;}"
+        "th{background:#F5F0E6;color:#2B2420;}</style></head><body>"
         "<h1>Transformation lineage</h1>"
         f"<p>{summary['total_events']} events across {summary['rows_touched']} source rows."
         f"{(' Actions &mdash; ' + actions) if actions else ''}</p>"

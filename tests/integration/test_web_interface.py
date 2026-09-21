@@ -83,8 +83,9 @@ def test_load_sample_reads_a_frame():
 
 
 # -------------------------------------------------------------------- formats
-def test_demo_offers_only_csv(demo):
-    assert state.allowed_formats(demo) == ["csv"]
+def test_demo_offers_every_format(demo):
+    """The demo is a sales tool: it must not hide a format the buyer is sold."""
+    assert state.allowed_formats(demo) == ["csv", "excel", "json", "sql"]
 
 
 def test_full_mode_offers_every_format(full):
@@ -127,15 +128,14 @@ def test_full_run_is_not_watermarked(full, contacts_csv):
     assert "DEMO" not in outcome.qa_report_html
 
 
-def test_demo_run_enforces_the_row_limit(full, contacts_csv):
-    """A frame larger than the demo cap is trimmed, and the note says so."""
+def test_demo_run_does_not_truncate(contacts_csv):
+    """No row cap in the demo any more, so the whole file is processed."""
     large = pd.concat([state.load_sample("messy_contacts.csv")] * 200, ignore_index=True)
     outcome = state.run_migration(
         large, source_name="big.csv", template="hubspot", limits=resolve_limits(False)
     )
-    assert outcome.row_limit.truncated
-    assert len(outcome.pipeline.clean_frame) <= 500
-    assert any("500" in note for note in outcome.notes)
+    assert not outcome.row_limit.truncated
+    assert not any("rows" in note for note in outcome.notes)
 
 
 def test_full_run_does_not_truncate(full):
@@ -146,14 +146,16 @@ def test_full_run_does_not_truncate(full):
     assert not outcome.row_limit.truncated
 
 
-def test_demo_run_does_not_track_lineage(demo, contacts_csv):
+def test_demo_run_tracks_lineage(demo, contacts_csv):
+    """Lineage is a headline feature; the demo shows it off like the rest."""
     outcome = state.run_migration(
         state.load_sample("messy_contacts.csv"),
         source_name="x.csv",
         template="hubspot",
         limits=demo,
     )
-    assert outcome.pipeline.lineage_log().empty
+    assert not outcome.pipeline.lineage_log().empty
+    assert outcome.lineage_report_html
 
 
 def test_full_run_tracks_lineage(full):
@@ -167,7 +169,8 @@ def test_full_run_tracks_lineage(full):
 
 
 # ------------------------------------------------------------------- branding
-def test_demo_run_ignores_custom_branding(demo):
+def test_demo_run_applies_custom_branding(demo):
+    """Branding is part of the product, so the demo honours it too."""
     from app_files.branding import Branding
 
     outcome = state.run_migration(
@@ -175,9 +178,9 @@ def test_demo_run_ignores_custom_branding(demo):
         source_name="x.csv",
         template="hubspot",
         limits=demo,
-        branding=Branding(company_name="Should Not Appear"),
+        branding=Branding(company_name="Acme Data Co"),
     )
-    assert "Should Not Appear" not in outcome.qa_report_html
+    assert "Acme Data Co" in outcome.qa_report_html
 
 
 def test_full_run_applies_custom_branding(full):
@@ -279,3 +282,99 @@ def test_the_report_route_serves_the_report_and_404s_unknown_tokens():
     missing = client.get(reports.report_url("not-a-real-token"))
     assert missing.status_code == 404
     assert "no longer available" in missing.text
+
+
+# ------------------------------------------------- new run outputs surfaced
+def test_a_run_carries_the_diff_and_lineage_reports(demo):
+    """Both were computed by the backend but never reached the results page."""
+    outcome = state.run_migration(
+        state.load_sample("messy_contacts.csv"),
+        source_name="messy_contacts.csv",
+        template="hubspot",
+        limits=demo,
+    )
+    assert outcome.diff_report_html
+    assert outcome.lineage_report_html
+    # Both reports wear the house palette, not the old grey.
+    assert "#F5F0E6" in outcome.diff_report_html
+    assert "#F5F0E6" in outcome.lineage_report_html
+
+
+def test_the_issues_frame_merges_validation_and_rule_failures(demo):
+    outcome = state.run_migration(
+        state.load_sample("messy_contacts.csv"),
+        source_name="messy_contacts.csv",
+        template="hubspot",
+        limits=demo,
+    )
+    issues = outcome.issues
+    assert not issues.empty
+    assert {"row", "field", "severity", "message"} <= set(issues.columns)
+    if outcome.rules is not None and outcome.rules.total_failures:
+        # Rule failures carry a `check` column that validation issues do not,
+        # so its presence proves the two sources were actually merged.
+        assert "check" in issues.columns
+
+
+def test_rules_are_actually_run_not_just_loaded(demo):
+    """The trap: a config whose rules never run reports a perfect score.
+
+    ``run_pipeline`` validates the mapped frame only; rules are run separately.
+    A regression that drops that call would leave ``quality_score: 100`` and
+    zero issues, which reads as "your data is fine".
+    """
+    outcome = state.run_migration(
+        state.load_sample("messy_contacts.csv"),
+        source_name="messy_contacts.csv",
+        template="hubspot",
+        limits=demo,
+    )
+    assert outcome.rules is not None
+    assert outcome.rules.rules_run > 0
+
+
+# ---------------------------------------------------- reconciliation path
+def test_reconciliation_run_produces_a_dashboard(demo):
+    outcome = state.run_reconciliation_migration(
+        state.load_sample("bank_statement.csv"),
+        state.load_sample("ledger.csv"),
+        source_name="bank_statement.csv",
+        limits=demo,
+    )
+    assert outcome.reconciliation is not None
+    # Reconciliation is not a mapping job, so there is no pipeline behind it —
+    # and the results page must still be able to read it.
+    assert outcome.pipeline is None
+    assert outcome.summary == {}
+    assert outcome.issues.empty
+    summary = outcome.reconciliation.summary
+    assert summary.bank_transactions > 0
+    assert summary.matched > 0
+    assert summary.match_rate > 0
+
+
+def test_reconciliation_dashboard_report_wears_the_palette(demo):
+    from app_files.utilities.reconciliation_dashboard import render_dashboard_html
+
+    outcome = state.run_reconciliation_migration(
+        state.load_sample("bank_statement.csv"),
+        state.load_sample("ledger.csv"),
+        source_name="bank_statement.csv",
+        limits=demo,
+    )
+    html = render_dashboard_html(outcome.reconciliation)
+    assert "#F5F0E6" in html
+    assert "#FDFBF7" in html
+    # The old green/red defaults are gone.
+    assert "#059669" not in html
+    assert "#dc2626" not in html
+
+
+def test_reconciliation_rejects_a_frame_without_the_named_columns(demo):
+    """The four column names are required; a missing one must be explained."""
+    frame = pd.DataFrame({"When": ["2025-01-01"], "Value": ["1.00"]})
+    with pytest.raises(ValueError, match="bank statement has no"):
+        state.run_reconciliation_migration(
+            frame, state.load_sample("ledger.csv"),
+            source_name="bank.csv", limits=demo,
+        )
