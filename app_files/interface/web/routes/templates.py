@@ -49,8 +49,8 @@ def templates_page() -> None:
                     config = load_mapping_config(name)
                 except Exception as exc:  # noqa: BLE001 - show the problem, keep the page
                     ui.label(f"This config could not be loaded: {exc}").classes(
-                        "text-red-600 text-sm"
-                    )
+                        "text-sm"
+                    ).style(f"color:{theme.DANGER}")
                     continue
 
                 description = _description(name)

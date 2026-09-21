@@ -1,8 +1,8 @@
-"""Launch the DataReady web UI. ``python main.py`` from the repo root.
+"""Launch the DataFlow web UI. ``python main.py`` from the repo root.
 
 One interface ships in this checkout:
 
-* **DataReady** — the NiceGUI web app under ``app_files/interface/web``.
+* **DataFlow** — the NiceGUI web app under ``app_files/interface/web``.
 
 The port comes from ``PORT`` (what a PaaS injects) then ``DATAREADY_PORT``,
 then the default; see :func:`app_files.settings.resolve_port`.
@@ -23,7 +23,7 @@ from app_files.settings import resolve_host, resolve_port  # noqa: E402
 
 
 def run_nicegui(host: str, port: int) -> None:
-    """Start the DataReady web UI."""
+    """Start the DataFlow web UI."""
     from app_files.interface.web.main import run_server
 
     run_server(host=host, port=port)
@@ -33,7 +33,7 @@ def main() -> None:
     host = resolve_host()
     port = resolve_port()
 
-    print(f"Starting the DataReady interface on http://{host}:{port}")
+    print(f"Starting the DataFlow interface on http://{host}:{port}")
     run_nicegui(host, port)
 
 

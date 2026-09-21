@@ -20,7 +20,7 @@ LICENSE_FILENAME = "license.json"
 
 
 def config_home() -> Path:
-    """The DataReady config directory, overridable for tests and portable installs."""
+    """The DataFlow config directory, overridable for tests and portable installs."""
     override = os.getenv("DATAREADY_HOME")
     if override:
         return Path(override).expanduser()

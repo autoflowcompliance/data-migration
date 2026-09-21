@@ -1,8 +1,8 @@
 services:
-  dataready:
+  dataflow:
     build: .
-    image: dataready:latest
-    container_name: dataready
+    image: dataflow:latest
+    container_name: dataflow
     ports:
       - "8080:8080"
     volumes:

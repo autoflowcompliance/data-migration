@@ -1,4 +1,4 @@
-"""Verify an installed copy of DataReady.
+"""Verify an installed copy of DataFlow.
 
 Usage:
     python tools/verify_install.py
@@ -24,7 +24,7 @@ from app_files.interface.web.routes.verify import run_checks  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Verify this DataReady install.")
+    parser = argparse.ArgumentParser(description="Verify this DataFlow install.")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     args = parser.parse_args(argv)
 

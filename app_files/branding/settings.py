@@ -24,11 +24,11 @@ HEX_COLOUR_LENGTH = 7
 class Branding:
     """Everything the report injector needs to re-skin a deliverable."""
 
-    company_name: str = "DataReady"
+    company_name: str = "DataFlow"
     logo_path: str | None = None
     contact_email: str | None = None
     website: str | None = None
-    accent_color: str = "#4F46E5"
+    accent_color: str = "#C97A2E"
     show_powered_by: bool = True
 
     def as_dict(self) -> dict[str, Any]:
@@ -50,7 +50,7 @@ class Branding:
 
 
 def normalise_colour(value: Any) -> str:
-    """Accept ``#4f46e5``, ``4f46e5`` or a nonsense string; always return a valid hex."""
+    """Accept ``#c97a2e``, ``c97a2e`` or a nonsense string; always return a valid hex."""
     text = str(value or "").strip()
     if not text:
         return Branding.accent_color

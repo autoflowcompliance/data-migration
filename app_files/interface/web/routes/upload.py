@@ -48,6 +48,10 @@ PROCESS_STEPS = [
 CRM_JOB = "CRM export"
 RECON_JOB = "Bank reconciliation"
 
+# The user-facing workflow, distinct from PROCESS_STEPS (the pipeline's own
+# internal phases shown as a live checklist beneath it).
+WORKFLOW_STEPS = ["Upload", "Configure", "Process", "Review"]
+
 
 @ui.page("/upload")
 def upload_page() -> None:
@@ -62,6 +66,21 @@ def upload_page() -> None:
             "CSV, Excel, JSON or a bank-statement PDF. Everything is processed "
             "in memory and, in client mode, on this machine.",
         )
+
+        steps_slot = ui.column().classes("w-full")
+
+        def show_steps(current: int) -> None:
+            """Draw the workflow stepper at ``current`` (0-indexed).
+
+            Redrawn rather than built once because the page stays mounted while
+            the run happens: the marker has to move from Upload to Process in
+            place, not on a fresh page load.
+            """
+            steps_slot.clear()
+            with steps_slot:
+                c.step_indicator(WORKFLOW_STEPS, current)
+
+        show_steps(0)
 
         config_row = ui.row().classes("gap-4 items-end w-full")
         with config_row:
@@ -81,6 +100,7 @@ def upload_page() -> None:
 
         def start_run(outcome) -> None:
             """Store a finished outcome and move to the results page."""
+            show_steps(3)
             session_store.set_outcome(outcome)
             session_store.session().template = template_select.value
             session_store.session().output_format = str(format_select.value).strip().lower()
@@ -105,6 +125,7 @@ def upload_page() -> None:
             return True
 
         def run_crm(frame, source_name: str) -> None:
+            show_steps(2)
             checklist_slot.clear()
             with checklist_slot:
                 c.section("Processing")
@@ -135,6 +156,7 @@ def upload_page() -> None:
             start_run(outcome)
 
         def run_reconciliation(bank, ledger, source_name: str) -> None:
+            show_steps(2)
             checklist_slot.clear()
             with checklist_slot:
                 c.section("Processing")
@@ -255,7 +277,7 @@ def upload_page() -> None:
                         max_file_size=_max_bytes(limits),
                         auto_upload=True,
                         label="Drop a file here or click to choose",
-                    ).classes("dr-dropzone w-full")
+                    ).classes("dropzone dr-dropzone w-full")
                 else:
                     with ui.row().classes("w-full gap-4"):
                         with ui.column().classes("flex-1"):
@@ -265,7 +287,7 @@ def upload_page() -> None:
                                 max_file_size=_max_bytes(limits),
                                 auto_upload=True,
                                 label="Bank statement (CSV or PDF)",
-                            ).classes("dr-dropzone w-full")
+                            ).classes("dropzone dr-dropzone w-full")
                         with ui.column().classes("flex-1"):
                             ui.label("Your ledger").classes("text-sm font-semibold")
                             ui.upload(
@@ -273,7 +295,7 @@ def upload_page() -> None:
                                 max_file_size=_max_bytes(limits),
                                 auto_upload=True,
                                 label="Ledger (CSV or PDF)",
-                            ).classes("dr-dropzone w-full")
+                            ).classes("dropzone dr-dropzone w-full")
 
         job_type.on_value_change(lambda _: render_uploader())
         render_uploader()

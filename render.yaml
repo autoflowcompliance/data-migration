@@ -1,4 +1,4 @@
-# Render Blueprint — deploys the DataReady web UI as a Docker web service.
+# Render Blueprint — deploys the DataFlow web UI as a Docker web service.
 #
 #   1. Push this repo to GitHub/GitLab.
 #   2. Render Dashboard -> New + -> Blueprint -> pick the repo.
@@ -17,7 +17,7 @@
 
 services:
   - type: web
-    name: dataready
+    name: dataflow
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .

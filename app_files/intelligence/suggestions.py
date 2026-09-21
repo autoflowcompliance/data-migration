@@ -273,7 +273,7 @@ def render_suggestions_html(suggestion_set: SuggestionSet) -> str:
         "<style>body{font-family:sans-serif;padding:20px;color:#111827;}"
         "ul{list-style:none;padding:0;}li{border-left:4px solid #e5e7eb;padding:8px 14px;"
         "margin-bottom:8px;background:#fff;}li.error{border-color:#dc2626;}"
-        "li.warning{border-color:#f59e0b;}li.info{border-color:#0ea5e9;}"
+        "li.warning{border-color:#f59e0b;}li.info{border-color:#2C7A6B;}"
         ".why{color:#6b7280;font-size:13px;}.do{display:block;font-size:13px;color:#111827;"
         "margin-top:4px;}.ok{color:#047857;font-weight:600;}</style></head><body>"
         f"<h1>Suggestions</h1><p>Quality score {suggestion_set.overall_score:.1f}%</p>"

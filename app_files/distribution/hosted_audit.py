@@ -326,7 +326,7 @@ def render_order_report(order: Order, summary: dict[str, Any]) -> str:
     return (
         "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Data quality audit</title>"
         "<style>body{font-family:sans-serif;padding:24px;color:#111827;}"
-        ".score{font-size:44px;font-weight:700;color:#2563eb;}"
+        ".score{font-size:44px;font-weight:700;color:#C97A2E;}"
         "table{border-collapse:collapse;}th,td{border-bottom:1px solid #e5e7eb;"
         "padding:6px 10px;text-align:left;}" 
         "th{background:#f3f4f6;}</style></head><body>"

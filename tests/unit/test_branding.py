@@ -51,9 +51,9 @@ def png_bytes() -> bytes:
 # ------------------------------------------------------------------- settings
 def test_defaults_are_loaded_when_no_file_exists():
     branding = load_branding()
-    assert branding.company_name == "DataReady"
+    assert branding.company_name == "DataFlow"
     assert branding.logo_path is None
-    assert branding.accent_color == "#4F46E5"
+    assert branding.accent_color == "#C97A2E"
     assert branding.show_powered_by is True
 
 
@@ -84,7 +84,7 @@ def test_partial_file_merges_over_defaults():
     path.write_text(json.dumps({"company_name": "Partial"}), encoding="utf-8")
     branding = load_branding()
     assert branding.company_name == "Partial"
-    assert branding.accent_color == "#4F46E5"  # untouched default
+    assert branding.accent_color == "#C97A2E"  # untouched default
 
 
 def test_unknown_keys_are_ignored():
@@ -100,19 +100,19 @@ def test_corrupt_branding_file_falls_back_to_defaults():
     path = branding_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("{not json", encoding="utf-8")
-    assert load_branding().company_name == "DataReady"
+    assert load_branding().company_name == "DataFlow"
 
 
 @pytest.mark.parametrize(
     ("given", "expected"),
     [
-        ("#4f46e5", "#4F46E5"),
-        ("4f46e5", "#4F46E5"),
+        ("#c97a2e", "#C97A2E"),
+        ("c97a2e", "#C97A2E"),
         ("#FF0000", "#FF0000"),
-        ("", "#4F46E5"),
-        ("nonsense", "#4F46E5"),
-        ("#GGGGGG", "#4F46E5"),
-        ("#12345", "#4F46E5"),
+        ("", "#C97A2E"),
+        ("nonsense", "#C97A2E"),
+        ("#GGGGGG", "#C97A2E"),
+        ("#12345", "#C97A2E"),
     ],
 )
 def test_normalise_colour(given, expected):
@@ -162,12 +162,12 @@ def test_accent_colour_is_applied(report_html):
 
 
 def test_footer_is_present_by_default(report_html):
-    assert "Powered by DataReady" in inject_branding(report_html, Branding())
+    assert "Powered by DataFlow" in inject_branding(report_html, Branding())
 
 
 def test_footer_is_suppressed_when_disabled(report_html):
     branded = inject_branding(report_html, Branding(show_powered_by=False))
-    assert "Powered by DataReady" not in branded
+    assert "Powered by DataFlow" not in branded
 
 
 def test_contact_details_appear_when_set(report_html):
@@ -196,7 +196,7 @@ def test_placeholders_are_substituted_when_a_template_opts_in():
     assert "Acme" in branded
     assert "hi@acme.com" in branded
     assert "{{BRAND_NAME}}" not in branded
-    assert "Powered by DataReady" in branded
+    assert "Powered by DataFlow" in branded
 
 
 def test_company_name_is_html_escaped(report_html):

@@ -24,7 +24,7 @@ output format, and download the results. See [docs/INSTALL.md](docs/INSTALL.md)
 for Docker and Render, and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) to add
 your own target format.
 
-One interface ships: **DataReady**, the NiceGUI web app, served by
+One interface ships: **DataFlow**, the NiceGUI web app, served by
 `python main.py`. It reads the frozen core, the target configs and the licence
 file, and the same command serves the hosted demo and the packaged desktop
 build.
@@ -130,7 +130,7 @@ SQL's numeric affinity and silently rewritten.
 
 ## Web UI
 
-DataReady is the shipped interface: **Upload → Verify → Results**, plus
+DataFlow is the shipped interface: **Upload → Verify → Results**, plus
 Templates, Batch, Branding and Settings. Upload a file, pick a target config,
 run the migration, then download the clean data, the QA report and the mapping
 log — and, when lineage tracking is on, the row-level lineage log. Unlicensed

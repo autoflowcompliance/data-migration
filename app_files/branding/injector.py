@@ -81,7 +81,7 @@ def build_powered_by(branding: Branding) -> str:
         return ""
     return (
         '<footer style="color:#6b7280;font-size:12px;margin-top:36px;'
-        'padding-top:12px;border-top:1px solid #e5e7eb;">Powered by DataReady</footer>'
+        'padding-top:12px;border-top:1px solid #e5e7eb;">Powered by DataFlow</footer>'
     )
 
 

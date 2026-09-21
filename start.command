@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DataReady launcher (macOS, double-clickable).
+# DataFlow launcher (macOS, double-clickable).
 cd "$(dirname "$0")"
 
 PYTHON=python3
@@ -8,7 +8,7 @@ if [ -x "runtime/python/bin/python3" ]; then
 fi
 
 if ! "$PYTHON" -c "import nicegui" >/dev/null 2>&1; then
-  echo "DataReady needs its dependencies. Installing them now…"
+  echo "DataFlow needs its dependencies. Installing them now…"
   "$PYTHON" -m pip install -r requirements.txt
 fi
 

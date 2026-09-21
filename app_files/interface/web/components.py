@@ -39,14 +39,21 @@ def section(title: str, subtitle: str = "") -> None:
 
 
 def nav_bar(links: Sequence[tuple[str, str]], active: str = "") -> None:
-    """Top navigation. Each entry is ``(label, route)``."""
-    with ui.row().classes("dr-nav w-full items-center gap-1"):
-        ui.html('<span class="dr-brand">DataReady</span>')
+    """Top navigation. Each entry is ``(label, route)``.
+
+    Emits the design spec's class names — ``nav-bar``, ``logo``, ``nav-btn``,
+    ``active`` — which the stylesheet styles directly. The earlier ``dr-*``
+    names are kept alongside them; the spec's rules are declared later in the
+    stylesheet, so where the two disagree the spec wins.
+    """
+    with ui.row().classes("nav-bar dr-nav w-full items-center gap-1"):
+        with ui.link(target="/").classes("no-underline"):
+            ui.html('<span class="logo dr-brand">DataFlow</span>')
         for label, route in links:
             element = theme.button(label, on_click=lambda r=route: ui.navigate.to(r))
-            element.classes("dr-nav-btn")
+            element.classes("nav-btn dr-nav-btn")
             if route == active:
-                element.classes("dr-active")
+                element.classes("active dr-active")
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +176,7 @@ def unavailable_note(feature_name: str) -> None:
     ui.html(
         '<div class="dr-note"><span>🔧</span><div>'
         f"<b>{escape(feature_name)}</b> isn't wired up in this build yet — "
-        "the rest of DataReady works normally.</div></div>"
+        "the rest of DataFlow works normally.</div></div>"
     )
 
 

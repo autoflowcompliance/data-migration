@@ -4,7 +4,7 @@ Branding is a licensed feature. The settings file can still be written without
 one (an agency preparing a client folder in advance), but the page says plainly
 that it will not be applied.
 
-Uploaded logos are stored under the DataReady config directory rather than in
+Uploaded logos are stored under the DataFlow config directory rather than in
 the source tree, so an installed client never needs write access to its own
 program files.
 """
@@ -55,7 +55,7 @@ def branding_page() -> None:
         email = c.field("Contact email", value=branding.contact_email or "")
         website = c.field("Website", value=branding.website or "")
         accent = c.field("Accent colour", value=branding.accent_color).classes("w-48")
-        powered = ui.switch("Show 'Powered by DataReady'", value=branding.show_powered_by)
+        powered = ui.switch("Show 'Powered by DataFlow'", value=branding.show_powered_by)
 
         c.section("Logo")
         logo_label = ui.label(
@@ -85,11 +85,11 @@ def branding_page() -> None:
             auto_upload=True,
             label="Upload a logo (PNG, JPG or SVG)",
             max_file_size=2_000_000,
-        ).classes("dr-dropzone w-full")
+        ).classes("dropzone dr-dropzone w-full")
 
         def save() -> None:
             updated = Branding(
-                company_name=company.value or "DataReady",
+                company_name=company.value or "DataFlow",
                 logo_path=upload_path["path"],
                 contact_email=email.value or None,
                 website=website.value or None,

@@ -36,7 +36,7 @@ def batch_page() -> None:
     with page_shell(NAV, active="/batch"):
         c.page_header(
             "Batch processing",
-            "Point DataReady at a folder and get one clean output per file, plus "
+            "Point DataFlow at a folder and get one clean output per file, plus "
             "a combined summary and dashboard.",
         )
 

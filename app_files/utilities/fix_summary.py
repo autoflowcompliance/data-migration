@@ -198,7 +198,7 @@ def _sentences(fix: FixSummary) -> list[str]:
 
 _STYLE = """
 body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:20px;}
-.card{max-width:760px;border:1px solid #e5e7eb;border-left:4px solid #2563eb;
+.card{max-width:760px;border:1px solid #e5e7eb;border-left:4px solid #C97A2E;
       border-radius:8px;padding:16px 20px;background:#fff;}
 h2{margin:0 0 8px;font-size:15px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;}
 p{margin:0;font-size:15px;line-height:1.55;color:#111827;}

@@ -38,7 +38,7 @@ reportlab>=4.0.0
 # surprised. The other four connectors use plain HTTP and need nothing extra.
 boto3>=1.34.0
 
-# Web framework - NiceGUI (the DataReady interface)
+# Web framework - NiceGUI (the DataFlow interface)
 nicegui>=3.0.0,<4.0.0
 
 # REST API (distribution layer) - FastAPI serves the /validate /clean /profile

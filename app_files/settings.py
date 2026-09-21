@@ -36,7 +36,7 @@ def resolve_host(env: Mapping[str, str] | None = None) -> str:
     return env.get("DATAREADY_HOST") or DEFAULT_HOST
 
 
-DEFAULT_PURCHASE_URL = "https://dataready.app/pricing"
+DEFAULT_PURCHASE_URL = "https://dataflow.app/pricing"
 
 
 def purchase_url(env: Mapping[str, str] | None = None) -> str:

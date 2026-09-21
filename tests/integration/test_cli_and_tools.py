@@ -131,13 +131,13 @@ def test_verify_install_tool_fails_on_a_corrupt_licence(monkeypatch, tmp_path):
 
 # ------------------------------------------------------- package builder
 def test_build_creates_a_zip(tmp_path):
-    zip_path = build(tmp_path / "dist", "DataReady-Test")
+    zip_path = build(tmp_path / "dist", "DataFlow-Test")
     assert zip_path.is_file()
     assert zip_path.suffix == ".zip"
 
 
 def test_package_contains_the_app_and_launchers(tmp_path):
-    zip_path = build(tmp_path / "dist", "DataReady-Test")
+    zip_path = build(tmp_path / "dist", "DataFlow-Test")
     with zipfile.ZipFile(zip_path) as archive:
         names = archive.namelist()
     assert any(name.endswith("main.py") for name in names)
@@ -148,7 +148,7 @@ def test_package_contains_the_app_and_launchers(tmp_path):
 
 
 def test_package_excludes_caches_and_compiled_files(tmp_path):
-    zip_path = build(tmp_path / "dist", "DataReady-Test")
+    zip_path = build(tmp_path / "dist", "DataFlow-Test")
     with zipfile.ZipFile(zip_path) as archive:
         names = archive.namelist()
     assert not any("__pycache__" in name for name in names)
@@ -156,15 +156,15 @@ def test_package_excludes_caches_and_compiled_files(tmp_path):
 
 
 def test_package_ships_the_client_readme(tmp_path):
-    zip_path = build(tmp_path / "dist", "DataReady-Test")
+    zip_path = build(tmp_path / "dist", "DataFlow-Test")
     with zipfile.ZipFile(zip_path) as archive:
-        readme = archive.read("DataReady-Test/README.md").decode("utf-8")
+        readme = archive.read("DataFlow-Test/README.md").decode("utf-8")
     assert "start.bat" in readme
     assert "Activate your licence" in readme
 
 
 def test_package_carries_the_client_config_and_samples(tmp_path):
-    zip_path = build(tmp_path / "dist", "DataReady-Test")
+    zip_path = build(tmp_path / "dist", "DataFlow-Test")
     with zipfile.ZipFile(zip_path) as archive:
         names = archive.namelist()
     assert any(name.endswith("configs/client.yaml") for name in names)
@@ -176,7 +176,7 @@ def test_package_can_bundle_a_runtime(tmp_path):
     runtime = tmp_path / "portable_python"
     (runtime / "bin").mkdir(parents=True)
     (runtime / "bin" / "python3").write_text("#!/bin/sh\n", encoding="utf-8")
-    zip_path = build(tmp_path / "dist", "DataReady-Test", runtime=runtime)
+    zip_path = build(tmp_path / "dist", "DataFlow-Test", runtime=runtime)
     with zipfile.ZipFile(zip_path) as archive:
         names = archive.namelist()
     assert any("runtime/python/bin/python3" in name for name in names)
@@ -184,10 +184,10 @@ def test_package_can_bundle_a_runtime(tmp_path):
 
 def test_build_is_repeatable(tmp_path):
     """Rebuilding over an existing folder must not nest or duplicate."""
-    first = build(tmp_path / "dist", "DataReady-Test")
-    second = build(tmp_path / "dist", "DataReady-Test")
+    first = build(tmp_path / "dist", "DataFlow-Test")
+    second = build(tmp_path / "dist", "DataFlow-Test")
     with zipfile.ZipFile(second) as archive:
         names = archive.namelist()
     assert len(names) == len(set(names)), "no duplicate entries"
-    assert not any("DataReady-Test/DataReady-Test/" in name for name in names)
+    assert not any("DataFlow-Test/DataFlow-Test/" in name for name in names)
     assert first == second

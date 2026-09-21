@@ -7,7 +7,7 @@
 # The demo deliberately runs without a licence, so the demo limits in
 # app_files/licensing/limits.py apply: 500 rows, 5 MB, CSV only, watermarked.
 
-app = "dataready-demo"
+app = "dataflow-demo"
 primary_region = "iad"
 
 [build]

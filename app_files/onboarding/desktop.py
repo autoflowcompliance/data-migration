@@ -217,13 +217,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - launcher s
     if UI_INTERNAL_FLAG in raw:
         return run_server(DEFAULT_HOST, int(os.environ.get("DATAREADY_PORT", DEFAULT_PORT)))
 
-    parser = argparse.ArgumentParser(description="Start the DataReady data migration tool.")
+    parser = argparse.ArgumentParser(description="Start the DataFlow data migration tool.")
     parser.add_argument("--port", type=int, default=None, help="preferred port (default: first free from 8080)")
     parser.add_argument("--no-browser", action="store_true", help="do not open a browser window")
     parser.add_argument("--timeout", type=float, default=60.0, help="seconds to wait for startup")
     args = parser.parse_args(argv)
 
-    print("Starting DataReady…")
+    print("Starting DataFlow…")
     try:
         result = launch(port=args.port, open_browser=not args.no_browser, timeout=args.timeout)
     except (FileNotFoundError, RuntimeError) as exc:

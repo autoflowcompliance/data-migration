@@ -139,7 +139,7 @@ h2{font-size:15px;margin:28px 0 10px;text-transform:uppercase;letter-spacing:.05
 .dims{display:flex;gap:14px;flex-wrap:wrap;}
 .dim{min-width:120px;}
 .bar{height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-top:4px;}
-.bar span{display:block;height:100%;background:#2563eb;}
+.bar span{display:block;height:100%;background:#C97A2E;}
 .dim .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;}
 .dim .v{font-size:15px;font-weight:700;}
 table{border-collapse:collapse;width:100%;background:#fff;font-size:13px;

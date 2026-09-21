@@ -40,7 +40,7 @@ def run_server(host: str | None = None, port: int | None = None) -> None:
     show = os.getenv("DATAREADY_SHOW", "1") == "1"
 
     mode = "full" if not limits.demo else "demo"
-    print(f"DataReady starting in {mode} mode on http://{host}:{port}")
+    print(f"DataFlow starting in {mode} mode on http://{host}:{port}")
     if licence.valid:
         print(f"Licensed to {licence.email} (issued {licence.issued})")
     else:
@@ -49,7 +49,7 @@ def run_server(host: str | None = None, port: int | None = None) -> None:
     ui.run(
         host=host,
         port=port,
-        title="DataReady",
+        title="DataFlow",
         favicon=FAVICON if FAVICON.is_file() else "⇄",
         reload=reload_enabled,
         show=show,

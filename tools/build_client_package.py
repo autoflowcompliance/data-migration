@@ -2,7 +2,7 @@
 
 Usage:
     python tools/build_client_package.py
-    python tools/build_client_package.py --out dist --name DataReady-1.0
+    python tools/build_client_package.py --out dist --name DataFlow-1.0
 
 Copies the application, templates, samples and docs into a clean folder, writes
 the per-platform launchers and a client config, and zips the result.
@@ -35,7 +35,7 @@ EXCLUDE_DIRS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".
 EXCLUDE_SUFFIXES = {".pyc", ".pyo"}
 
 START_SH = """#!/usr/bin/env bash
-# DataReady launcher (Linux/macOS)
+# DataFlow launcher (Linux/macOS)
 cd "$(dirname "$0")"
 PYTHON=python3
 if [ -x "runtime/python/bin/python3" ]; then
@@ -45,7 +45,7 @@ exec "$PYTHON" main.py
 """
 
 START_COMMAND = """#!/usr/bin/env bash
-# DataReady launcher (macOS, double-clickable)
+# DataFlow launcher (macOS, double-clickable)
 cd "$(dirname "$0")"
 PYTHON=python3
 if [ -x "runtime/python/bin/python3" ]; then
@@ -55,7 +55,7 @@ exec "$PYTHON" main.py
 """
 
 START_BAT = """@echo off
-REM DataReady launcher (Windows)
+REM DataFlow launcher (Windows)
 cd /d "%~dp0"
 set PYTHON=python
 if exist "runtime\\python\\python.exe" set PYTHON=runtime\\python\\python.exe
@@ -63,7 +63,7 @@ if exist "runtime\\python\\python.exe" set PYTHON=runtime\\python\\python.exe
 pause
 """
 
-CLIENT_README = """# DataReady
+CLIENT_README = """# DataFlow
 
 ## Start the app
 
@@ -170,7 +170,7 @@ def build(out_dir: Path, name: str, runtime: Path | None = None) -> Path:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the client zip.")
     parser.add_argument("--out", type=Path, default=ROOT / "dist")
-    parser.add_argument("--name", default="DataReady-1.0")
+    parser.add_argument("--name", default="DataFlow-1.0")
     parser.add_argument("--runtime", type=Path, default=None,
                         help="path to an unpacked portable Python to bundle")
     parser.add_argument("--no-zip", action="store_true", help="leave the folder, skip the zip")

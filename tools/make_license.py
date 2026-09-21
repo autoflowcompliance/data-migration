@@ -36,7 +36,7 @@ def make_license(email: str, issued: str | None = None, version: str = "1.0") ->
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate a DataReady licence.")
+    parser = argparse.ArgumentParser(description="Generate a DataFlow licence.")
     parser.add_argument("email", help="the buyer's email address")
     parser.add_argument("--issued", default=None, help="issue date (YYYY-MM-DD), default today")
     parser.add_argument("--version", default="1.0", help="licence version")
