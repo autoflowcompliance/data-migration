@@ -36,15 +36,16 @@ def resolve_host(env: Mapping[str, str] | None = None) -> str:
     return env.get("DATAREADY_HOST") or DEFAULT_HOST
 
 
-DEFAULT_PURCHASE_URL = "https://dataflow.app/pricing"
+DEFAULT_PURCHASE_URL = "/buy"
 
 
 def purchase_url(env: Mapping[str, str] | None = None) -> str:
     """Where the demo's "the licensed version has no limit" link points.
 
-    Configurable because the checkout a self-hosted buyer sees is not the one
-    the hosted demo uses; a deployment sets ``DATAREADY_PURCHASE_URL`` and both
-    the demo banner and the exhausted-runs notice follow it.
+    The default is the app's own ``/buy`` page, so the purchase flow is one
+    route rather than an external checkout. A deployment that sells through a
+    hosted checkout instead sets ``DATAREADY_PURCHASE_URL`` and both the demo
+    banner and the exhausted-runs notice follow it.
     """
     env = os.environ if env is None else env
     return (env.get("DATAREADY_PURCHASE_URL") or "").strip() or DEFAULT_PURCHASE_URL

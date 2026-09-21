@@ -25,6 +25,7 @@ from app_files.pipeline import run_pipeline
 NAV = [
     ("Home", "/"),
     ("Settings", "/settings"),
+    ("Buy", "/buy"),
     ("Verify", "/verify"),
 ]
 

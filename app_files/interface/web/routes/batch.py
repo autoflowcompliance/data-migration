@@ -18,6 +18,7 @@ from app_files.interface.web import state
 from app_files.interface.web import theme
 from app_files.interface.web.layout import page_shell
 from app_files.licensing import current_mode
+from app_files.settings import purchase_url
 
 NAV = [
     ("Home", "/"),
@@ -25,6 +26,7 @@ NAV = [
     ("Batch", "/batch"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),
+    ("Buy", "/buy"),
 ]
 
 
@@ -47,7 +49,7 @@ def batch_page() -> None:
                 "Folder processing needs a licence. A licence also unlocks every "
                 "output format and unbounded row counts.",
                 "See the licence options",
-                lambda: ui.navigate.to("/settings"),
+                lambda: ui.navigate.to(purchase_url()),
             )
             return
 

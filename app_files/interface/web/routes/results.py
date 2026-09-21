@@ -34,6 +34,7 @@ NAV = [
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),
+    ("Buy", "/buy"),
 ]
 
 

@@ -22,12 +22,14 @@ from app_files.licensing import (
     verify_license,
     write_license,
 )
+from app_files.settings import purchase_url
 
 NAV = [
     ("Home", "/"),
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),
+    ("Buy", "/buy"),
     ("Verify", "/verify"),
 ]
 
@@ -68,6 +70,7 @@ def settings_page() -> None:
                     ("Enabled", "Lineage · Batch · Branding"),
                 ]
             )
+            c.purchase_note(purchase_url())
 
         c.section("Activate a licence", "Paste the licence JSON you were sent.")
         licence_box = c.textarea(

@@ -34,6 +34,7 @@ NAV = [
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),
+    ("Buy", "/buy"),
 ]
 
 # Build order must match the numbering supplied to the pipeline: the core

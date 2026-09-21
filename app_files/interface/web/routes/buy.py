@@ -27,9 +27,21 @@ import urllib.request
 
 from nicegui import ui
 
+from app_files.interface.web import components as c
 from app_files.interface.web import theme
 
 FORMSPREE_URL = os.environ.get("FORMSPREE_URL", "")
+
+# Mirrors the app-wide nav (the same list every other route declares) so the
+# purchase page is not a dead end and its Buy button shows the active state.
+BUY_NAV = [
+    ("Home", "/"),
+    ("Upload", "/upload"),
+    ("Templates", "/templates"),
+    ("Settings", "/settings"),
+    ("Buy", "/buy"),
+    ("Verify", "/verify"),
+]
 
 PAYMENT_DEFAULTS = {
     "beneficiary": "[YOUR FULL NAME]",
@@ -137,18 +149,25 @@ _PAGE_STYLE = f"""
 """
 
 
-def _page_chrome() -> None:
-    """Shared head injection and the way back for both purchase pages."""
+def _page_chrome(active: str) -> None:
+    """Shared head injection, the app nav, and the way back for both pages.
+
+    ``nav_bar`` is the same bar every other route renders, so the purchase
+    pages are not dead ends and the Buy button highlights while the buyer is
+    here. The explicit back link stays as well: a buyer who landed on
+    ``/buy/confirmed`` from a payment email has no history to go back through.
+    """
     theme.inject_theme()
     ui.add_head_html(_PAGE_STYLE)
+    c.nav_bar(BUY_NAV, active=active)
     ui.link("← Back to DataFlow", "/").classes("no-underline").style(
-        f"display:block; max-width:560px; margin:24px auto -32px; color:{theme.SLATE};"
+        f"display:block; max-width:560px; margin:16px auto -24px; color:{theme.SLATE};"
     )
 
 
 @ui.page("/buy")
 def buy_page() -> None:
-    _page_chrome()
+    _page_chrome(active="/buy")
     with ui.column().classes("we-card"):
         ui.html('<div class="we-title">Get your data cleaned</div>')
         ui.html(
@@ -186,7 +205,7 @@ def buy_page() -> None:
 
 @ui.page("/buy/confirmed")
 def buy_confirmed_page(name: str = "", ref: str = "") -> None:
-    _page_chrome()
+    _page_chrome(active="/buy")
     display_name = name or "there"
     reference = ref or PAYMENT["reference"]
     with ui.column().classes("we-card"):

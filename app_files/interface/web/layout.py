@@ -42,12 +42,17 @@ def _demo_footer() -> None:
     The write-once conditions matter: the limits are read from disk when the
     page is built, so a user who installs a licence while the app is open sees
     the correct state the moment they navigate anywhere.
+
+    The banner's link is resolved through ``purchase_url`` rather than
+    hardcoded, so a deployment that sells through a hosted checkout reaches it
+    from here too.
     """
     from app_files.licensing import DEMO_RUNS_PER_SESSION, current_mode
+    from app_files.settings import purchase_url
 
     licence, limits = current_mode()
     if limits.demo:
-        c.demo_banner(DEMO_RUNS_PER_SESSION)
+        c.demo_banner(DEMO_RUNS_PER_SESSION, purchase_url())
     elif licence.email:
         ui.label(f"Licensed to {licence.email}").classes("text-xs mt-6").style(
             f"color:{theme.SLATE}"

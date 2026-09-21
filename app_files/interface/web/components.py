@@ -234,7 +234,22 @@ def info_note(text: str) -> None:
     ui.html(f'<div class="dr-note dr-note-info">{escape(text)}</div>')
 
 
-def demo_banner(runs: int) -> None:
+def _is_external(url: str) -> bool:
+    """Whether a purchase URL leaves the app.
+
+    A deployment can point ``DATAREADY_PURCHASE_URL`` at a hosted checkout, in
+    which case the link opens in a new tab; the built-in ``/buy`` route stays
+    in the tab so the buyer keeps their session.
+    """
+    return url.startswith(("http://", "https://"))
+
+
+def _buy_anchor(purchase_url: str, label: str = "Get a licence →") -> str:
+    target = ' target="_blank" rel="noopener"' if _is_external(purchase_url) else ""
+    return f'<a class="dr-buy" href="{escape(purchase_url)}"{target}>{escape(label)}</a>'
+
+
+def demo_banner(runs: int, purchase_url: str = "/buy") -> None:
     """The persistent demo strip.
 
     Says what the demo actually is: a run allowance, with everything else
@@ -243,12 +258,14 @@ def demo_banner(runs: int) -> None:
     opposite of what a demo is for.
 
     ``runs`` comes from the resolved limits rather than being hard-coded here,
-    so lowering ``DEMO_RUNS_PER_SESSION`` changes the banner too.
+    so lowering ``DEMO_RUNS_PER_SESSION`` changes the banner too. The link is
+    the demo's one call to action, so it must reach the purchase flow.
     """
     ui.html(
-        '<div class="dr-note dr-note-demo">'
-        f"<b>Demo mode</b> — {runs} runs per session. Everything else works. "
-        "The licensed version has no limit.</div>"
+        '<div class="dr-note dr-note-demo" style="align-items:center">'
+        f"<span><b>Demo mode</b> — {runs} runs per session. Everything else works. "
+        "The licensed version has no limit.</span>"
+        f"{_buy_anchor(purchase_url)}</div>"
     )
 
 
@@ -258,8 +275,20 @@ def runs_exhausted_note(purchase_url: str, runs: int) -> None:
         '<div class="dr-note dr-note-demo" style="align-items:center">'
         f"<span>You've used your {runs} free demo runs. "
         "The licensed version has no limit.</span>"
-        f'<a class="dr-buy" href="{escape(purchase_url)}" target="_blank" '
-        'rel="noopener">Get a licence →</a></div>'
+        f"{_buy_anchor(purchase_url)}</div>"
+    )
+
+
+def purchase_note(purchase_url: str) -> None:
+    """The demo's standing call to action, for panels that are not exhausted.
+
+    Distinct from :func:`runs_exhausted_note`, which claims the allowance is
+    spent — wrong copy to show on a Settings panel a visitor may open first.
+    """
+    ui.html(
+        '<div class="dr-note dr-note-demo" style="align-items:center">'
+        "<span>The licensed version has no limit and no watermark.</span>"
+        f"{_buy_anchor(purchase_url)}</div>"
     )
 
 

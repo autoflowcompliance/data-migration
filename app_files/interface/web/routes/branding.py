@@ -26,6 +26,7 @@ NAV = [
     ("Upload", "/upload"),
     ("Branding", "/branding"),
     ("Settings", "/settings"),
+    ("Buy", "/buy"),
 ]
 
 
