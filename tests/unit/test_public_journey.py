@@ -2,8 +2,9 @@
 
 These guard the shape of the URL space itself. The failure they catch is a
 visitor who reaches ``/`` expecting the product and finds either a 404 or the
-app shell wearing a marketing URL, and the quieter one where the landing page's
-CTAs point at a domain that was never deployed.
+app shell wearing a marketing URL, the quieter one where the landing page's
+CTAs point at a domain that was never deployed, and the footer's Privacy and
+Terms links pointing at pages that were never written.
 """
 
 from __future__ import annotations
@@ -23,11 +24,24 @@ from app_files.interface.web.routes import (
     batch, branding, buy, home, results, settings, templates, upload, verify,
 )
 
-SITE_INDEX = Path(__file__).resolve().parents[2] / "site" / "index.html"
+SITE_DIR = Path(__file__).resolve().parents[2] / "site"
+SITE_INDEX = SITE_DIR / "index.html"
 
 APP_ROUTE_MODULES = (batch, branding, buy, home, results, settings, templates, upload, verify)
 
 ROUTES = "app_files.interface.web.routes"
+
+PUBLIC_PAGES = ("/", "/privacy.html", "/terms.html")
+
+
+@pytest.fixture
+def mounted_public_paths(monkeypatch):
+    """The public document routes actually present on the FastAPI app."""
+    monkeypatch.setattr(landing, "_registered", [])
+    with nicegui_reset_globals():
+        prepare_simulation()
+        landing.register_landing_route()
+        return [getattr(route, "path", None) for route in app.routes]
 
 
 @pytest.fixture
@@ -93,3 +107,69 @@ def test_the_landing_page_is_a_standalone_document():
     assert "<!DOCTYPE html>" in html
     assert "<title>DataFlow" in html
     assert "<style>" in html
+
+
+# ------------------------------------------------------------ privacy & terms
+# The footer has always linked these; before they existed the landing page
+# advertised a privacy policy and terms of sale that 404'd.
+
+def test_every_public_page_maps_to_a_file_that_exists():
+    for route, file in landing.PUBLIC_PAGES.items():
+        assert file.is_file(), f"{route} points at the missing file {file}"
+        assert file.parent == SITE_DIR
+
+
+def test_all_three_public_pages_are_mounted(mounted_public_paths):
+    for route in PUBLIC_PAGES:
+        assert route in mounted_public_paths, f"{route} is not mounted"
+
+
+def test_the_public_routes_are_mounted_once(mounted_public_paths):
+    """Registering twice would shadow the first mount with an identical one."""
+    for route in PUBLIC_PAGES:
+        assert mounted_public_paths.count(route) == 1, f"{route} mounted more than once"
+
+
+def test_the_footer_links_point_at_served_pages():
+    """The landing footer must not link a document that is not mounted."""
+    html = SITE_INDEX.read_text()
+    for route in ("/privacy.html", "/terms.html"):
+        assert f'href="{route}"' in html, f"the footer does not link {route}"
+        assert route in landing.PUBLIC_PAGES, f"{route} is linked but not served"
+
+
+@pytest.mark.parametrize("name", ["privacy.html", "terms.html"])
+def test_each_public_page_is_a_standalone_document(name):
+    html = (SITE_DIR / name).read_text()
+    assert "<!DOCTYPE html>" in html
+    assert "<title>" in html
+    assert "<style>" in html
+
+
+def test_the_public_pages_carry_the_warm_editorial_tokens():
+    """Same palette as the landing page, not a different-looking microsite."""
+    landing_html = SITE_INDEX.read_text()
+    for name in ("privacy.html", "terms.html"):
+        html = (SITE_DIR / name).read_text()
+        for token in ("--ink: #2B2420", "--paper: #F5F0E6", "--amber: #C97A2E",
+                      "--teal: #2C7A6B", "--line: #E4DCC8"):
+            assert token in landing_html, f"the landing page no longer defines {token}"
+            assert token in html, f"{name} is missing the {token} token"
+
+
+def test_the_privacy_page_states_the_retention_position():
+    """The claims a privacy policy is actually read for."""
+    html = (SITE_DIR / "privacy.html").read_text()
+    for claim in ("What we collect: Nothing", "processed in memory",
+                  "Nothing is written to disk", "We do not track you across the web",
+                  "We do not sell data", "autoflowcompliance@outlook.com"):
+        assert claim in html, f"the privacy page does not state {claim!r}"
+
+
+def test_the_terms_page_states_the_commercial_terms():
+    html = (SITE_DIR / "terms.html").read_text()
+    for term in ("perpetual, non-exclusive, non-transferable", "$2,000", "one-time",
+                 "No subscription", "within 24 hours", "30 days of email support",
+                 "lifetime of the current major version", "refund the purchase in full",
+                 "provided as-is", "autoflowcompliance@outlook.com"):
+        assert term in html, f"the terms page does not state {term!r}"
