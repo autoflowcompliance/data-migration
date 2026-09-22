@@ -30,7 +30,7 @@ from app_files.settings import purchase_url
 from app_files.utilities.reconciliation_dashboard import render_dashboard_html
 
 NAV = [
-    ("Home", "/"),
+    ("Home", "/demo"),
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),

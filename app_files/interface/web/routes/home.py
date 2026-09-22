@@ -1,4 +1,9 @@
-"""Route ``/`` — what this does, and one obvious way to start."""
+"""Route ``/demo`` — the app home: what this does, and one obvious way to start.
+
+The app's own home page. The public landing page lives at ``/``
+(:mod:`app_files.interface.web.landing`); this is the first page a visitor
+sees once they step into the demo.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +17,7 @@ from app_files.interface.web import theme
 from app_files.interface.web.layout import page_shell
 
 NAV = [
-    ("Home", "/"),
+    ("Home", "/demo"),
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),
@@ -20,10 +25,10 @@ NAV = [
 ]
 
 
-@ui.page("/")
+@ui.page("/demo")
 def home_page() -> None:
     theme.inject_theme()
-    with page_shell(NAV, active="/"):
+    with page_shell(NAV, active="/demo"):
         branding = load_branding()
         with ui.column().classes("dr-hero gap-0"):
             ui.html(

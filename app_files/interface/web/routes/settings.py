@@ -25,7 +25,7 @@ from app_files.licensing import (
 from app_files.settings import purchase_url
 
 NAV = [
-    ("Home", "/"),
+    ("Home", "/demo"),
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),

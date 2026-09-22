@@ -35,7 +35,7 @@ FORMSPREE_URL = os.environ.get("FORMSPREE_URL", "")
 # Mirrors the app-wide nav (the same list every other route declares) so the
 # purchase page is not a dead end and its Buy button shows the active state.
 BUY_NAV = [
-    ("Home", "/"),
+    ("Home", "/demo"),
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),
@@ -160,7 +160,7 @@ def _page_chrome(active: str) -> None:
     theme.inject_theme()
     ui.add_head_html(_PAGE_STYLE)
     c.nav_bar(BUY_NAV, active=active)
-    ui.link("← Back to DataFlow", "/").classes("no-underline").style(
+    ui.link("← Back to DataFlow", "/demo").classes("no-underline").style(
         f"display:block; max-width:560px; margin:16px auto -24px; color:{theme.SLATE};"
     )
 

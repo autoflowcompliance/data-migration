@@ -23,7 +23,7 @@ from app_files.profiling import profile
 from app_files.pipeline import run_pipeline
 
 NAV = [
-    ("Home", "/"),
+    ("Home", "/demo"),
     ("Settings", "/settings"),
     ("Buy", "/buy"),
     ("Verify", "/verify"),

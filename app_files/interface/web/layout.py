@@ -16,7 +16,7 @@ from app_files.interface.web import theme
 from app_files.interface.web.session import session
 
 NAV = [
-    ("Home", "/"),
+    ("Home", "/demo"),
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Batch", "/batch"),

@@ -84,7 +84,7 @@ async def raw_http():
 
 
 async def test_every_route_renders_the_app_shell(app_user):
-    for path in ["/", "/upload", "/results", "/templates", "/settings",
+    for path in ["/demo", "/upload", "/results", "/templates", "/settings",
                  "/batch", "/branding", "/verify"]:
         await app_user.open(path)
         assert app_user.find("DataFlow").elements, f"{path} did not render the shell"
@@ -98,7 +98,7 @@ async def test_the_served_html_carries_the_design_tokens(raw_http):
     actually receives. This checks the served HTML for the palette and the
     Quasar brand override, on every route.
     """
-    for path in ["/", "/upload", "/results", "/templates", "/settings",
+    for path in ["/demo", "/upload", "/results", "/templates", "/settings",
                  "/batch", "/branding", "/verify"]:
         response = await raw_http.get(path)
         assert response.status_code == 200, f"{path} returned {response.status_code}"
@@ -118,7 +118,7 @@ async def test_the_served_html_carries_the_design_tokens(raw_http):
 
 async def test_the_nav_bar_carries_the_spec_classes(raw_http):
     """The bar and its buttons must reach the browser with the spec's classes."""
-    html = (await raw_http.get("/")).text
+    html = (await raw_http.get("/demo")).text
     for class_name in ("nav-bar", "nav-btn", "logo"):
         assert class_name in html, f"the served nav bar is missing .{class_name} class"
 
@@ -131,7 +131,7 @@ async def test_the_served_html_carries_no_stock_quasar_blue(raw_http):
     serialised into window.vue_config. Both are visible in the served HTML,
     so both are checked here rather than trusting the screenshot.
     """
-    for path in ["/", "/upload", "/settings", "/branding"]:
+    for path in ["/demo", "/upload", "/settings", "/branding"]:
         html = (await raw_http.get(path)).text
         for stock in ("#5898d4", "#26a69a", "#9c27b0"):
             assert stock not in html, f"stock Quasar colour {stock} is served on {path}"

@@ -22,7 +22,7 @@ from app_files.interface.web.layout import page_shell
 from app_files.licensing import config_home, current_mode
 
 NAV = [
-    ("Home", "/"),
+    ("Home", "/demo"),
     ("Upload", "/upload"),
     ("Branding", "/branding"),
     ("Settings", "/settings"),

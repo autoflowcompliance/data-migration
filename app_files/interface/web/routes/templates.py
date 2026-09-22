@@ -18,7 +18,7 @@ from app_files.licensing import current_mode
 from app_files.mappers import load_mapping_config
 
 NAV = [
-    ("Home", "/"),
+    ("Home", "/demo"),
     ("Upload", "/upload"),
     ("Templates", "/templates"),
     ("Settings", "/settings"),

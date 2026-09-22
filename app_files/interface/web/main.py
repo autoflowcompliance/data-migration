@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 from nicegui import ui  # noqa: E402
 
 from app_files.interface.web import routes  # noqa: E402,F401  (registers the routes)
+from app_files.interface.web.landing import register_landing_route  # noqa: E402
 from app_files.interface.web.reports import register_report_route  # noqa: E402
 from app_files.licensing import current_mode  # noqa: E402
 from app_files.settings import resolve_host, resolve_port  # noqa: E402
@@ -33,6 +34,7 @@ def run_server(host: str | None = None, port: int | None = None) -> None:
     runnable directly for the NiceGUI-only workflow.
     """
     register_report_route()
+    register_landing_route()
     licence, limits = current_mode()
     host = host or resolve_host()
     port = port if port is not None else resolve_port()

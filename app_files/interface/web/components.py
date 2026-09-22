@@ -45,9 +45,13 @@ def nav_bar(links: Sequence[tuple[str, str]], active: str = "") -> None:
     ``active`` — which the stylesheet styles directly. The earlier ``dr-*``
     names are kept alongside them; the spec's rules are declared later in the
     stylesheet, so where the two disagree the spec wins.
+
+    The logo points at the app home (``/demo``), not ``/``: ``/`` is the public
+    landing page, and clicking a logo inside the app should keep the visitor in
+    the app.
     """
     with ui.row().classes("nav-bar dr-nav w-full items-center gap-1"):
-        with ui.link(target="/").classes("no-underline"):
+        with ui.link(target="/demo").classes("no-underline"):
             ui.html('<span class="logo dr-brand">DataFlow</span>')
         for label, route in links:
             element = theme.button(label, on_click=lambda r=route: ui.navigate.to(r))
