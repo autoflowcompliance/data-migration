@@ -101,6 +101,18 @@ def test_the_landing_page_has_no_undeployed_demo_domain():
     assert "demo.dataflow.io" not in SITE_INDEX.read_text()
 
 
+def test_every_public_page_gives_one_reachable_contact_address():
+    """A wrong address here is invisible until a customer emails it and gets
+    silence, so it is pinned. ``hello@dataflow.io`` was the landing footer's
+    until it was found to sit on a domain with no DNS record at all."""
+    contact = "autoflowcompliance@outlook.com"
+    for name in ("index.html", "privacy.html", "terms.html"):
+        html = (SITE_DIR / name).read_text()
+        assert contact in html, f"{name} does not give the contact address"
+        for stale in ("hello@dataflow.io", "dataflow.io", "autoflowcompliance.com"):
+            assert stale not in html, f"{name} still points at the dead address {stale}"
+
+
 def test_the_landing_page_is_a_standalone_document():
     """It is served raw, so it must carry its own head and title."""
     html = SITE_INDEX.read_text()
