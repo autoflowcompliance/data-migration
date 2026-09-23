@@ -190,3 +190,35 @@ and `docs/RULES.md`.
 One verified change at a time. Add a single new isolated feature, confirm it
 against the full suite and the goldens, then stop. Bundling several unverified
 features is how this project previously went sideways.
+
+## The web interface is on NiceGUI 3.x
+
+The web UI was ported from NiceGUI 1.x, so 1.x-shaped calls still lurk there
+and fail *silently* — NiceGUI catches handler exceptions and drops them, so the
+page simply appears to do nothing.
+
+- Uploads: `event.content` / `event.name` are gone. NiceGUI 3.x passes one
+  `event.file` whose `read()` (also `text()`, `save()`) is **async** and whose
+  name is `.name`. Handlers must be `async def`. `tests/unit/test_upload_api.py`
+  drives the real `SmallFileUpload` and will fail if this drifts again.
+- Guard the *computed* result, not the declaration. The three `site/*.html`
+  pages shipped their wordmark invisible because `.nav .brand` had no `color`,
+  so "Data" inherited body ink on an ink hero — 1.00:1, no error, no failing
+  test. The same trap had the nav links hovering to `var(--ink)`, vanishing as
+  the pointer reached them. The contrast guards in
+  `tests/unit/test_public_journey.py` resolve `var(--token)` through the page's
+  palette and assert a WCAG ratio, and they loop over **all three** pages —
+  fixing only index.html is how privacy/terms stayed broken. The NiceGUI app
+  nav is fine (its active chip is amber, not ink), so check before "fixing" it.
+
+## The hosted demo (Render) must stay warm
+
+Render's free tier suspends the service after ~15 idle minutes; the next
+visitor pays a cold start (~32s measured). `.github/workflows/keep-alive.yml`
+pings `https://dataflow-awxm.onrender.com/` every 14 minutes.
+
+It is deliberately self-contained: no checkout, no repo access, `permissions:
+{}`. It only curls a URL, so it cannot affect the app or its tests. The
+schedule is pinned by `tests/unit/test_keep_alive_workflow.py` — a cron slowed
+past 15 minutes or a host that no longer matches `render.yaml` stops keeping
+the demo awake while the job still reports success.

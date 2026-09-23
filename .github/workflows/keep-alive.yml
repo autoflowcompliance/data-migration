@@ -1,0 +1,52 @@
+name: Keep the demo awake
+
+# Render's free tier suspends a web service after ~15 minutes idle, and the
+# next visitor then waits through a cold start (measured at ~32s for this
+# app). This workflow pings the service on a schedule so a visitor arriving
+# from the landing page lands on a warm instance instead.
+#
+# Deliberately self-contained: it pings a URL and touches nothing else in the
+# repo, so it cannot affect the app or its tests.
+
+on:
+  schedule:
+    # Every 14 minutes. GitHub runs cron in UTC and may delay a run under load,
+    # so this sits one minute inside Render's 15-minute idle window. Lower it to
+    # '*/10 * * * *' for more margin at the cost of more runs.
+    - cron: '*/14 * * * *'
+  # Lets the schedule be kicked off by hand, and proves the target is correct
+  # without waiting for the next tick.
+  workflow_dispatch:
+
+# The job reads a public URL and needs no repo access at all.
+permissions: {}
+
+# A ping that overlaps the next is redundant, so never queue them up.
+concurrency:
+  group: keep-awake
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DEMO_URL: https://dataflow-awxm.onrender.com/
+    steps:
+      - name: Ping the demo
+        run: |
+          # --fail turns an HTTP 4xx/5xx into a non-zero exit, so a service that
+          # is up but broken still fails this job. Without it curl reports
+          # success for a 503 and the job goes green while the demo is down.
+          #
+          # --max-time is generous: a cold start is the exact case this job
+          # exists to handle, and cutting it short would report a failure for a
+          # service that was merely waking up.
+          code=$(curl --silent --show-error --location \
+                      --fail \
+                      --retry 2 --retry-delay 5 --retry-all-errors \
+                      --max-time 120 \
+                      --output /dev/null \
+                      --write-out '%{http_code}' \
+                      "$DEMO_URL")
+          echo "Pinged $DEMO_URL -> HTTP $code"

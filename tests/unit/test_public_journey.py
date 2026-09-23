@@ -143,6 +143,102 @@ def test_the_landing_page_is_a_standalone_document():
     assert "<style>" in html
 
 
+# ------------------------------------------------- the hero wordmark's legibility
+# The nav wordmark is "Data<span>Flow</span>": the span is amber, the "Data" half
+# takes the colour of the `.brand` rule. That rule had no colour at all, so
+# "Data" inherited body ink (#2B2420) and sat on a hero of the same colour —
+# 1.00:1, literally invisible, leaving only "Flow" on screen. Nothing 404s and
+# no test failed; the page just shipped without half its name.
+
+def _luminance(hex_colour: str) -> float:
+    channels = [int(hex_colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+              for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast(one: str, other: str) -> float:
+    """WCAG contrast ratio between two ``#rrggbb`` colours."""
+    hi, lo = sorted((_luminance(one), _luminance(other)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _token(html: str, name: str) -> str:
+    match = re.search(rf"--{re.escape(name)}:\s*(#[0-9A-Fa-f]{{6}})", html)
+    assert match, f"the landing page no longer defines --{name}"
+    return match.group(1)
+
+
+def _declared_colour(rule_body: str, html: str) -> str | None:
+    """The colour a rule sets, as ``#rrggbb``, resolving a ``var(--token)``.
+
+    The rules here write ``var(--surface)`` rather than a literal, so a naive
+    hex search finds nothing and reports a missing declaration that is present.
+    The ``var()`` form is resolved through the page's own tokens, so the test
+    still fails if a palette value drifts.
+    """
+    match = re.search(r"(?<!-[\w])color:\s*(#[0-9A-Fa-f]{6}|var\(--[\w-]+\))", rule_body)
+    if not match:
+        return None
+    value = match.group(1)
+    if value.startswith("var("):
+        return _token(html, value[6:-1])
+    return value
+
+
+def test_the_hero_wordmark_is_legible_against_the_hero():
+    """Pins the contrast, not the declaration, so a palette change is caught.
+
+    Checked on *every* page that carries the wordmark. The fix landed on
+    index.html first and left privacy/terms still rendering "Data" invisibly,
+    so the loop is the point: one page passing is not the fix.
+    """
+    for name in ("index.html", "privacy.html", "terms.html"):
+        html = (SITE_DIR / name).read_text()
+        brand = re.search(r"\.nav \.brand\s*\{([^}]*)\}", html)
+        assert brand, f"{name} has no .nav .brand rule"
+
+        colour = _declared_colour(brand.group(1), html)
+        assert colour, (
+            f"{name}: .nav .brand sets no colour, so the wordmark inherits body "
+            f"ink and disappears into the ink-coloured hero"
+        )
+
+        ratio = _contrast(colour, _token(html, "ink"))
+        assert ratio >= 4.5, (
+            f"{name}: the hero wordmark is {ratio:.2f}:1 against the hero — it "
+            f"must reach 4.5:1 to be readable"
+        )
+
+
+def test_the_hero_headline_is_legible_against_the_hero():
+    """The h1 has the same failure mode: ink text on an ink hero."""
+    for name in ("index.html", "privacy.html", "terms.html"):
+        html = (SITE_DIR / name).read_text()
+        heading = re.search(r"\bh1\s*\{([^}]*)\}", html)
+        assert heading, f"{name} has no h1 rule"
+        colour = _declared_colour(heading.group(1), html)
+        assert colour, f"{name}: h1 sets no colour, so it inherits body ink on an ink hero"
+        ratio = _contrast(colour, _token(html, "ink"))
+        assert ratio >= 4.5, f"{name}: the h1 is {ratio:.2f}:1 against the hero"
+
+
+def test_the_hero_nav_links_stay_readable_when_hovered():
+    """The hover colour is the same trap: it was ``var(--ink)``, so a nav link
+    turned invisible at the moment the pointer reached it."""
+    for name in ("index.html", "privacy.html", "terms.html"):
+        html = (SITE_DIR / name).read_text()
+        hover = re.search(r"\.nav nav a:hover\s*\{([^}]*)\}", html)
+        assert hover, f"{name} has no .nav nav a:hover rule"
+        colour = _declared_colour(hover.group(1), html)
+        assert colour, f"{name}: the nav hover sets no colour"
+        ratio = _contrast(colour, _token(html, "ink"))
+        assert ratio >= 4.5, (
+            f"{name}: the nav hover colour is {ratio:.2f}:1 against the hero, so "
+            f"the link vanishes as the pointer reaches it"
+        )
+
+
 # ------------------------------------------------------------ privacy & terms
 # The footer has always linked these; before they existed the landing page
 # advertised a privacy policy and terms of sale that 404'd.
