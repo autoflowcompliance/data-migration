@@ -19,6 +19,7 @@ import pytest
 from nicegui import app
 from nicegui.testing.general import nicegui_reset_globals, prepare_simulation
 
+from app_files.interface.web import components
 from app_files.interface.web import landing
 from app_files.interface.web.routes import (
     batch, branding, buy, home, results, settings, templates, upload, verify,
@@ -99,6 +100,27 @@ def test_the_landing_page_hero_cta_points_at_the_demo_route():
 
 def test_the_landing_page_has_no_undeployed_demo_domain():
     assert "demo.dataflow.io" not in SITE_INDEX.read_text()
+
+
+def test_the_app_logo_points_at_the_landing_page():
+    """The app must have a way back to the marketing home.
+
+    The logo is the conventional place for it, and the app is otherwise a
+    closed surface: every NAV entry stays inside the app, so without this a
+    visitor who lands on ``/demo`` from a link has no route back to ``/``.
+    """
+    source = Path(components.__file__).read_text()
+    logo = re.search(r'ui\.link\(target="([^"]+)"\)[^\n]*\n[^\n]*logo dr-brand', source)
+    assert logo, "the nav bar no longer builds the logo link in the expected shape"
+    assert logo.group(1) == "/", f"the app logo points at {logo.group(1)!r}, not '/'"
+
+
+def test_the_landing_nav_links_to_the_demo():
+    """The top nav must offer the demo, not only the hero CTA."""
+    html = SITE_INDEX.read_text()
+    nav = re.search(r"<nav>(.*?)</nav>", html, re.S)
+    assert nav, "the landing page has no top nav"
+    assert '<a href="/demo">Demo</a>' in nav.group(1)
 
 
 def test_every_public_page_gives_one_reachable_contact_address():

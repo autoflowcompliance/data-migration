@@ -154,6 +154,31 @@ async def test_a_crm_sample_run_reaches_the_results_page(app_user):
     assert app_user.find("Quality score").elements
 
 
+async def test_the_run_counter_is_absent_on_a_fresh_visit(app_user):
+    """A first-time visitor must not be greeted with a limit.
+
+    The counter used to render "3 of 3 demo runs left" before anything had been
+    run, which announces a restriction rather than showing the product.
+    """
+    await app_user.open("/upload")
+    app_user.find("Upload your file")
+    await app_user.should_not_see("demo runs left")
+    await app_user.should_not_see("used your")
+
+
+async def test_the_sample_path_never_raises_the_counter(app_user):
+    """The sample consumes no run, so it must not surface an allowance either.
+
+    Clicking the sample button is the guided tour; a visitor who only clicks it
+    has spent nothing, and a "3 of 3 left" banner here was pure noise.
+    """
+    await app_user.open("/upload")
+    app_user.find("Try it with sample data").click()
+    await app_user.should_see("Clean data")
+
+    await app_user.should_not_see("demo runs left")
+
+
 async def test_a_reconciliation_sample_run_reaches_the_dashboard(app_user):
     """The sample must follow the job type, not the config selector.
 

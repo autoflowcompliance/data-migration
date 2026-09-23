@@ -172,8 +172,8 @@ def upload_page() -> None:
             checklist_slot.clear()
             start_run(outcome)
 
-        def handle_crm_upload(event) -> None:
-            data, name = event.content.read(), event.name
+        async def handle_crm_upload(event) -> None:
+            data, name = await event.file.read(), event.file.name
             if not _accept(data, name, limits):
                 return
             try:
@@ -184,8 +184,8 @@ def upload_page() -> None:
             if claim_run():
                 run_crm(frame, name)
 
-        def handle_bank_upload(event) -> None:
-            data, name = event.content.read(), event.name
+        async def handle_bank_upload(event) -> None:
+            data, name = await event.file.read(), event.file.name
             if not _accept(data, name, limits):
                 return
             try:
@@ -196,8 +196,8 @@ def upload_page() -> None:
             bank_state["name"] = name
             _maybe_reconcile()
 
-        def handle_ledger_upload(event) -> None:
-            data, name = event.content.read(), event.name
+        async def handle_ledger_upload(event) -> None:
+            data, name = await event.file.read(), event.file.name
             if not _accept(data, name, limits):
                 return
             try:
@@ -369,8 +369,21 @@ _LEDGER_FOR = {"bank_statement.pdf": "ledger.csv", "bank_statement.csv": "ledger
 
 
 def _run_allowance_note(allowance: int | None, buy_url: str) -> None:
-    """A live count of the remaining demo runs, under the uploader."""
+    """A live count of the remaining demo runs, under the uploader.
+
+    Deliberately silent until the visitor has spent a run. A first-time visitor
+    has no allowance to track yet, so "3 of 3 demo runs left" is a limit
+    announced before anything was used — it reads as a restriction and does
+    nothing to move them toward the product. It becomes useful the moment a run
+    is consumed, and that is when it appears.
+
+    Gating on ``runs_used`` rather than on ``remaining < allowance`` also keeps
+    the sample-data path out of it: the sample never calls ``register_run``, so
+    a visitor who only ever clicks the sample never sees a counter at all.
+    """
     if allowance is None:
+        return
+    if session_store.runs_used() == 0:
         return
     remaining = session_store.runs_remaining(allowance)
     if remaining is None:

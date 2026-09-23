@@ -46,12 +46,13 @@ def nav_bar(links: Sequence[tuple[str, str]], active: str = "") -> None:
     names are kept alongside them; the spec's rules are declared later in the
     stylesheet, so where the two disagree the spec wins.
 
-    The logo points at the app home (``/demo``), not ``/``: ``/`` is the public
-    landing page, and clicking a logo inside the app should keep the visitor in
-    the app.
+    The logo points at ``/``, the public landing page, following the convention
+    that clicking a logo takes you out of the product and back to the marketing
+    home. The app's own home is ``/demo``, which the Home entry still reaches —
+    so the two directions are distinct and both are one click away.
     """
     with ui.row().classes("nav-bar dr-nav w-full items-center gap-1"):
-        with ui.link(target="/demo").classes("no-underline"):
+        with ui.link(target="/").classes("no-underline"):
             ui.html('<span class="logo dr-brand">DataFlow</span>')
         for label, route in links:
             element = theme.button(label, on_click=lambda r=route: ui.navigate.to(r))

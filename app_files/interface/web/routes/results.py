@@ -302,8 +302,16 @@ def _embed_html(html: str, height: str = "70vh") -> None:
 
 
 def _render_run_countdown(limits) -> None:
-    """Remaining demo runs, so the allowance is never a surprise."""
+    """Remaining demo runs, so the allowance is never a surprise.
+
+    Silent until a run has actually been spent, matching the uploader. The
+    results page is reachable from the sample button, which does not consume a
+    run — showing "3 of 3 left" there would announce a limit to a visitor who
+    has used none.
+    """
     if limits.max_runs_per_session is None:
+        return
+    if session_store.runs_used() == 0:
         return
     remaining = session_store.runs_remaining(limits.max_runs_per_session)
     if remaining is None:
@@ -314,4 +322,4 @@ def _render_run_countdown(limits) -> None:
             "The licensed version has no limit."
         )
     else:
-        c.runs_exhausted_note(purchase_url())
+        c.runs_exhausted_note(purchase_url(), limits.max_runs_per_session)

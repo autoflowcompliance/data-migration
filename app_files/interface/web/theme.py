@@ -275,7 +275,13 @@ h1, h2, h3, h4, .dr-title {{
   padding: 8px !important;
 }}
 .dr-dropzone .q-uploader__list {{ background: var(--surface) !important; }}
-.dr-dropzone .q-uploader__header-content {{ color: var(--slate) !important; }}
+/* The heading ("Drop a file here or click to choose") sits at ink weight 500
+   so it reads as the page's instruction rather than as a grey hint, and the
+   file-size line ("0.0B / 0.00%") at slate so it stays subordinate to it. */
+.dr-dropzone .q-uploader__header-content {{ color: var(--ink) !important; font-weight: 500 !important; }}
+.dr-dropzone .q-uploader__title {{ color: var(--ink) !important; font-weight: 500 !important; }}
+.dr-dropzone .q-uploader__subtitle,
+.dr-dropzone .q-item__label--caption {{ color: var(--slate) !important; }}
 .dr-dropzone .q-btn {{ color: var(--amber) !important; }}
 
 /* ---- Quasar controls, re-skinned so nothing renders in default styling ----

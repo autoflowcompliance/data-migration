@@ -70,12 +70,12 @@ def branding_page() -> None:
             preview.set_source(branding.logo_path)
         preview.set_visibility(has_logo)
 
-        def handle_logo(event) -> None:
+        async def handle_logo(event) -> None:
             destination_dir = assets_dir()
             destination_dir.mkdir(parents=True, exist_ok=True)
-            suffix = Path(event.name).suffix.lower() or ".png"
+            suffix = Path(event.file.name).suffix.lower() or ".png"
             destination = destination_dir / f"brand_logo{suffix}"
-            destination.write_bytes(event.content.read())
+            destination.write_bytes(await event.file.read())
             upload_path["path"] = str(destination)
             logo_label.text = str(destination)
             preview.set_source(destination)

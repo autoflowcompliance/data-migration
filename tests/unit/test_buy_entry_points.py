@@ -97,8 +97,66 @@ def test_the_landing_page_has_no_stale_checkout_links():
     assert "dataflow.app/pricing" not in html
 
 
-def _rendered(func, *args) -> str:
-    """The HTML ``func`` passes to ``ui.html``, without a running NiceGUI app."""
+# ------------------------------------------------- the counter's visibility
+# The demo counter is useful only once something has been spent. On a fresh
+# visit it announces a limit instead of showing the product, so these pin when
+# it is allowed to render at all.
+def test_the_counter_is_silent_before_any_run():
+    from app_files.interface.web import session as session_store
+    from app_files.interface.web.routes import upload as upload_route
+
+    session_store.reset_all()
+    captured = _capture(upload_route._run_allowance_note, 3, "/buy")
+    assert captured == [], "the counter rendered before a run was consumed"
+    session_store.reset_all()
+
+
+def test_the_counter_appears_once_a_run_is_spent():
+    from app_files.interface.web import session as session_store
+    from app_files.interface.web.routes import upload as upload_route
+
+    session_store.reset_all()
+    session_store.register_run()
+    html = "".join(_capture(upload_route._run_allowance_note, 3, "/buy"))
+    assert "2 of 3 demo runs left" in html, html
+    session_store.reset_all()
+
+
+def test_the_counter_switches_to_the_exhausted_message_at_the_limit():
+    from app_files.interface.web import session as session_store
+    from app_files.interface.web.routes import upload as upload_route
+
+    session_store.reset_all()
+    for _ in range(3):
+        session_store.register_run()
+    html = "".join(_capture(upload_route._run_allowance_note, 3, "/buy"))
+    assert "used your 3 free demo runs" in html
+    assert 'href="/buy"' in html
+    session_store.reset_all()
+
+
+def test_the_sample_path_never_consumes_a_run():
+    """The sample must not spend an allowance, so it cannot raise the counter.
+
+    Read from the source because the path is a closure inside the page body and
+    is not callable in isolation; the two facts are one behaviour, not two.
+    """
+    from pathlib import Path as _Path
+
+    from app_files.interface.web.routes import upload as upload_route
+
+    source = _Path(upload_route.__file__).read_text()
+    sample = source.split("async def load_sample")[1].split("job_type = ui.radio")[0]
+    assert "register_run" not in sample, "the sample path consumes a demo run"
+    assert "claim_run" not in sample, "the sample path claims a demo run"
+
+
+def _capture(func, *args):
+    """Whatever ``func`` renders, as a list of markup strings.
+
+    Like ``_rendered`` but tolerates a function that legitimately renders
+    nothing, which is the behaviour under test for the pre-run counter.
+    """
     captured = []
 
     class _Ui:
@@ -112,5 +170,15 @@ def _rendered(func, *args) -> str:
         func(*args)
     finally:
         c.ui = original
+    return captured
+
+
+def _rendered(func, *args) -> str:
+    """The HTML ``func`` passes to ``ui.html``, without a running NiceGUI app.
+
+    Fails loudly when ``func`` renders nothing, for the callers that expect a
+    note to be on screen. Use ``_capture`` directly to assert on silence.
+    """
+    captured = _capture(func, *args)
     assert captured, f"{func.__name__} rendered nothing"
     return "".join(captured)
