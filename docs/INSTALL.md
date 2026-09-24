@@ -64,5 +64,6 @@ report). Add a licence through `DATAREADY_HOME` for the full tool.
 python -m pytest -q
 ```
 
-Expect `465 passed`. The suite covers the frozen core plus every new layer, and
-runs in a few seconds — there is no reason not to run it before a commit.
+Expect the whole suite to pass: over 1000 tests covering the frozen core plus
+every new layer, in under twenty seconds — there is no reason not to run it
+before a commit.

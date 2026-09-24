@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import yaml
 
 from app_files.auditors import audit_import
 from app_files.cleaners import load_cleaning_config
@@ -20,17 +21,46 @@ from app_files.pipeline import run_pipeline
 from app_files.reporters import render_audit_report
 
 
+class _UsageError(Exception):
+    """A bad input the caller can fix. Printed as a message, never a traceback."""
+
+    def __init__(self, message: str, code: int = 2) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+# Everything a malformed or incomplete config can throw while loading. The
+# loader lives in the frozen core, so turning these into plain English is the
+# CLI's job: a raw traceback reads as "the tool is broken" to a buyer.
+_CONFIG_ERRORS = (yaml.YAMLError, FileNotFoundError, ValueError, TypeError, KeyError)
+
+
 def _read_csv(path: Path) -> pd.DataFrame:
-    """Read CSV with encoding detection."""
+    """Read CSV with encoding detection.
+
+    A missing, empty or headerless file is a user mistake, not a crash, so it
+    is reported as a :class:`_UsageError` rather than a pandas traceback.
+    """
     import chardet
-    import io
-    
-    with open(path, 'rb') as f:
-        raw = f.read()
-        result = chardet.detect(raw)
-        encoding = result['encoding'] or 'utf-8'
-    
-    return pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding)
+
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise _UsageError(f"Could not read {path}: {exc}") from exc
+
+    if not raw.strip():
+        raise _UsageError(f"{path} is empty — there is nothing to migrate.")
+
+    encoding = chardet.detect(raw)['encoding'] or 'utf-8'
+    try:
+        return pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding)
+    except pd.errors.EmptyDataError as exc:
+        raise _UsageError(
+            f"{path} has no columns to parse — a migration needs a header row "
+            f"and at least one data row."
+        ) from exc
+    except UnicodeDecodeError as exc:
+        raise _UsageError(f"Could not decode {path} as {encoding}: {exc}") from exc
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -49,6 +79,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--audit-key", default=None, help="unique key column for the audit")
     parser.add_argument("--date-dayfirst", action="store_true", 
                        help="Parse dates with day first (DD/MM/YYYY instead of MM/DD/YYYY)")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run the pipeline and print what it would write, without writing it.",
+    )
+    parser.add_argument(
+        "--rollback",
+        type=Path,
+        default=None,
+        help="Also write a rollback file (JSON) recording every change and removal.",
+    )
+    parser.add_argument(
+        "--runbook",
+        type=Path,
+        default=None,
+        help="Also write a cutover runbook (Markdown) for this migration.",
+    )
     return parser
 
 
@@ -118,7 +165,42 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "batch":
         return run_batch_command(argv[1:])
 
+    try:
+        return _run_single_file(argv)
+    except _UsageError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return exc.code
+    except _CONFIG_ERRORS as exc:
+        # A config that will not load is a fixable input error, not a crash.
+        print(
+            f"error: could not load the mapping config: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
+def _run_single_file(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
+
+    # A dry run must not create the output directory, or "nothing was written"
+    # would be false the moment the directory appears.
+    if args.dry_run:
+        from app_files.safety import dry_run
+
+        source = _read_csv(args.input)
+        plan = dry_run(source, args.crm, cleaning_config=load_cleaning_config(args.cleaning_config))
+        print(
+            f"DRY RUN — {plan.rows_in} rows in, {plan.rows_out} out "
+            f"({plan.row_drop} dropped, {plan.duplicates_removed} duplicate(s)), "
+            f"quality score {plan.quality_score}%, {plan.issues} issue(s)"
+        )
+        print("Would write:")
+        for entry in plan.outputs:
+            rows = f" ({entry['rows']} rows)" if "rows" in entry else ""
+            print(f"  {entry['name']}: {entry['filename']}{rows}")
+        print("No files were written.")
+        return 0
+
     args.outdir.mkdir(parents=True, exist_ok=True)
 
     # Load cleaning config and apply date_first preference
@@ -145,6 +227,23 @@ def main(argv: list[str] | None = None) -> int:
         f"quality score {summary['quality_score']}%, "
         f"{summary['errors']} errors, {summary['warnings']} warnings"
     )
+
+    if args.rollback or args.runbook:
+        from app_files.safety import build_cutover_runbook, build_rollback_file
+
+        rollback = build_rollback_file(
+            _read_csv(args.input),
+            args.crm,
+            source_filename=args.input.name,
+            cleaning_config=cleaning_config,
+        )
+        if args.rollback:
+            rollback.write(args.rollback)
+            print(f"Rollback file: {args.rollback} ({len(rollback.entries)} entries)")
+        if args.runbook:
+            content = build_cutover_runbook(rollback, output_dir=str(args.outdir))
+            args.runbook.write_text(content, encoding="utf-8")
+            print(f"Cutover runbook: {args.runbook}")
 
     if args.audit_export:
         if not args.audit_key:

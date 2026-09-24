@@ -11,6 +11,19 @@ from app_files.branding.injector import (
     inject_demo_watermark,
     logo_data_uri,
 )
+from app_files.branding.profiles import (
+    PROFILES_FILENAME,
+    BrandProfile,
+    PortalEntry,
+    ProfileError,
+    ProfileSet,
+    apply_profile_to_report,
+    build_portal,
+    load_profiles,
+    portal_entries_from_directory,
+    profiles_path,
+    save_profiles,
+)
 from app_files.branding.settings import (
     BRANDING_FILENAME,
     Branding,
@@ -22,13 +35,24 @@ from app_files.branding.settings import (
 
 __all__ = [
     "BRANDING_FILENAME",
+    "PROFILES_FILENAME",
+    "BrandProfile",
     "Branding",
+    "PortalEntry",
+    "ProfileError",
+    "ProfileSet",
+    "apply_profile_to_report",
     "branding_path",
+    "build_portal",
     "inject_branding",
     "inject_branding_into_bytes",
     "inject_demo_watermark",
     "load_branding",
+    "load_profiles",
     "logo_data_uri",
     "normalise_colour",
+    "portal_entries_from_directory",
+    "profiles_path",
     "save_branding",
+    "save_profiles",
 ]

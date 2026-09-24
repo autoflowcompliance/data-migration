@@ -29,6 +29,7 @@ from starlette.routing import Route
 
 from app_files.ingestion import UnsupportedFormatError, read_any
 from app_files.lineage import LineageTracker
+from app_files.observability import MetricsRegistry, read_trend
 from app_files.pipeline import run_pipeline
 from app_files.profiling import profile
 
@@ -86,6 +87,151 @@ async def health(request: Request) -> JSONResponse:
             "formats": ["csv", "excel", "json", "sql"],
         }
     )
+
+
+async def health_deep(request: Request) -> JSONResponse:
+    """Full health: liveness plus readiness (configs load, output writable)."""
+    from app_files.observability import full_health
+
+    report = full_health()
+    return JSONResponse(report, status_code=200 if report["ok"] else 503)
+
+
+async def metrics(request: Request) -> Response:
+    """Prometheus text exposition for a scrape."""
+    registry = MetricsRegistry()
+    for entry in read_trend():
+        registry.record_run(
+            status="succeeded",
+            quality=float(entry.get("quality_score", 0.0)),
+            rows=int(entry.get("rows_out", 0)),
+            config=str(entry.get("config", "")),
+        )
+    return Response(registry.render(), media_type="text/plain; version=0.0.4")
+
+
+async def connectors_endpoint(request: Request) -> JSONResponse:
+    """Every connector, with which ones have credentials configured."""
+    from app_files.distribution.connectors import credential_report
+
+    return JSONResponse({"connectors": credential_report()})
+
+
+async def formats_endpoint(request: Request) -> JSONResponse:
+    """Output formats: the built-ins plus any registered plugins."""
+    from app_files.output import FORMATS, available_formats, plugin_report
+
+    return JSONResponse(
+        {
+            "builtin": sorted(FORMATS),
+            "plugins": plugin_report(),
+            "available": available_formats(),
+        }
+    )
+
+
+async def privacy_endpoint(request: Request) -> JSONResponse:
+    """Detect personal data in an uploaded file, and optionally mask it."""
+    form = await request.form()
+    data, filename = await _read_upload(request)
+    frame = _frame_from_bytes(data, filename)
+
+    from app_files.privacy import MaskPlan, detect_personal_data, mask_personal_data
+
+    report = detect_personal_data(frame)
+    payload: dict[str, Any] = {"report": report.as_dict()}
+
+    mask_raw = _form_value(form, "mask", "")
+    if mask_raw:
+        # ``mask`` is a JSON object: {"modes": {...}, "columns": {...}}.
+        try:
+            plan_data = json.loads(mask_raw)
+        except json.JSONDecodeError as exc:
+            raise BadRequest(f"'mask' is not valid JSON: {exc}") from exc
+        plan = MaskPlan(
+            modes=plan_data.get("modes", {}), columns=plan_data.get("columns", {})
+        )
+        result = mask_personal_data(frame, report, plan)
+        payload["masked"] = result.as_dict()
+        payload["masked_rows"] = len(result.frame)
+    return JSONResponse(payload)
+
+
+async def compliance_endpoint(request: Request) -> JSONResponse:
+    """The compliance posture this install can actually verify."""
+    from app_files.platform import assess_compliance
+
+    return JSONResponse(assess_compliance().as_dict())
+
+
+async def admin_endpoint(request: Request) -> JSONResponse:
+    """The read-only admin snapshot: runs, tenants, connectors, formats, health."""
+    from app_files.admin import snapshot
+
+    tenant = request.query_params.get("tenant", "")
+    return JSONResponse(snapshot(tenant=tenant).as_dict())
+
+
+async def deployment_endpoint(request: Request) -> JSONResponse:
+    """Validate a named deployment profile against this environment."""
+    profile = request.query_params.get("profile", "container")
+    from app_files.platform.deployment import DeploymentError, validate_deployment
+
+    try:
+        report = validate_deployment(profile)
+    except DeploymentError as exc:
+        raise BadRequest(str(exc)) from exc
+    return JSONResponse(report.as_dict())
+
+
+async def dry_run_endpoint(request: Request) -> JSONResponse:
+    """Describe what a run would write, without writing anything."""
+    form = await request.form()
+    data, filename = await _read_upload(request)
+    frame = _frame_from_bytes(data, filename)
+    crm = _form_value(form, "crm", "hubspot")
+    output_format = _form_value(form, "format", "csv")
+
+    from app_files.safety import dry_run
+
+    plan = dry_run(frame, crm, output_format=output_format)
+    return JSONResponse(plan.as_dict())
+
+
+async def alerts_endpoint(request: Request) -> JSONResponse:
+    """Evaluate the alert rules against a posted run summary."""
+    body = await request.json()
+    summary = body.get("summary", body) if isinstance(body, dict) else {}
+    rules = _parse_alert_rules(body.get("rules")) if isinstance(body, dict) else None
+
+    from app_files.observability import AlertRule, evaluate_alerts
+
+    if rules is None:
+        rules = [
+            AlertRule(name="run-failed", kind="failure", severity="critical"),
+            AlertRule(name="low-quality", kind="quality_below", threshold=80, severity="warning"),
+            AlertRule(name="slow-run", kind="duration_above", threshold=120, severity="warning"),
+        ]
+    alerts = evaluate_alerts(rules, summary)
+    return JSONResponse({"alerts": [alert.as_dict() for alert in alerts]})
+
+
+def _parse_alert_rules(raw: Any) -> list[Any] | None:
+    if not isinstance(raw, list):
+        return None
+    from app_files.observability import AlertRule
+
+    return [
+        AlertRule(
+            name=str(item.get("name", "rule")),
+            kind=str(item.get("kind", "failure")),
+            threshold=float(item.get("threshold", 0)),
+            severity=str(item.get("severity", "warning")),
+            channels=list(item.get("channels", [])),
+        )
+        for item in raw
+        if isinstance(item, dict)
+    ]
 
 
 def _configs() -> list[str]:
@@ -250,10 +396,20 @@ def create_app() -> Starlette:
     app = Starlette(
         routes=[
             Route("/health", health, methods=["GET"]),
+            Route("/health/deep", health_deep, methods=["GET"]),
+            Route("/metrics", metrics, methods=["GET"]),
+            Route("/connectors", connectors_endpoint, methods=["GET"]),
+            Route("/formats", formats_endpoint, methods=["GET"]),
+            Route("/compliance", compliance_endpoint, methods=["GET"]),
+            Route("/admin", admin_endpoint, methods=["GET"]),
+            Route("/deployment", deployment_endpoint, methods=["GET"]),
             Route("/validate", validate, methods=["POST"]),
             Route("/clean", clean, methods=["POST"]),
             Route("/profile", profile_endpoint, methods=["POST"]),
+            Route("/privacy", privacy_endpoint, methods=["POST"]),
             Route("/reconcile", reconcile, methods=["POST"]),
+            Route("/dry-run", dry_run_endpoint, methods=["POST"]),
+            Route("/alerts", alerts_endpoint, methods=["POST"]),
         ],
         exception_handlers={
             BadRequest: _bad_request,

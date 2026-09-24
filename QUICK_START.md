@@ -14,7 +14,7 @@ pip install -r requirements.txt
 python -m pytest -q
 ```
 
-Expect `465 passed`. The suite takes a few seconds.
+Expect the whole suite to pass: over 1000 tests in under thirty seconds.
 
 ## 3. Run it
 
