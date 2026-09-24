@@ -338,6 +338,45 @@ A channel that fails does not raise: a missed alert is bad, but a failed run
 because an alert could not be sent is worse. Alerts fire on failure, a quality
 score below its floor, and a run over its duration or SLA budget.
 
+## Security and governance
+
+Five roles, most to least privileged: `owner`, `admin`, `operator`, `viewer`,
+`client`. `require(principal, permission)` raises `AccessDenied` rather than
+returning false, because a silent no is how a viewer ends up thinking an admin
+action worked. Managing users is owner-only; an admin runs the system but does
+not hand out access to it. A client principal carries the workspace it may read,
+and a read outside that scope is refused even though the role allows reading —
+a role is what you may do, the scope is what you may do it to.
+
+The audit log is append-only in the sense that the code only appends. That is a
+promise, not a proof. `AuditChain` makes it tamper-evident: each entry hashes the
+entry before it, so editing any record changes every hash after it and
+verification fails at the first edit. The chain is written beside the existing
+log, so the log format and every reader of it are untouched.
+
+Data at rest is encrypted with AES-256-GCM, which authenticates as well as
+encrypts: a tampered ciphertext fails to open rather than returning garbage.
+Keys come from a `SecretStore` — a `chmod 600` file or an injected mapping,
+never a bare environment variable, which leaks into process listings and crash
+dumps. The store refuses a key file other users can read.
+
+```python
+from app_files.governance import (
+    AuditChain, Permission, Principal, Role, SecretStore,
+    encrypt_text, require,
+)
+
+principal = Principal("sam", Role.OPERATOR)
+require(principal, Permission.RUN_PIPELINE)
+
+chain = AuditChain()
+chain.append({"actor": principal.name, "action": "run", "client": "acme"})
+assert chain.verify().ok
+
+key = SecretStore().get("default")
+sealed = encrypt_text('{"client": "acme"}', key)
+```
+
 ## Documentation
 
 | Document | Covers |
@@ -353,13 +392,14 @@ score below its floor, and a run over its duration or SLA budget.
 python -m pytest -q
 ```
 
-Expect `1176 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1257 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
+role-based access control, the tamper-evident audit chain, encryption at rest,
 config-schema validation, golden-file regression fixtures, and malformed-input
-error handling. It runs in about twenty-nine seconds, so there is no reason not
-to run it before a commit.
+error handling. It runs in about thirty seconds, so there is no reason not to
+run it before a commit.
 
 Frozen core: `app_files/cleaners/`, `mappers/`, `validators/`, `auditors/` and
 `reporters/` are treated as stable. New capability goes in sibling packages that

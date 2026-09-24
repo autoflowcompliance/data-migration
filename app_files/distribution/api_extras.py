@@ -30,6 +30,7 @@ from app_files.distribution.api import (
     _frame_from_bytes,
     _read_upload,
 )
+from app_files.governance import AccessDenied, Permission, Principal, Role, require
 from app_files.mappers import load_mapping_config, suggest_mapping
 from app_files.mappers.learning import MappingMemory
 
@@ -209,6 +210,42 @@ async def live_endpoint(request: Request) -> JSONResponse:
     return JSONResponse(report.as_dict(), status_code=report.http_status)
 
 
+def _principal_from_request(request: Request) -> Principal:
+    """Read the caller's role and scope from headers.
+
+    The header carries a declared role, not a credential: authentication is the
+    deployment's job and lands here as an authenticated principal. The point of
+    this route is that authorization is enforced once, centrally, rather than
+    being re-implemented per endpoint.
+    """
+    role = request.headers.get("X-DataFlow-Role", "viewer")
+    scope = request.headers.get("X-DataFlow-Scope", "")
+    name = request.headers.get("X-DataFlow-User", "")
+    unknown = False
+    try:
+        parsed = Role(str(role).lower())
+    except ValueError:
+        parsed = Role.VIEWER
+        unknown = True
+    return Principal(name=name, role=parsed, scope=scope, authenticated=not unknown)
+
+
+async def users_endpoint(request: Request) -> JSONResponse:
+    """An admin-only read. A viewer gets 403, not an empty list."""
+    principal = _principal_from_request(request)
+    try:
+        require(principal, Permission.MANAGE_USERS)
+    except AccessDenied as exc:
+        return JSONResponse({"status": "denied", "error": str(exc)}, status_code=403)
+    return JSONResponse(
+        {
+            "status": "ok",
+            "caller": {"name": principal.name, "role": principal.role.value},
+            "roles": [role.value for role in Role],
+        }
+    )
+
+
 def register_extra_routes(app: Any) -> Any:
     """Add the extra routes to an existing Starlette app. Idempotent."""
     from starlette.routing import Route
@@ -225,6 +262,7 @@ def register_extra_routes(app: Any) -> Any:
         Route("/metrics", metrics_endpoint, methods=["GET"]),
         Route("/ready", ready_endpoint, methods=["GET"]),
         Route("/live", live_endpoint, methods=["GET"]),
+        Route("/users", users_endpoint, methods=["GET"]),
     ]
     for route in additions:
         if route.path not in existing:
