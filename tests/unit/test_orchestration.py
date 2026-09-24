@@ -287,6 +287,49 @@ class TestResourceLimits:
         assert queue.get(job.id).state is JobState.FAILED
         assert "memory" in queue.get(job.id).error.lower()
 
+    def test_the_memory_limit_holds_with_a_warm_allocator_arena(self, queue):
+        """The bug this pins: RSS growth is blind to arena reuse.
+
+        Allocating and freeing the same size first leaves the pages resident, so
+        a subsequent allocation of that size does not raise RSS at all -- and a
+        limit read from RSS alone then misses it entirely. Reproduced reliably:
+        60 of 60 warm-arena allocations slipped past a 1 MB limit. This is why
+        the measurement is not RSS growth alone.
+        """
+        import gc
+
+        def hog(payload):
+            return {"blob": bytearray(40 * 1024 * 1024)}
+
+        register_handler("hog", hog)
+        # Warm the arena with allocations of the same size, then free them. RSS
+        # after this is already ~40 MB, so the job's own allocation adds none.
+        for _ in range(4):
+            bytearray(40 * 1024 * 1024)
+        gc.collect()
+
+        for _ in range(5):
+            job = queue.submit(_spec(kind="hog", limits=ResourceLimits(max_memory_mb=1.0)))
+            Worker("w", queue).run()
+            assert queue.get(job.id).state is JobState.FAILED, "warm arena slipped past the limit"
+            assert "memory" in queue.get(job.id).error.lower()
+
+    def test_memory_growth_is_measured_by_allocation_not_resident_pages(self):
+        """A budget's usage must see an allocation the OS never re-faulted."""
+        import gc
+
+        bytearray(40 * 1024 * 1024)
+        gc.collect()
+        budget = ResourceBudget(limits=ResourceLimits(max_memory_mb=1.0))
+        try:
+            bytearray(40 * 1024 * 1024)
+            assert budget.usage().peak_memory_mb > 1.0
+            assert budget.breach() is not None
+        finally:
+            # Release the tracer. Leaving a budget's own tracing running would
+            # tax every later test in the session with tracemalloc's overhead.
+            budget.stop()
+
 
 # ------------------------------------------------------------------ workers
 class TestWorkers:
@@ -296,6 +339,21 @@ class TestWorkers:
         report = Worker("w", queue).run()
         assert report.succeeded == 1
         assert next(iter(queue.jobs().values())).result["echo"] == 7
+
+    def test_an_unserialisable_result_fails_cleanly(self, queue):
+        """A handler may return bytes; the durable log holds JSON.
+
+        Before this was guarded, the json.dumps inside the queue raised out of
+        the worker, the job stayed RUNNING forever, and the failure surfaced as
+        a bare TypeError rather than anything a user could act on.
+        """
+        register_handler("bytes_result", lambda payload: {"blob": b"\x00binary"})
+        job = queue.submit(_spec(kind="bytes_result"))
+        report = Worker("w", queue).run()
+        assert report.failed == 1
+        stored = queue.get(job.id)
+        assert stored.state is JobState.FAILED
+        assert "could not be stored" in stored.error
 
     def test_a_handler_failure_marks_the_job_failed(self, queue):
         register_handler("boom", lambda payload: (_ for _ in ()).throw(RuntimeError("nope")))

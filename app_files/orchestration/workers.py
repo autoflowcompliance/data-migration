@@ -141,20 +141,35 @@ class Worker:
 
         budget = ResourceBudget(limits=job.spec.limits)
         try:
-            handler = get_handler(job.spec.kind)
-            result = handler(job.spec.payload) or {}
-        except LimitBreach as exc:
-            return self._on_failure(job, f"Resource limit exceeded: {exc}")
-        except Exception as exc:  # noqa: BLE001 - any handler failure is a job failure
-            return self._on_failure(job, f"{type(exc).__name__}: {exc}")
+            try:
+                handler = get_handler(job.spec.kind)
+                result = handler(job.spec.payload) or {}
+            except LimitBreach as exc:
+                return self._on_failure(job, f"Resource limit exceeded: {exc}")
+            except Exception as exc:  # noqa: BLE001 - any handler failure is a job failure
+                return self._on_failure(job, f"{type(exc).__name__}: {exc}")
 
-        usage = budget.usage()
-        message = budget.breach()
+            usage = budget.usage()
+            message = budget.breach()
+        finally:
+            # Tracing, when this job's budget started it, is released here. If
+            # it were left running, the next job's budget would see this job's
+            # allocations as its own baseline and every job after a big one
+            # would fail.
+            budget.stop()
         if message:
             return self._on_failure(job, f"Resource limit exceeded: {message}")
         result = dict(result)
         result.setdefault("usage", usage.as_dict())
-        self.queue.succeed(job.id, result)
+        try:
+            self.queue.succeed(job.id, result)
+        except (TypeError, ValueError) as exc:
+            # A handler may return anything. The durable log holds JSON, and a
+            # result that cannot be serialised must fail the job with a clear
+            # message rather than crash the worker and strand the job RUNNING.
+            return self._on_failure(
+                job, f"Job result could not be stored: {type(exc).__name__}: {exc}"
+            )
         _emit(job, JobState.SUCCEEDED)
         return JobState.SUCCEEDED
 
