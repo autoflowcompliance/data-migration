@@ -38,6 +38,8 @@ class BatchItem:
     rule_failures: int = 0
     rules_run: int = 0
     privacy_masked: int = 0
+    addresses_normalised: int = 0
+    amounts_converted: int = 0
     error: str | None = None
     output_dir: str | None = None
 
@@ -57,6 +59,8 @@ class BatchItem:
             "rule_failures": self.rule_failures,
             "rules_run": self.rules_run,
             "privacy_masked": self.privacy_masked,
+            "addresses_normalised": self.addresses_normalised,
+            "amounts_converted": self.amounts_converted,
             "error": self.error or "",
             "output_dir": self.output_dir or "",
         }
@@ -152,6 +156,7 @@ def process_one(
         out_dir.mkdir(parents=True, exist_ok=True)
         write_deliverables(result, out_dir, output_format=output_format)
 
+        from app_files.normalization.binding import apply_configured_normalization
         from app_files.privacy.binding import apply_configured_privacy
         from app_files.privacy.report import inject_pii_report
         from app_files.rules.binding import apply_configured_rules
@@ -175,6 +180,12 @@ def process_one(
             qa_html = inject_pii_report(
                 qa_html, privacy.report, privacy.mask_result.summary()
             )
+        normalization = apply_configured_normalization(result.clean_frame, template)
+        if normalization is not None:
+            normalization.frame.to_csv(out_dir / "normalized_data.csv", index=False)
+            conversions = normalization.conversions_frame()
+            if not conversions.empty:
+                conversions.to_csv(out_dir / "currency_conversions.csv", index=False)
         if built.rules or built.cross_field_rules or privacy is not None:
             (out_dir / "qa_report.html").write_text(qa_html, encoding="utf-8")
             result.validation.issues_frame().to_csv(out_dir / "issues.csv", index=False)
@@ -192,6 +203,12 @@ def process_one(
             rules_run=int(built.total_rules_run),
             output_dir=str(out_dir),
             privacy_masked=int(privacy.total_masked) if privacy else 0,
+            addresses_normalised=(
+                int(normalization.addresses_normalised) if normalization else 0
+            ),
+            amounts_converted=(
+                int(normalization.amounts_converted) if normalization else 0
+            ),
         )
     except Exception as exc:  # noqa: BLE001 - one bad file must not sink the batch
         return BatchItem(file=path.name, status="failed", error=f"{type(exc).__name__}: {exc}")

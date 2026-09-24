@@ -363,6 +363,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.date_dayfirst:
         cleaning_config.date_first = True
 
+    from app_files.normalization.binding import (
+        NormalizationConfigError,
+        apply_configured_normalization,
+    )
     from app_files.privacy.binding import apply_configured_privacy
     from app_files.privacy.config import PrivacyConfigError
     from app_files.privacy.report import inject_pii_report
@@ -410,6 +414,19 @@ def main(argv: list[str] | None = None) -> int:
             privacy.report_html, encoding="utf-8"
         )
         qa_html = inject_pii_report(qa_html, privacy.report, privacy.mask_result.summary())
+    # A config-declared ``normalization:`` block canonicalises addresses and
+    # converts currencies on a copy. The pipeline's own clean_data.csv is left
+    # as-is, so a config without the block is byte-identical to before.
+    try:
+        normalization = apply_configured_normalization(result.clean_frame, args.crm)
+    except NormalizationConfigError as exc:
+        print(f"Invalid normalization configuration: {exc}", file=sys.stderr)
+        return 2
+    if normalization is not None:
+        normalization.frame.to_csv(args.outdir / "normalized_data.csv", index=False)
+        conversions = normalization.conversions_frame()
+        if not conversions.empty:
+            conversions.to_csv(args.outdir / "currency_conversions.csv", index=False)
     (args.outdir / "qa_report.html").write_text(qa_html, encoding="utf-8")
 
     summary = result.summary()
@@ -432,6 +449,13 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"Privacy: {counts['detected']} value(s) detected, "
             f"{counts['masked']} masked in {', '.join(counts['columns']) or 'no columns'}"
+        )
+    if normalization is not None:
+        counts = normalization.summary()
+        print(
+            f"Normalization: {counts['addresses_normalised']} address(es) canonicalised, "
+            f"{counts['amounts_converted']} amount(s) converted"
+            + (f", {counts['amounts_failed']} unconverted" if counts["amounts_failed"] else "")
         )
 
     if args.audit_export:

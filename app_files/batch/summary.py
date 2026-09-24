@@ -19,6 +19,8 @@ COLUMNS = [
     "rule_failures",
     "rules_run",
     "privacy_masked",
+    "addresses_normalised",
+    "amounts_converted",
     "error",
     "output_dir",
 ]

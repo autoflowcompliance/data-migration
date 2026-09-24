@@ -166,6 +166,11 @@ a name containing `&` truncates itself and swallows the reference after it.
   under it. A new state-writing layer that hardcodes a path under the repo root
   will litter the working tree and fail the portability tests in
   `tests/unit/test_market_layers.py` (`test_orders_storage_honours_autoflow_home`).
+- A config's `normalization:` block **is** bound in unattended runs (CLI and
+  batch) too: `app_files/normalization/binding.apply_configured_normalization`
+  writes `normalized_data.csv` and `currency_conversions.csv` beside the
+  pipeline's own output. Same additive contract as privacy — `clean_data.csv`
+  is never rewritten.
 - A config's `privacy:` block **is** bound in unattended runs (CLI and batch):
   `app_files/privacy/binding.apply_configured_privacy` masks the frame the
   pipeline produced and the entry points write `masked_data.csv` plus the

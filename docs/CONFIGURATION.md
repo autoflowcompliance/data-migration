@@ -63,6 +63,42 @@ rules:                # optional validation rules, see RULES.md
 `phone_e164` needs a country context to interpret national-format numbers;
 numbers that already start with `+` are parsed as-is.
 
+### `normalization`
+
+An optional block that canonicalises addresses and converts currencies after
+the pipeline has run. It is bound in unattended runs (CLI and batch): the
+normalised data is written as `normalized_data.csv` beside `clean_data.csv`,
+and every conversion is written to `currency_conversions.csv` with the rate and
+the date it applied. The pipeline's own `clean_data.csv` is never rewritten, so
+a config without this block is byte-identical to before.
+
+```yaml
+normalization:
+  addresses:
+    - column: address          # one entry per address column
+  currency:
+    target: USD
+    columns: [amount, fee]     # or a single `column:`
+    source_currency: EUR       # optional: for bare numbers with no symbol
+    rates:
+      - {base: EUR, quote: USD, rate: 1.08, as_of: 2026-01-15}
+      - {base: GBP, quote: USD, rate: 1.27, as_of: 2026-01-15}
+    rate_file: rates.yaml      # optional; resolved relative to the config
+```
+
+| Key | Meaning |
+| --- | --- |
+| `addresses` | A list of `column` entries (or plain names) to canonicalise. |
+| `currency.target` | The currency to convert amounts into. |
+| `currency.column` / `columns` | The amount column(s) to convert. |
+| `currency.source_currency` | Currency to assume for values with no symbol or code. Without it, such a value is reported as unconverted rather than guessed. |
+| `currency.rates` / `rate_file` | Rates, inline or in a YAML file beside the config. A file's top-level `rates:` key (or a bare list) is accepted. |
+| `enabled` | Set `false` to keep the block but turn it off. |
+
+An unrecognised address is left alone, not rewritten. A rate with no matching
+entry leaves its amount unconverted and counted, so a missing rate is visible
+rather than silently zeroing the value. A rate must be positive.
+
 ## Adding a new CRM
 
 1. Look at your source file's header row and decide the target column names.

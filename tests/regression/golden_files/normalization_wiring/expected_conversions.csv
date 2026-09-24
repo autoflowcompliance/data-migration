@@ -1,0 +1,3 @@
+column,row,original,amount,from,to,rate,as_of,converted
+amount,0,"€1,000.00",1080.0,EUR,USD,1.08,2026-01-15,True
+amount,1,£500.00,635.0,GBP,USD,1.27,2026-01-15,True
