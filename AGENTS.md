@@ -19,6 +19,11 @@ app_files/
 ├── profiling/                # LAYER 4 — 5-dimension quality scores
 ├── lineage/                  # LAYER 5 — row-level transformation log
 ├── output/                   # LAYER 6 — csv/excel/json/sql writers
+├── privacy/                  # PII detection + masking (off by default)
+│   ├── config.py             # YAML-block config; per-column strategies
+│   ├── detect.py             # Luhn / mod-97 / SSN-validated detectors
+│   ├── mask.py               # redact | hash | tokenize | partial
+│   └── report.py             # appends a card to the frozen QA report
 ├── interface/web/main.py     # LAYER 7 — the web UI entry (NiceGUI)
 │   ├── routes/               # one module per page; import registers the route
 │   ├── theme.py              # LAYER 7 — design tokens + stylesheet
@@ -30,16 +35,33 @@ app_files/
 The core reporter's HTML is **not** modified to add the scorecard.
 `profiling/report.render_qa_report_with_profile` injects it into the rendered
 HTML afterwards. Verify the base report is unpolluted with
-`'Quality scorecard' not in run_pipeline(...).qa_report_html`.
+`'Quality scorecard' not in run_pipeline(...).qa_report_html`. The privacy layer
+follows the same rule — `privacy/report.inject_pii_report` appends, so
+`'Privacy scan' not in run_pipeline(...).qa_report_html` also holds.
+
+`privacy/` is off unless a `privacy:` block enables it, and it never edits the
+frame it is given. Detectors are checksum-validated, not pattern-only: a 16-digit
+order id that fails Luhn is not a card. When nothing is kind-scoped, a re-scan of
+`mask_frame`'s output must report zero detections — that is the property the unit,
+integration and golden tests defend. A field rule with `kinds:` deliberately
+leaves the other kinds in that column alone, so a scoped config's re-scan is
+*expected* to still find them; that is a choice, not a leak. `tokenize` needs a
+key and raises `PrivacyKeyError` without one rather than silently becoming
+irreversible.
 
 ## Commands
 
 ```bash
-python -m pytest -q                 # full suite, 536 tests, ~12s
+python -m pytest -q                 # full suite, 691 tests, ~18s
 python -m pytest app_files/tests/   # the original 25 pre-existing tests
 python main.py                      # DataFlow (NiceGUI) — port 8080
 python build_desktop.py --check     # packaged desktop target
 ```
+
+The suite needs the optional readers installed or it reports failures that look
+like regressions: `pip install -r app_files/requirements-dev.txt` (this pulls
+`xlrd`/`xlwt`, `pdfplumber`, `reportlab`, `boto3` and `pytest-asyncio`). Without
+`pytest-asyncio` the suite does not even collect.
 
 One UI ships. There is no second entry point and no `DATAREADY_UI` setting —
 `main.py`, the container and the desktop launcher all reach

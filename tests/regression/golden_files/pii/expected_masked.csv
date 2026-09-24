@@ -1,0 +1,4 @@
+full_name,email,phone,card,ssn,note
+John Smith,[REDACTED],[REDACTED],[REDACTED],[REDACTED],call [REDACTED]
+Jane Doe,[REDACTED],[REDACTED],[REDACTED],[REDACTED],ok
+Blank Row,,,,,

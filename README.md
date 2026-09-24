@@ -86,6 +86,25 @@ list the built-in validators write to, so they appear in the issues CSV and the
 QA report with nothing extra to wire up. Full reference in
 [docs/RULES.md](docs/RULES.md).
 
+### Privacy — find and mask personal data
+
+A separate layer finds personally identifiable information and replaces it
+before the data reaches a destination. It reads the frame the pipeline
+produced and never modifies the cleaning, mapping or reporting code.
+
+Detected kinds: emails, phone numbers, credit cards, IBANs, national ID
+numbers, passports and your own named patterns. Structured identifiers are
+validated rather than pattern-matched alone — a card must pass Luhn, an IBAN
+must pass mod-97 — so an order number is not mistaken for a card.
+
+Four masking strategies, chosen per column: `redact`, `hash` (deterministic, so
+masked tables still join), `tokenize` (reversible from an encrypted vault), and
+`partial` (last four kept). Only the matched span is rewritten, so a phone
+number inside a note is masked while the note survives.
+
+The layer is off unless a config turns it on. See
+[docs/PRIVACY.md](docs/PRIVACY.md).
+
 ### Profiling — five quality scores
 
 Every run scores the data 0 to 100 on five dimensions:
@@ -217,6 +236,7 @@ judgments.
 | [docs/INSTALL.md](docs/INSTALL.md) | Install with pip or Docker, verify the install |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Add a new CRM or bank format |
 | [docs/RULES.md](docs/RULES.md) | Every rule type with a worked YAML example |
+| [docs/PRIVACY.md](docs/PRIVACY.md) | Detect and mask personal data |
 
 ## Tests
 
@@ -224,11 +244,11 @@ judgments.
 python -m pytest -q
 ```
 
-Expect `465 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `691 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
-writers, config-schema validation, golden-file regression fixtures, and
-malformed-input error handling. It runs in about two seconds, so there is no
-reason not to run it before a commit.
+writers, PII detection and masking, config-schema validation, golden-file
+regression fixtures, and malformed-input error handling. It runs in about
+twenty seconds, so there is no reason not to run it before a commit.
 
 Frozen core: `app_files/cleaners/`, `mappers/`, `validators/`, `auditors/` and
 `reporters/` are treated as stable. New capability goes in sibling packages that

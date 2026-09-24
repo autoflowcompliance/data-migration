@@ -14,10 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 from app_files.ingestion import read_any
 from app_files.pipeline import run_pipeline
+from app_files.privacy import PrivacyConfig, detect_frame, mask_frame
 from app_files.services.bank_reconciliation.reconciler import run_reconciliation
 
 GOLDEN = Path(__file__).resolve().parent / "golden_files"
@@ -29,6 +29,7 @@ def test_golden_files_are_present():
         "contacts": {"input.csv", "expected_output.csv"},
         "bank_statement": {"input.csv", "expected_bank_only.csv"},
         "ledger": {"input.csv", "expected_ledger_only.csv"},
+        "pii": {"input.csv", "expected_masked.csv"},
     }.items():
         folder = GOLDEN / name
         assert folder.is_dir(), f"missing golden folder: {name}"
@@ -111,3 +112,27 @@ def test_reconciliation_totals_are_stable():
         "missing_from_books": 1,
         "recorded_but_never_cleared": 1,
     }
+
+
+def test_pii_masking_golden_output_is_unchanged():
+    """Known PII in, known redaction out. If this breaks, the change is guilty
+    until proven innocent — do not regenerate the expected file."""
+    folder = GOLDEN / "pii"
+    source = pd.read_csv(folder / "input.csv", dtype=str, keep_default_na=False)
+    produced = mask_frame(source, PrivacyConfig(enabled=True)).frame
+    expected = pd.read_csv(folder / "expected_masked.csv", dtype=str, keep_default_na=False)
+
+    assert list(produced.columns) == list(expected.columns)
+    assert produced.fillna("").astype(str).to_dict("records") == expected.fillna("").astype(str).to_dict("records")
+
+
+def test_pii_golden_input_is_fully_masked():
+    """The point of the fixture: no sensitive value survives the pass."""
+    folder = GOLDEN / "pii"
+    source = pd.read_csv(folder / "input.csv", dtype=str, keep_default_na=False)
+    config = PrivacyConfig(enabled=True)
+    found = detect_frame(source, config)
+    assert found.total == 9, "fixture should carry 9 planted PII values"
+
+    rescan = detect_frame(mask_frame(source, config).frame, config)
+    assert rescan.total == 0, "masked golden output must scan clean"
