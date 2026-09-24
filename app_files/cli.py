@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import yaml
 
 from app_files.auditors import audit_import
 from app_files.cleaners import load_cleaning_config
@@ -20,17 +21,46 @@ from app_files.pipeline import run_pipeline
 from app_files.reporters import render_audit_report
 
 
+class _UsageError(Exception):
+    """A bad input the caller can fix. Printed as a message, never a traceback."""
+
+    def __init__(self, message: str, code: int = 2) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+# Everything a malformed or incomplete config can throw while loading. The
+# loader lives in the frozen core, so turning these into plain English is the
+# CLI's job: a raw traceback reads as "the tool is broken" to a buyer.
+_CONFIG_ERRORS = (yaml.YAMLError, FileNotFoundError, ValueError, TypeError, KeyError)
+
+
 def _read_csv(path: Path) -> pd.DataFrame:
-    """Read CSV with encoding detection."""
+    """Read CSV with encoding detection.
+
+    A missing, empty or headerless file is a user mistake, not a crash, so it
+    is reported as a :class:`_UsageError` rather than a pandas traceback.
+    """
     import chardet
-    import io
-    
-    with open(path, 'rb') as f:
-        raw = f.read()
-        result = chardet.detect(raw)
-        encoding = result['encoding'] or 'utf-8'
-    
-    return pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding)
+
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise _UsageError(f"Could not read {path}: {exc}") from exc
+
+    if not raw.strip():
+        raise _UsageError(f"{path} is empty — there is nothing to migrate.")
+
+    encoding = chardet.detect(raw)['encoding'] or 'utf-8'
+    try:
+        return pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding)
+    except pd.errors.EmptyDataError as exc:
+        raise _UsageError(
+            f"{path} has no columns to parse — a migration needs a header row "
+            f"and at least one data row."
+        ) from exc
+    except UnicodeDecodeError as exc:
+        raise _UsageError(f"Could not decode {path} as {encoding}: {exc}") from exc
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -118,6 +148,21 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "batch":
         return run_batch_command(argv[1:])
 
+    try:
+        return _run_single_file(argv)
+    except _UsageError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return exc.code
+    except _CONFIG_ERRORS as exc:
+        # A config that will not load is a fixable input error, not a crash.
+        print(
+            f"error: could not load the mapping config: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
+def _run_single_file(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)
 

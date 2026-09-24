@@ -128,6 +128,63 @@ All four carry identical data. SQL column types are inferred from content, so a
 column of phone numbers or postcodes becomes `TEXT` rather than being handed to
 SQL's numeric affinity and silently rewritten.
 
+## Also included
+
+These ship and are tested, and are reachable from the code rather than from a
+dedicated page.
+
+### Connectors — pull from where the file already lives
+
+`app_files/distribution/connectors.py` fetches a file from five providers behind
+one interface: `s3`, `google_sheets`, `google_drive`, `dropbox`, `onedrive`.
+
+```python
+from app_files.distribution.connectors import pull
+file = pull("s3", bucket="my-bucket", key="contacts.csv")   # ConnectorFile(name, data)
+```
+
+S3 is exercised end to end against `moto`, a real S3 protocol implementation.
+The other four speak their real REST APIs over an injectable HTTP transport, so
+request construction is tested; only the provider's own server is untested.
+Credentials come from the environment and none are stored in the repository.
+`credential_report()` names exactly which variables are missing, so the UI can
+tell the user what to set instead of failing with a stack trace.
+
+### Client workspaces
+
+`app_files/collaboration/workspaces.py` gives each client a folder —
+`config.yaml`, `samples/`, `output/`, and an append-only `runs.jsonl` audit
+trail. Every path is rooted inside the workspace and `resolve_path` refuses to
+escape it, so one client's data cannot read another's. `run_in_workspace()`
+runs the full pipeline and writes the clean file, QA report, issues and lineage
+log into the client's folder. Relocate the tree with `AUTOFLOW_HOME`.
+
+### Quality trends and suggestions
+
+`app_files/intelligence/` records a per-column baseline of each run and flags
+when a new run stops looking like the last one, and ranks what to fix next from
+the frame's own profile.
+
+### Batch
+
+`python -m app_files.cli batch` processes a whole folder, writing per-file
+output, a `summary.csv` and a `dashboard.html`.
+
+## Not included
+
+So a buyer is not surprised: the following are **not** built today, and the code
+does not claim them. SFTP or direct database reads; watch folders, a scheduler,
+event triggers, dependency chains or incremental/watermark processing; a visual
+mapping or rule editor beyond the YAML builder; schema-drift detection;
+cross-field rules or rule versioning; an interactive lineage graph, blast-radius
+analysis or OpenLineage export; N-way (3+ file) reconciliation or reconciliation
+history; signed deliverables; multi-brand profiles, custom domains or a client
+portal; RBAC, an immutable audit log, encryption or compliance posture; a job
+queue, distributed workers or resource limits; Prometheus metrics; tenant
+isolation, cloud orchestration or backup/DR; a plugin system, a public Python
+SDK or an admin console; dry-run mode, rollback files or a cutover runbook
+generator.
+
 ## Web UI
 
 DataFlow is the shipped interface: **Upload → Verify → Results**, plus
@@ -155,6 +212,63 @@ python -m app_files.cli -i app_files/samples/messy_contacts.csv -c hubspot -o ou
 7 rows in, 6 out, quality score 66.7%, 1 errors, 1 warnings
 Wrote deliverables to output
 ```
+
+`batch` processes a whole folder in one pass and writes a per-file folder, a
+`summary.csv` and a `dashboard.html`:
+
+```bash
+python -m app_files.cli batch --in app_files/samples --template hubspot \
+    --out output/batch --format csv
+```
+
+One bad file does not sink the batch: it is reported as `fail` on its line and
+the rest continue.
+
+### Exit codes and errors
+
+A bad input is a message on stderr, not a stack trace. The CLI never prints a
+traceback for a problem the caller can fix.
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Ran, no validation errors |
+| `1` | Ran, but validation found errors (see `issues.csv`) |
+| `2` | Could not run: unreadable/empty input, malformed or incomplete config, unknown target config |
+
+```bash
+$ python -m app_files.cli -i missing.csv -c hubspot -o output
+error: Could not read missing.csv: [Errno 2] No such file or directory: 'missing.csv'
+```
+
+Unparseable dates and amounts are not errors: they are reported as *unmatched*
+or as issues so a human can look, and the run completes.
+
+## REST API
+
+For programmatic access, run the API directly. It is a Starlette app, separate
+from the web UI:
+
+```bash
+python -m app_files.distribution.api --host 127.0.0.1 --port 8600
+```
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Liveness plus the available target configs |
+| `POST` | `/validate` | Validate an uploaded file against a config |
+| `POST` | `/clean` | Clean and map an uploaded file, return the frame |
+| `POST` | `/profile` | Return the five-dimension quality profile |
+| `POST` | `/reconcile` | Reconcile a bank statement against a ledger |
+
+The POST endpoints take a multipart upload plus form fields.
+
+- `/validate`, `/clean`, `/profile`: a `file` upload and a `config`.
+- `/reconcile`: a `statement` upload and a `ledger` upload, plus
+  `bank_date_col`, `bank_amount_col`, `ledger_date_col`, `ledger_amount_col`
+  (defaulting to `Date`/`Amount`) and an optional `tolerance` in days.
+
+Format errors return a `400` with a short message; unexpected failures return a
+`500` rather than leaking a traceback.
 
 ## Docker
 
@@ -224,11 +338,11 @@ judgments.
 python -m pytest -q
 ```
 
-Expect `465 passed`. The suite covers value transforms, each ingestion adapter,
-each rule type, each profiling dimension, the lineage tracker, all four output
-writers, config-schema validation, golden-file regression fixtures, and
-malformed-input error handling. It runs in about two seconds, so there is no
-reason not to run it before a commit.
+Expect the whole suite to pass: over 600 tests in under twenty seconds. It
+covers value transforms, each ingestion adapter, each rule type, each profiling
+dimension, the lineage tracker, all four output writers, config-schema
+validation, golden-file regression fixtures, and malformed-input error handling.
+There is no reason not to run it before a commit.
 
 Frozen core: `app_files/cleaners/`, `mappers/`, `validators/`, `auditors/` and
 `reporters/` are treated as stable. New capability goes in sibling packages that

@@ -35,7 +35,7 @@ HTML afterwards. Verify the base report is unpolluted with
 ## Commands
 
 ```bash
-python -m pytest -q                 # full suite, 536 tests, ~12s
+python -m pytest -q                 # full suite, 621 tests, ~16s
 python -m pytest app_files/tests/   # the original 25 pre-existing tests
 python main.py                      # DataFlow (NiceGUI) — port 8080
 python build_desktop.py --check     # packaged desktop target
@@ -133,6 +133,13 @@ a name containing `&` truncates itself and swallows the reference after it.
 
 ## API notes that are easy to get wrong
 
+- The CLI's exit contract is `0` ran-clean, `1` ran-with-validation-errors, `2`
+  could-not-run (bad or missing input, malformed/incomplete config, unknown
+  target config). `app_files/cli.py` turns `_CONFIG_ERRORS` and `_UsageError`
+  into a one-line stderr message — a raw traceback for a fixable input reads as
+  "the tool is broken" to a buyer. Pinned by
+  `tests/integration/test_final_sweep.py::TestFailurePaths`. Do not let a new
+  `raise` path escape `main()` uncaught.
 - `run_pipeline(source, crm=..., lineage_tracker=LineageTracker())` — lineage
   is opt-in via a tracker instance, not a `track_lineage=` flag.
 - `run_reconciliation` takes **raw CSV bytes plus four explicit column names**
