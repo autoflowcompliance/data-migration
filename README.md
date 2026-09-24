@@ -444,6 +444,34 @@ Three properties the tests pin:
   is available. Memory is measured as what the job *adds*, not the interpreter's
   total footprint, so an in-process worker does not fail every small job.
 
+## Tenants, backup and deployment
+
+A tenant is the unit of isolation for a hosted install: its own data, config,
+outputs, queue and license under one root. The existing client workspaces still
+apply inside a tenant; a tenant is the layer around them.
+
+```python
+from app_files.tenancy import TenantRegistry, create_backup, restore_backup
+
+tenant = TenantRegistry().create("Acme Corp", tenant_id="acme")
+backup = create_backup(tenant)              # archive + per-file digest manifest
+restore_backup(backup, TenantRegistry().get("acme"))
+```
+
+- **The id is not the name.** Folder is keyed on an immutable id, so renaming a
+  client does not move their history, and two clients called "Acme" do not
+  collide. `resolve_path` refuses `..`, which is what the isolation test asserts.
+- **A restore is verifiable.** The digest manifest travels inside the archive, so
+  a backup copied to another machine is self-describing. `verify_backup` checks
+  every file; `restore_backup` verifies *before* writing, because restoring a
+  corrupt file over a healthy one is worse than refusing to restore.
+- **One-command deploy.** `app_files.tenancy.deployment_plan` generates a compose
+  file, a Render blueprint or a Kubernetes manifest. It mirrors the port
+  precedence in `settings.resolve_port` and sets both state homes, because
+  getting either wrong is a deploy that fails with a message pointing at
+  networking instead of the config.
+- **Billing reads `tenant.usage()`** — bytes and files per subtree.
+
 ## Documentation
 
 | Document | Covers |
@@ -459,13 +487,14 @@ Three properties the tests pin:
 python -m pytest -q
 ```
 
-Expect `1364 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1406 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
 role-based access control, the tamper-evident audit chain, encryption at rest,
 plugin registration for transforms, rule types, output formats and
-destinations,
+destinations, the durable job queue and its resource limits, tenant isolation,
+backup and verified restore, deployment manifests,
 config-schema validation, golden-file regression fixtures, and malformed-input
 error handling. It runs in about thirty seconds, so there is no reason not to
 run it before a commit.

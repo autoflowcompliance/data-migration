@@ -246,6 +246,70 @@ async def users_endpoint(request: Request) -> JSONResponse:
     )
 
 
+async def tenants_endpoint(request: Request) -> JSONResponse:
+    """List tenants and their disk usage. Admin-only, like every tenant action."""
+    from app_files.tenancy import TenantRegistry
+
+    principal = _principal_from_request(request)
+    try:
+        require(principal, Permission.MANAGE_TENANTS)
+    except AccessDenied as exc:
+        return JSONResponse({"status": "denied", "error": str(exc)}, status_code=403)
+
+    registry = TenantRegistry()
+    tenants = registry.list()
+    include_usage = request.query_params.get("usage", "").lower() in {"1", "true", "yes"}
+    return JSONResponse(
+        {
+            "status": "ok",
+            "count": len(tenants),
+            "tenants": [
+                {**tenant.as_dict(), **({"usage": tenant.usage()} if include_usage else {})}
+                for tenant in tenants
+            ],
+        }
+    )
+
+
+async def backup_endpoint(request: Request) -> JSONResponse:
+    """Create a tenant backup, or verify an existing one.
+
+    ``?action=create`` writes a new archive; ``?action=verify`` checks a named
+    archive against its embedded manifest. A create is the only mutating admin
+    action here, and it is gated the same way.
+    """
+    from app_files.tenancy import BackupError, TenantRegistry, create_backup, verify_backup
+
+    principal = _principal_from_request(request)
+    try:
+        require(principal, Permission.MANAGE_TENANTS)
+    except AccessDenied as exc:
+        return JSONResponse({"status": "denied", "error": str(exc)}, status_code=403)
+
+    action = request.query_params.get("action", "create").lower()
+    registry = TenantRegistry()
+    if action == "create":
+        tenant_id = request.query_params.get("tenant", "").strip()
+        if not tenant_id:
+            raise BadRequest("Pass ?tenant=<id>")
+        tenant = registry.get(tenant_id)
+        backup = create_backup(tenant)
+        return JSONResponse({"status": "ok", **backup.as_dict()})
+    if action == "verify":
+        path = request.query_params.get("path", "").strip()
+        if not path:
+            raise BadRequest("Pass ?path=<archive>")
+        try:
+            manifest = verify_backup(path)
+        except BackupError as exc:
+            return JSONResponse({"status": "invalid", "error": str(exc)}, status_code=409)
+        return JSONResponse(
+            {"status": "ok", "tenant": manifest.tenant,
+             "files": manifest.file_count, "created_at": manifest.created_at}
+        )
+    raise BadRequest(f"Unknown action {action!r}. Use create or verify.")
+
+
 def register_extra_routes(app: Any) -> Any:
     """Add the extra routes to an existing Starlette app. Idempotent."""
     from starlette.routing import Route
@@ -263,6 +327,8 @@ def register_extra_routes(app: Any) -> Any:
         Route("/ready", ready_endpoint, methods=["GET"]),
         Route("/live", live_endpoint, methods=["GET"]),
         Route("/users", users_endpoint, methods=["GET"]),
+        Route("/tenants", tenants_endpoint, methods=["GET"]),
+        Route("/backup", backup_endpoint, methods=["POST"]),
     ]
     for route in additions:
         if route.path not in existing:

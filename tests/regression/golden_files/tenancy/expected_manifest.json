@@ -1,0 +1,20 @@
+{
+  "digests": {
+    "config/config.yaml": "3f90bc08da5800987b5c8263d1cca56e15a75a2291910127598aff73d698131d",
+    "data/input.csv": "a7e84ddefda116188ff4ef92e6f0e6b4e00d52f48585662c38ce6568e6557691",
+    "output/clean.csv": "a7e84ddefda116188ff4ef92e6f0e6b4e00d52f48585662c38ce6568e6557691"
+  },
+  "file_count": 4,
+  "restored": [
+    "config/config.yaml",
+    "data/input.csv",
+    "output/clean.csv",
+    "tenant.json"
+  ],
+  "tree": [
+    "config/config.yaml",
+    "data/input.csv",
+    "output/clean.csv",
+    "tenant.json"
+  ]
+}

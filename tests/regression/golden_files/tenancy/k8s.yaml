@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dataflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: dataflow}
+  template:
+    metadata:
+      labels: {app: dataflow}
+    spec:
+      containers:
+        - name: dataflow
+          image: dataflow:2.0
+          ports:
+            - containerPort: 10000
+          env:
+            - name: AUTOFLOW_HOME
+              value: '/app/run_config'
+            - name: DATAREADY_HOME
+              value: '/app/run_config'
+          readinessProbe:
+            httpGet: {path: /ready, port: 10000}
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 10000}
+            initialDelaySeconds: 15
+          volumeMounts:
+            - name: state
+              mountPath: /app/run_config
+      volumes:
+        - name: state
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dataflow
+spec:
+  selector: {app: dataflow}
+  ports:
+    - port: 10000
+      targetPort: 10000

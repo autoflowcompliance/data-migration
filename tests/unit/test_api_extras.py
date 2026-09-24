@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 from starlette.testclient import TestClient
 
@@ -189,6 +191,105 @@ class TestPythonSDK:
         from app_files.distribution.sdk import connect
 
         assert connect("http://example").base_url == "http://example"
+
+
+class TestTenantsAndBackupEndpoints:
+    """Layer 16 through the API: isolation, admin gating, verified restore."""
+
+    OWNER: ClassVar[dict[str, str]] = {
+        "X-DataFlow-Role": "owner",
+        "X-DataFlow-User": "root",
+    }
+
+    def test_tenant_routes_are_registered(self, app):
+        paths = {route.path for route in app.routes}
+        assert {"/tenants", "/backup"} <= paths
+
+    def test_a_viewer_cannot_list_tenants(self, client):
+        response = client.get("/tenants", headers={"X-DataFlow-Role": "viewer"})
+        assert response.status_code == 403
+        assert response.json()["status"] == "denied"
+
+    def test_an_admin_lists_tenants_with_usage(self, client, tmp_path):
+        from app_files.tenancy import ensure_tenant
+
+        tenant = ensure_tenant("Acme", tenant_id="acme")
+        tenant.resolve_path("data", "a.csv").write_text("x" * 10)
+        body = client.get("/tenants?usage=1", headers=self.OWNER).json()
+        assert body["count"] == 1
+        assert body["tenants"][0]["id"] == "acme"
+        assert body["tenants"][0]["usage"]["breakdown"]["data"]["bytes"] == 10
+
+    def test_backup_create_needs_a_tenant(self, client):
+        assert client.post("/backup", headers=self.OWNER).status_code == 400
+
+    def test_backup_create_needs_owner(self, client):
+        assert client.post(
+            "/backup?tenant=acme", headers={"X-DataFlow-Role": "operator"}
+        ).status_code == 403
+
+    def test_an_admin_cannot_manage_tenants(self, client):
+        # Tenant creation and deletion grant and destroy access, so they sit
+        # with the owner, alongside managing users.
+        assert client.get(
+            "/tenants", headers={"X-DataFlow-Role": "admin"}
+        ).status_code == 403
+
+    def test_backup_then_verify_round_trips(self, client):
+        from app_files.tenancy import ensure_tenant
+
+        tenant = ensure_tenant("Acme", tenant_id="acme")
+        tenant.resolve_path("data", "a.csv").write_text("hello")
+        created = client.post("/backup?tenant=acme", headers=self.OWNER).json()
+        assert created["status"] == "ok"
+        assert created["files"] == 2  # tenant.json + data/a.csv
+
+        verified = client.post(
+            f"/backup?action=verify&path={created['path']}", headers=self.OWNER
+        ).json()
+        assert verified["status"] == "ok"
+        assert verified["tenant"] == "acme"
+
+    def test_verify_reports_a_corrupt_archive_as_conflict(self, client, tmp_path):
+        from app_files.tenancy import ensure_tenant
+
+        tenant = ensure_tenant("Acme", tenant_id="acme")
+        tenant.resolve_path("data", "a.csv").write_text("hello")
+        created = client.post("/backup?tenant=acme", headers=self.OWNER).json()
+
+        # Corrupt the archive's own embedded manifest, which is authoritative.
+        import io
+        import json as _json
+        import tarfile
+        from pathlib import Path
+
+        archive = Path(created["path"])
+        staging = tmp_path / "corrupt"
+        staging.mkdir()
+        with tarfile.open(archive, "r:gz") as tar:
+            tar.extractall(staging, filter="data")
+        manifest = staging / "backup-manifest.json"
+        data = _json.loads(manifest.read_text())
+        data["files"]["data/a.csv"] = "0" * 64
+        manifest.write_text(_json.dumps(data))
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+            for path in sorted(staging.rglob("*")):
+                if path.is_file() and path.name != "backup-manifest.json":
+                    tar.add(path, arcname=str(path.relative_to(staging)))
+            tar.add(manifest, arcname="backup-manifest.json")
+        archive.write_bytes(buffer.getvalue())
+
+        response = client.post(
+            f"/backup?action=verify&path={created['path']}", headers=self.OWNER
+        )
+        assert response.status_code == 409
+        assert response.json()["status"] == "invalid"
+
+    def test_an_unknown_backup_action_is_a_400(self, client):
+        assert client.post(
+            "/backup?action=explode", headers=self.OWNER
+        ).status_code == 400
 
 
 class TestSDKOverRealHTTP:

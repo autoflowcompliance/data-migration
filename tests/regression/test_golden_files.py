@@ -35,6 +35,9 @@ def test_golden_files_are_present():
             "bank.csv", "ledger.csv", "processor.csv", "expected_result.json",
         },
         "orchestration": {"jobs.json", "expected_transcript.json"},
+        "tenancy": {
+            "expected_manifest.json", "render.yaml", "docker-compose.yml", "k8s.yaml",
+        },
     }.items():
         folder = GOLDEN / name
         assert folder.is_dir(), f"missing golden folder: {name}"
