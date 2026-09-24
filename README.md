@@ -444,6 +444,40 @@ Three properties the tests pin:
   is available. Memory is measured as what the job *adds*, not the interpreter's
   total footprint, so an in-process worker does not fail every small job.
 
+## Cloud licensing and brand profiles
+
+Two additions for a hosted, multi-client install. Both are inert until asked
+for, so an existing single-brand, offline install behaves exactly as before.
+
+```bash
+python tools/cloud_license.py issue-trial buyer@acme.com --days 14
+python tools/cloud_license.py activate acme@example.com --issued 2026-01-01T00:00:00 --seats 5
+python tools/cloud_license.py add-seat alice
+python tools/cloud_license.py usage
+```
+
+- **Seats are refused, not warned about.** Activating past the seat count raises;
+  a limit that only logs is a limit that gets ignored. Releasing a seat frees it,
+  and the count that matters is *active* seats, not total history.
+- **Metering is per account**, so an invoice is reconstructed from what ran.
+- **A trial expires on its own date**, not "issued plus N days", so a shortened
+  trial is possible and a client clock change cannot extend it. `days_remaining`
+  rounds up, because a 14-day trial issued a microsecond ago must say 14, not 13.
+
+Brand profiles (`app_files.branding.profiles`) hold one brand per client:
+
+```python
+from app_files.branding import resolve_profile, save_profile
+
+save_profile("acme", Branding(company_name="Acme Corp"))
+outcome = run_migration(frame, source_name="c.csv", template="hubspot",
+                        limits=limits, brand_profile="acme")
+```
+
+`resolve_profile(None)` is the install's existing single-brand settings, so the
+default path is unchanged. An unknown profile name **raises** rather than falling
+back — falling back would put one client's brand on another client's report.
+
 ## Tenants, backup and deployment
 
 A tenant is the unit of isolation for a hosted install: its own data, config,
@@ -487,14 +521,15 @@ restore_backup(backup, TenantRegistry().get("acme"))
 python -m pytest -q
 ```
 
-Expect `1406 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1457 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
 role-based access control, the tamper-evident audit chain, encryption at rest,
 plugin registration for transforms, rule types, output formats and
 destinations, the durable job queue and its resource limits, tenant isolation,
-backup and verified restore, deployment manifests,
+backup and verified restore, deployment manifests, cloud/SaaS licensing with
+seats and metering, trials, brand profiles,
 config-schema validation, golden-file regression fixtures, and malformed-input
 error handling. It runs in about thirty seconds, so there is no reason not to
 run it before a commit.

@@ -22,6 +22,69 @@ def inbox(tmp_path, contacts_csv, bank_csv) -> Path:
     return folder
 
 
+# ------------------------------------------------------- cloud licence tool
+class TestCloudLicenseTool:
+    """The operator's tool: trials, seats and metering, none of it offline."""
+
+    @pytest.fixture(autouse=True)
+    def _home(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path))
+
+    def _run(self, capsys, *argv):
+        from tools.cloud_license import main as cloud_main
+
+        code = cloud_main(list(argv))
+        return code, capsys.readouterr()
+
+    def test_issue_trial_reports_the_expiry(self, capsys):
+        code, out = self._run(capsys, "issue-trial", "new@acme.com", "--days", "14")
+        assert code == 0
+        assert json.loads(out.out)["plan"] == "trial"
+
+    def test_status_reports_offline_before_anything_is_issued(self, capsys):
+        code, out = self._run(capsys, "status")
+        assert code == 0
+        assert json.loads(out.out) == {"mode": "offline", "cloud": False}
+
+    def test_activate_then_add_a_seat(self, capsys):
+        code, _ = self._run(
+            capsys, "activate", "acme@example.com",
+            "--issued", "2026-01-01T00:00:00", "--seats", "2",
+        )
+        assert code == 0
+        code, out = self._run(capsys, "add-seat", "alice")
+        assert code == 0
+        assert json.loads(out.out)["name"] == "alice"
+
+    def test_exceeding_the_seats_exits_non_zero_with_a_message(self, capsys):
+        self._run(
+            capsys, "activate", "acme@example.com",
+            "--issued", "2026-01-01T00:00:00", "--seats", "1",
+        )
+        self._run(capsys, "add-seat", "alice")
+        code, out = self._run(capsys, "add-seat", "bob")
+        assert code == 2
+        assert "All 1 seat" in out.err
+
+    def test_usage_reports_metered_runs(self, capsys):
+        self._run(
+            capsys, "activate", "acme@example.com",
+            "--issued", "2026-01-01T00:00:00", "--seats", "1",
+        )
+        code, out = self._run(capsys, "usage")
+        assert code == 0
+        assert json.loads(out.out)["runs"] == 0
+
+    def test_converting_a_non_trial_exits_non_zero(self, capsys):
+        self._run(
+            capsys, "activate", "acme@example.com",
+            "--issued", "2026-01-01T00:00:00",
+        )
+        code, out = self._run(capsys, "convert")
+        assert code == 2
+        assert "not a trial" in out.err
+
+
 # ------------------------------------------------------------------ CLI batch
 def test_batch_cli_processes_a_folder(inbox, tmp_path, capsys):
     out = tmp_path / "outbox"

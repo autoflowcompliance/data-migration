@@ -18,7 +18,12 @@ from typing import Any
 
 import pandas as pd
 
-from app_files.branding import Branding, inject_branding, inject_demo_watermark
+from app_files.branding import (
+    Branding,
+    inject_branding,
+    inject_demo_watermark,
+    resolve_profile,
+)
 from app_files.collaboration.comparison import build_comparison, render_comparison_html
 from app_files.ingestion import available_extensions, read_any
 from app_files.licensing import (
@@ -184,6 +189,7 @@ def run_migration(
     enable_rules: bool = True,
     enable_lineage: bool | None = None,
     run_structural_check: bool = True,
+    brand_profile: str | None = None,
 ) -> RunOutcome:
     """Run the core pipeline under the active limits and build the report.
 
@@ -195,7 +201,11 @@ def run_migration(
         branding: white-label settings; ignored when the limits forbid branding.
         enable_lineage: ``None`` uses the mode's default.
         run_structural_check: pass through to the pipeline.
+        brand_profile: name of a saved brand profile. A run may pick a profile
+            per client; an explicit ``branding`` wins over it.
     """
+    if branding is None and brand_profile is not None:
+        branding = resolve_profile(brand_profile)
     row_limit = apply_row_limit(source, limits)
     track_lineage = limits.lineage if enable_lineage is None else enable_lineage
     tracker = LineageTracker() if track_lineage else None
