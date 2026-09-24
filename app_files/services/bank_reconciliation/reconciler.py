@@ -166,7 +166,6 @@ def run_reconciliation(
 ) -> dict[str, Any]:
     """Full pipeline from raw uploaded file bytes to a reconciliation result.
     Returns cleaned frames, match results, and a summary dict."""
-    import io
     bank_df = _read_statement(bank_bytes, "bank statement")
     ledger_df = _read_statement(ledger_bytes, "ledger")
 

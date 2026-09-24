@@ -31,6 +31,9 @@ def test_golden_files_are_present():
         "ledger": {"input.csv", "expected_ledger_only.csv"},
         "pii": {"input.csv", "expected_masked.csv"},
         "cross_field": {"input.csv", "rules.yaml", "expected_failures.json"},
+        "reconciliation_3way": {
+            "bank.csv", "ledger.csv", "processor.csv", "expected_result.json",
+        },
     }.items():
         folder = GOLDEN / name
         assert folder.is_dir(), f"missing golden folder: {name}"

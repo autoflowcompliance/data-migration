@@ -1,0 +1,123 @@
+{
+  "strategy": "amount_date_desc",
+  "threshold": 2.5,
+  "summary": {
+    "strategy": "amount_date_desc",
+    "sources": [
+      "bank",
+      "ledger",
+      "processor"
+    ],
+    "matched_groups": 6,
+    "unmatched": {
+      "bank": 1,
+      "ledger": 1,
+      "processor": 2
+    },
+    "partial_groups": 1
+  },
+  "groups": [
+    {
+      "rows": {
+        "bank": 0,
+        "ledger": 0,
+        "processor": 0
+      },
+      "score": 4.0,
+      "agreed": [
+        "amount:Amount",
+        "date:Date",
+        "text:Description"
+      ]
+    },
+    {
+      "rows": {
+        "bank": 1,
+        "ledger": 1,
+        "processor": 1
+      },
+      "score": 4.0,
+      "agreed": [
+        "amount:Amount",
+        "date:Date",
+        "text:Description"
+      ]
+    },
+    {
+      "rows": {
+        "bank": 2,
+        "ledger": 2,
+        "processor": 2
+      },
+      "score": 4.0,
+      "agreed": [
+        "amount:Amount",
+        "date:Date",
+        "text:Description"
+      ]
+    },
+    {
+      "rows": {
+        "bank": 3,
+        "ledger": 3,
+        "processor": 3
+      },
+      "score": 3.0,
+      "agreed": [
+        "amount:Amount",
+        "date:Date",
+        "text:Description"
+      ]
+    },
+    {
+      "rows": {
+        "bank": 5,
+        "ledger": 4,
+        "processor": 5
+      },
+      "score": 4.0,
+      "agreed": [
+        "amount:Amount",
+        "date:Date",
+        "text:Description"
+      ]
+    },
+    {
+      "rows": {
+        "bank": 6,
+        "ledger": 5,
+        "processor": 6
+      },
+      "score": 4.0,
+      "agreed": [
+        "amount:Amount",
+        "date:Date",
+        "text:Description"
+      ]
+    }
+  ],
+  "partial": [
+    {
+      "anchor_row": 4,
+      "matched_rows": {
+        "bank": 4,
+        "processor": 4
+      },
+      "missing_sources": [
+        "ledger"
+      ]
+    }
+  ],
+  "unmatched_descriptions": {
+    "bank": [
+      "MYSTERY DEPOSIT UNKNOWN"
+    ],
+    "ledger": [
+      "CHEQUE 000123 NEVER CLEARED"
+    ],
+    "processor": [
+      "MYSTERY DEPOSIT UNKNOWN",
+      "PROCESSOR FEE"
+    ]
+  }
+}

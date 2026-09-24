@@ -266,6 +266,45 @@ This is prep work for a bookkeeper, not finished bookkeeping. The tool finds and
 cleans discrepancies. It does not categorise transactions or make accounting
 judgments.
 
+For three or more feeds — statement, ledger, and a payment processor, say —
+`reconcile_multiway` matches them all at once. The first source is the anchor,
+and a group counts as matched only when every source contributes a row; a row
+that matched two feeds out of three is reported as a partial group and stays in
+the unmatched list. The two-file case runs through the same engine and produces
+the same counts as the original matcher.
+
+Match logic is data, not code. A strategy lists weighted components —
+`amount`, `date`, `reference` or `text` — and a pair matches when the passing
+weight reaches a threshold. The default requires both an amount and a date, which
+is the original behaviour; a reference strategy can match on the reference alone,
+and a weighted strategy can let a strong amount agreement excuse a differing
+reference.
+
+```python
+from app_files.services.bank_reconciliation import (
+    MatchStrategy, ReconciliationHistory, reconcile_multiway,
+)
+
+strategy = MatchStrategy.from_dict({
+    "name": "amount_date_reference",
+    "components": [
+        {"type": "amount", "column": "Amount", "weight": 2.0},
+        {"type": "date", "column": "Date", "weight": 1.0, "date_window_days": 2},
+        {"type": "reference", "column": "Reference", "weight": 1.0},
+    ],
+    "threshold": 2.5,
+})
+result = reconcile_multiway(
+    {"bank": bank, "ledger": ledger, "processor": processor}, strategy
+)
+print(result.summary())
+print(result.render())
+
+store = ReconciliationHistory()          # under AUTOFLOW_HOME
+store.record("acme", result)
+print(store.render_trend("acme"))        # month over month
+```
+
 ## Documentation
 
 | Document | Covers |
@@ -281,11 +320,12 @@ judgments.
 python -m pytest -q
 ```
 
-Expect `691 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1097 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
-writers, PII detection and masking, config-schema validation, golden-file
+writers, PII detection and masking, cross-field rules and rule versioning,
+multi-way reconciliation, migration safety, config-schema validation, golden-file
 regression fixtures, and malformed-input error handling. It runs in about
-twenty seconds, so there is no reason not to run it before a commit.
+twenty-eight seconds, so there is no reason not to run it before a commit.
 
 Frozen core: `app_files/cleaners/`, `mappers/`, `validators/`, `auditors/` and
 `reporters/` are treated as stable. New capability goes in sibling packages that
