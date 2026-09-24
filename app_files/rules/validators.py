@@ -13,7 +13,7 @@ rule works on bank/ledger data that has not been cleaned yet.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -97,7 +97,7 @@ def check_regex(value: Any, rule: Rule) -> bool:
         raise ValueError(f"Rule {rule.name!r} has an invalid regex: {exc}") from exc
 
 
-VALIDATORS = {
+VALIDATORS: dict[str, Callable[[Any, Rule], bool]] = {
     "required": check_required,
     "range": check_range,
     "length": check_length,

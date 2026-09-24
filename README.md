@@ -414,6 +414,36 @@ from app_files.plugins import LifecycleEvent, subscribe
 subscribe(LifecycleEvent.RUN_COMPLETED, lambda event, payload: audit(payload))
 ```
 
+## Orchestration
+
+A durable queue sits beside the batch engine: jobs are submitted, persisted,
+claimed by a worker, and completed, and none of that needs the submitter to
+stay alive. State is a JSONL log under `AUTOFLOW_HOME` — append per submission
+and per state change, never rewritten in place, so a crash leaves the old state
+or the new state and never a torn one.
+
+```python
+from app_files.orchestration import JobQueue, JobSpec, Priority, run_workers, register_handler
+
+register_handler("batch", lambda payload: run_batch(**payload).as_dict())
+queue = JobQueue()
+queue.submit(JobSpec("batch", {"input_dir": "in", "output_dir": "out"}, priority=Priority.HIGH))
+reports = run_workers(queue, count=3, threads=True)
+```
+
+Three properties the tests pin:
+
+- **No job is lost.** Two workers can never claim the same job — the select and
+  the mark run under one lock. A worker that dies mid-job is recovered by
+  `requeue_stale`, which is what stops a durable queue from quietly losing work.
+- **Priority means something.** Lanes drain high-first, oldest-first within a
+  lane, so a burst of low-priority work cannot leapfrog a high-priority job that
+  has been waiting.
+- **One job cannot starve the system.** A job declares a memory, CPU and runtime
+  budget, and a worker refuses to start a job whose declared memory exceeds what
+  is available. Memory is measured as what the job *adds*, not the interpreter's
+  total footprint, so an in-process worker does not fail every small job.
+
 ## Documentation
 
 | Document | Covers |
@@ -429,7 +459,7 @@ subscribe(LifecycleEvent.RUN_COMPLETED, lambda event, payload: audit(payload))
 python -m pytest -q
 ```
 
-Expect `1303 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1364 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
