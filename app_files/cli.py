@@ -254,6 +254,78 @@ def run_batch_command(argv: list[str]) -> int:
     return 1 if result.failed else 0
 
 
+def build_drift_parser() -> argparse.ArgumentParser:
+    """``python -m app_files.cli drift …`` — gate a run on schema change."""
+    parser = argparse.ArgumentParser(
+        prog="app_files.cli drift",
+        description=(
+            "Compare a source file's schema to the last one seen for it, then "
+            "run only if the change is safe. A blocked run stops and exits "
+            "non-zero; re-run with --accept once a human has approved the drift."
+        ),
+    )
+    parser.add_argument("-i", "--input", required=True, type=Path, help="source CSV")
+    parser.add_argument("-c", "--crm", required=True,
+                        help=f"target CRM or mapping config path ({', '.join(available_crms())})")
+    parser.add_argument("-o", "--outdir", type=Path, default=Path("output"))
+    parser.add_argument("--source", default=None,
+                        help="name this source is remembered under (defaults to the filename)")
+    parser.add_argument("--project", default="Drift-guarded run")
+    parser.add_argument("--accept", action="store_true",
+                        help="record the changed schema even when it would block")
+    return parser
+
+
+def run_drift_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli drift …``.
+
+    On a blocked verdict the run does not happen and the process exits non-zero,
+    so a scheduled job stops instead of quietly migrating a changed source.
+    """
+    from app_files.drift import WARN, DriftBlocked, DriftGate
+
+    args = build_drift_parser().parse_args(argv)
+    frame = _read_csv(args.input)
+    source = args.source or args.input.name
+    gate = DriftGate()
+
+    if args.accept:
+        # The human has looked at the drift and approved it; record the new
+        # shape so the next run is judged against what was actually migrated.
+        gate.remember(source, frame)
+        print(f"Recorded the current schema for {source!r}.")
+
+    try:
+        result, decision = gate.guarded_run(
+            source, frame, args.crm, source_filename=args.input.name,
+            project_name=args.project,
+        )
+    except DriftBlocked as blocked:
+        decision = blocked.decision
+        print(decision.summary(), file=sys.stderr)
+        print(
+            "The run was stopped. Review the change, then re-run with --accept "
+            "to record the new schema.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if decision.verdict == WARN:
+        print(f"Warning: {decision.summary()}")
+    else:
+        print(decision.summary())
+
+    args.outdir.mkdir(parents=True, exist_ok=True)
+    result.clean_frame.to_csv(args.outdir / "clean_data.csv", index=False)
+    summary = result.summary()
+    print(
+        f"{summary['rows_in']} rows in, {summary['rows_out']} out, "
+        f"quality score {summary['quality_score']}%"
+    )
+    print(f"Wrote deliverables to {args.outdir}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "batch":
@@ -262,6 +334,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_watch_command(argv[1:])
     if argv and argv[0] == "pull":
         return run_pull_command(argv[1:])
+    if argv and argv[0] == "drift":
+        return run_drift_command(argv[1:])
 
     args = build_parser().parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)
