@@ -34,7 +34,12 @@ from app_files.rules.builder import (
     rules_to_yaml,
     unique_name,
 )
-from app_files.rules.execution import field_map, resolve_rules, run_with_rules
+from app_files.rules.execution import (
+    field_map,
+    resolve_cross_field_rules,
+    resolve_rules,
+    run_with_rules,
+)
 from app_files.utilities.rule_library import load_library
 
 # --------------------------------------------------------------------- fixtures
@@ -547,6 +552,35 @@ def test_field_map_keeps_mapped_names_working(contacts_frame):
     result = run_pipeline(contacts_frame, crm="hubspot", source_filename="messy_contacts.csv")
     mapping = field_map(result)
     assert mapping["email"] == "email"
+
+
+def test_resolve_cross_field_rules_repoints_every_column(contacts_frame):
+    """A two-column rule written in source terms must run on mapped columns."""
+    from app_files.rules.cross_field import CrossFieldRule
+
+    result = run_pipeline(contacts_frame, crm="hubspot", source_filename="messy_contacts.csv")
+    rule = CrossFieldRule(
+        name="phone_below_country", type="compare",
+        fields=["Phone 1", "Country"], operator="<",
+    )
+    resolved, unmatched = resolve_cross_field_rules(result, [rule])
+    assert unmatched == []
+    assert resolved[0].fields == ["phone", "country"]
+    assert resolved[0].name == "phone_below_country"
+
+
+def test_resolve_cross_field_rules_reports_one_missing_column(contacts_frame):
+    """One bad column disqualifies the whole rule, rather than half-running it."""
+    from app_files.rules.cross_field import CrossFieldRule
+
+    result = run_pipeline(contacts_frame, crm="hubspot", source_filename="messy_contacts.csv")
+    rule = CrossFieldRule(
+        name="bad_pair", type="compare",
+        fields=["Phone 1", "Nowhere"], operator="<",
+    )
+    resolved, unmatched = resolve_cross_field_rules(result, [rule])
+    assert resolved == []
+    assert unmatched == ["bad_pair"]
 
 
 def test_resolve_rules_repoints_a_source_column(contacts_frame):

@@ -101,3 +101,58 @@ class TestRuleReport:
         assert report["rules_run"] == 2
         assert report["rule_failures"] == 1
         assert report["failures_by_rule"] == {"phone_e164_format": 1}
+
+
+CROSS_CONFIG = "tests/regression/golden_files/rules_wiring/crm.yaml"
+CROSS_INPUT = "tests/regression/golden_files/rules_wiring/cross_field.csv"
+
+
+class TestCrossFieldBinding:
+    """A config's ``cross_field:`` block must run in a run, like ``rules:``."""
+
+    def test_cross_field_rules_are_loaded_from_the_config(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path))
+        built = run_configured(read_any(CROSS_INPUT), CROSS_CONFIG,
+                               project_name="G", source_filename="cross_field.csv")
+        assert [r.name for r in built.cross_field_rules] == [
+            "phone_below_zip", "zip_below_phone"
+        ]
+        assert built.cross_field_result.rules_run == 2
+
+    def test_source_column_names_are_translated_to_the_mapped_frame(
+        self, tmp_path, monkeypatch
+    ):
+        """The rule names `Phone Number`; the frame has `phone`."""
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path))
+        built = run_configured(read_any(CROSS_INPUT), CROSS_CONFIG,
+                               project_name="G", source_filename="cross_field.csv")
+        assert [r.fields for r in built.cross_field_rules] == [
+            ["phone", "zip"], ["zip", "phone"]
+        ]
+        assert built.unmatched_cross_field == []
+
+    def test_failures_are_reported_with_row_precision(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path))
+        built = run_configured(read_any(CROSS_INPUT), CROSS_CONFIG,
+                               project_name="G", source_filename="cross_field.csv")
+        assert built.cross_field_result.failures_by_rule == {"phone_below_zip": 2}
+        issues = [i for i in built.result.validation.issues
+                  if i.check.startswith("cross_field:")]
+        assert {i.severity for i in issues} == {"error"}
+        assert {i.row for i in issues} == {0, 2}  # 0-based frame rows
+
+    def test_combined_counters_cover_both_rule_kinds(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path))
+        built = run_configured(read_any(CROSS_INPUT), CROSS_CONFIG,
+                               project_name="G", source_filename="cross_field.csv")
+        # 1 single-field + 2 cross-field = 3 declared and run
+        assert built.total_rules_run == 3
+        # 1 required failure + 2 compare failures
+        assert built.total_rule_failures == 3
+        assert failures_exceed(built) is True
+
+    def test_the_report_includes_cross_field_issues(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path))
+        built = run_configured(read_any(CROSS_INPUT), CROSS_CONFIG,
+                               project_name="G", source_filename="cross_field.csv")
+        assert "phone must stay below zip" in built.qa_report_html

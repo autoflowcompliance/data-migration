@@ -161,7 +161,7 @@ def process_one(
             project_name=f"{project_name} — {path.stem}",
             source_filename=path.name,
         )
-        if built.rules:
+        if built.rules or built.cross_field_rules:
             (out_dir / "qa_report.html").write_text(built.qa_report_html, encoding="utf-8")
             result.validation.issues_frame().to_csv(out_dir / "issues.csv", index=False)
 
@@ -174,8 +174,8 @@ def process_one(
             score=float(profile(result.clean_frame).overall),
             errors=int(summary.get("errors", 0)),
             warnings=int(summary.get("warnings", 0)),
-            rule_failures=int(built.rule_result.total_failures),
-            rules_run=int(built.rule_result.rules_run),
+            rule_failures=int(built.total_rule_failures),
+            rules_run=int(built.total_rules_run),
             output_dir=str(out_dir),
         )
     except Exception as exc:  # noqa: BLE001 - one bad file must not sink the batch

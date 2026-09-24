@@ -163,9 +163,9 @@ for issue in result.issues:
 
 ## Rules in an unattended run
 
-A config's `rules:` block runs automatically in every entry point — the CLI,
-the batch engine and the web UI — not only when you call `run_rules_for`
-yourself. The failures land in the same issue list the core validator fills, so
+A config's `rules:` and `cross_field:` blocks run automatically in every entry
+point — the CLI, the batch engine and the web UI — not only when you call
+`run_rules_for` yourself. The failures land in the same issue list the core validator fills, so
 they appear in `issues.csv`, in the QA report and in the quality score:
 
 ```bash
@@ -173,6 +173,9 @@ python -m app_files.cli -i contacts.csv -c hubspot -o out/
 # 7 rows in, 6 out, quality score 66.7%, 1 errors, 2 warnings
 # Rules: 2 of 2 run, 1 failure(s)
 ```
+
+The printed counts cover both kinds of rule, and `--strict-rules` triggers on a
+cross-field failure exactly as it does on a single-field one.
 
 A rule failure is **advisory by default** — it is reported, not enforced, so a
 run whose core validation passes still exits 0. Add `--strict-rules` to make a
@@ -240,7 +243,13 @@ ambiguous.
 A cross-field rule is evaluated row by row and reports one `Issue` per failing
 row, under the check name `cross_field:<rule name>`. Those issues are the same
 type the single-field rules produce, so they appear in the issues CSV and the QA
-report with nothing extra to wire up.
+report.
+
+Rules are written against the **source** headers the buyer sees (`Open Date`),
+but they run against the **mapped** frame (`open_date`). Both `rules:` and
+`cross_field:` columns are translated the same way, so write them in source
+terms — the engine resolves them, and a rule whose columns resolve to nothing is
+reported as unmatched rather than silently passing.
 
 Two things a rule will not do:
 

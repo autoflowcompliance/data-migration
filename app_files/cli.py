@@ -376,10 +376,15 @@ def main(argv: list[str] | None = None) -> int:
     # run's issues.csv and score omitted them entirely. Apply them here on top
     # of the result we already have (never re-running the pipeline, which would
     # drop the cleaning config above).
+    #
+    # The exit code is decided by the *core* validation captured here, before
+    # the rules merge. A merged error-severity rule issue would otherwise flip
+    # ``validation.valid`` and make an advisory rule fail the run, contradicting
+    # the documented contract and the batch engine's own exit logic.
+    core_valid = result.validation.valid
     built = apply_configured_rules(
         result, args.crm, project_name=args.project, source_filename=args.input.name
     )
-    rule_outcome = built.rule_result
     result.clean_frame.to_csv(args.outdir / "clean_data.csv", index=False)
     result.mapping_log().to_csv(args.outdir / "mapping_log.csv", index=False)
     result.cleaning_log().to_csv(args.outdir / "cleaning_log.csv", index=False)
@@ -392,13 +397,15 @@ def main(argv: list[str] | None = None) -> int:
         f"quality score {summary['quality_score']}%, "
         f"{summary['errors']} errors, {summary['warnings']} warnings"
     )
-    if built.rules:
+    declared_rules = len(built.rules) + len(built.cross_field_rules)
+    if declared_rules:
+        unmatched = built.unmatched_rules + built.unmatched_cross_field
         print(
-            f"Rules: {rule_outcome.rules_run} of {len(built.rules)} run, "
-            f"{rule_outcome.total_failures} failure(s)"
+            f"Rules: {built.total_rules_run} of {declared_rules} run, "
+            f"{built.total_rule_failures} failure(s)"
         )
-        if built.unmatched_rules:
-            print(f"  unmatched rules: {', '.join(built.unmatched_rules)}")
+        if unmatched:
+            print(f"  unmatched rules: {', '.join(unmatched)}")
 
     if args.audit_export:
         if not args.audit_key:
@@ -422,11 +429,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Wrote deliverables to {args.outdir}")
     if args.strict_rules and failures_exceed(built, max_failures=0):
         print(
-            f"--strict-rules: {rule_outcome.total_failures} declared rule failure(s).",
+            f"--strict-rules: {built.total_rule_failures} declared rule failure(s).",
             file=sys.stderr,
         )
         return 1
-    return 0 if result.validation.valid else 1
+    return 0 if core_valid else 1
 
 
 if __name__ == "__main__":

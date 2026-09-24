@@ -61,3 +61,28 @@ def test_the_rule_less_run_stays_byte_identical(tmp_path, monkeypatch):
     built = run_configured(frame, "salesforce", **RUN_KWARGS)
     assert built.result.clean_frame.to_csv(index=False) == plain.clean_frame.to_csv(index=False)
     assert built.qa_report_html == plain.qa_report_html
+
+
+CROSS_CONFIG = str(GOLDEN / "crm.yaml")
+CROSS_KWARGS = {"project_name": "Golden", "source_filename": "cross_field.csv"}
+
+
+@pytest.fixture
+def cross_built(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path / "state"))
+    return run_configured(read_any(GOLDEN / "cross_field.csv"), CROSS_CONFIG, **CROSS_KWARGS)
+
+
+def test_the_cross_field_clean_output_matches(cross_built):
+    produced = cross_built.result.clean_frame.to_csv(index=False)
+    assert produced == (GOLDEN / "expected_cross_clean.csv").read_text(encoding="utf-8")
+
+
+def test_the_cross_field_issues_match(cross_built):
+    produced = cross_built.result.validation.issues_frame().to_csv(index=False)
+    assert produced == (GOLDEN / "expected_cross_issues.csv").read_text(encoding="utf-8")
+
+
+def test_the_golden_cross_field_failure_is_present(cross_built):
+    checks = set(cross_built.result.validation.issues_frame()["check"])
+    assert "cross_field:phone_below_zip" in checks

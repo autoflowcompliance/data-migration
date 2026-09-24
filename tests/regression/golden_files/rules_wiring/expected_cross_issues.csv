@@ -1,0 +1,4 @@
+row,field,check,severity,message
+3,phone,rule:phone_required,error,Required field 'phone' is empty
+2,phone,cross_field:phone_below_zip,error,phone must stay below zip
+4,phone,cross_field:phone_below_zip,error,phone must stay below zip

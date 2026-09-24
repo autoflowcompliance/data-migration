@@ -28,9 +28,23 @@ import pandas as pd
 
 from app_files.pipeline import PipelineResult, run_pipeline
 from app_files.profiling import Profile, profile
+from app_files.rules.cross_field import (
+    CrossFieldRuleError,
+    load_cross_field_rules,
+)
 from app_files.rules.engine import RuleResult, load_rules_for
 from app_files.rules.execution import BuiltRuleRun, run_with_rules
 from app_files.rules.schema import RuleConfigError
+
+
+def _config_path(crm: str | Path) -> Path | None:
+    """The YAML file a config name or path resolves to, or None."""
+    path = Path(crm)
+    if not path.exists():
+        from app_files.mappers.schema import CONFIG_DIR
+
+        path = CONFIG_DIR / f"{str(crm).strip().lower()}.yaml"
+    return path if path.exists() else None
 
 
 def _declared_rules(crm: str | Path) -> list[Any]:
@@ -39,6 +53,25 @@ def _declared_rules(crm: str | Path) -> list[Any]:
         return list(load_rules_for(crm))
     except RuleConfigError:
         return []
+
+
+def _declared_cross_field_rules(crm: str | Path) -> list[Any]:
+    """The config's ``cross_field:`` rules, or none."""
+    path = _config_path(crm)
+    if path is None:
+        return []
+    import yaml
+
+    with open(path, encoding="utf-8") as handle:
+        data = yaml.safe_load(handle) or {}
+    try:
+        return list(load_cross_field_rules(data))
+    except CrossFieldRuleError:
+        return []
+
+
+def _has_rules(crm: str | Path) -> bool:
+    return bool(_declared_rules(crm) or _declared_cross_field_rules(crm))
 
 
 def rules_home() -> Path:
@@ -94,7 +127,8 @@ def apply_configured_rules(
     run's real header with a placeholder.
     """
     rules = _declared_rules(crm)
-    if not rules:
+    cross_field_rules = _declared_cross_field_rules(crm)
+    if not rules and not cross_field_rules:
         return BuiltRuleRun(
             result=result,
             rule_result=RuleResult(issues=[], rules_run=0),
@@ -114,6 +148,7 @@ def apply_configured_rules(
         source_filename=source_filename,
         run_structural_check=run_structural_check,
         result=result,
+        cross_field_rules=cross_field_rules,
     )
 
 
@@ -133,7 +168,8 @@ def run_configured(
     keeps the no-rules output byte-identical to the frozen pipeline.
     """
     rules = _declared_rules(crm)
-    if not rules:
+    cross_field_rules = _declared_cross_field_rules(crm)
+    if not rules and not cross_field_rules:
         return _as_built(
             run_pipeline(
                 source,
@@ -151,6 +187,7 @@ def run_configured(
         project_name=project_name,
         source_filename=source_filename,
         run_structural_check=run_structural_check,
+        cross_field_rules=cross_field_rules,
     )
 
 
@@ -160,17 +197,19 @@ def failures_exceed(run: BuiltRuleRun, max_failures: int = 0) -> bool:
     The hook for ``--strict-rules``: ``max_failures=0`` means any declared
     failure is too many.
     """
-    return run.rule_result.total_failures > max_failures
+    return run.total_rule_failures > max_failures
 
 
 def rule_report(run: BuiltRuleRun) -> dict[str, Any]:
     """A compact rule outcome for a summary line or a CSV row."""
     counts = run.rule_result.failures_by_rule or {}
+    cross = run.cross_field_result
     return {
-        "rules_declared": len(run.rules),
-        "rules_run": run.rule_result.rules_run,
-        "rule_failures": run.rule_result.total_failures,
-        "unmatched_rules": len(run.unmatched_rules),
+        "rules_declared": len(run.rules) + len(run.cross_field_rules),
+        "rules_run": run.rule_result.rules_run + getattr(cross, "rules_run", 0),
+        "rule_failures": run.rule_result.total_failures
+        + len(getattr(cross, "issues", []) or []),
+        "unmatched_rules": len(run.unmatched_rules) + len(run.unmatched_cross_field),
         "failures_by_rule": dict(counts),
     }
 

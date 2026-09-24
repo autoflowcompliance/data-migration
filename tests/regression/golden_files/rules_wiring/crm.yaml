@@ -1,0 +1,33 @@
+crm: Widget CRM
+version: "1.0"
+fields:
+  - name: full_name
+    aliases: ["Full Name"]
+  - name: phone
+    transform: phone_e164
+    aliases: ["Phone Number"]
+  - name: zip
+    aliases: ["Zip Code"]
+  - name: balance
+    type: number
+    aliases: ["Balance"]
+
+rules:
+  - name: phone_required
+    field: phone
+    type: required
+    severity: error
+
+cross_field:
+  # The mapped columns are compared, but the rule names the source headers a
+  # buyer sees — the resolver has to translate them.
+  - name: phone_below_zip
+    type: compare
+    fields: ["Phone Number", "Zip Code"]
+    operator: "<"
+    message: "phone must stay below zip"
+  - name: zip_below_phone
+    type: compare
+    fields: ["Zip Code", "Phone Number"]
+    operator: "<"
+    severity: warning
