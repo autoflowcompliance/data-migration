@@ -9,9 +9,12 @@ resolves them.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
+
+if TYPE_CHECKING:
+    from app_files.services.bank_reconciliation.multiway import MatchStrategy
 
 
 def clean_currency_amount(value: Any) -> float | None:
@@ -157,31 +160,239 @@ def reconcile_transactions(
     }
 
 
+def reconcile_transactions_with_strategy(
+    bank_df: pd.DataFrame,
+    ledger_df: pd.DataFrame,
+    *,
+    strategy: MatchStrategy | None = None,
+    ledger_strategy: MatchStrategy | None = None,
+) -> dict[str, Any]:
+    """The reconciler driven by a config's ``matching:`` block.
+
+    A strategy names the columns it compares on each side, so the bank and
+    ledger frames can use different source column names. With no strategy this
+    delegates to :func:`reconcile_transactions`, so the default path is the
+    frozen matcher itself rather than a re-implementation of it.
+    """
+    if strategy is None:
+        raise ValueError("reconcile_transactions_with_strategy needs a strategy")
+
+    left_strategy = strategy
+    right_strategy = ledger_strategy or strategy
+    bank = bank_df.copy().reset_index(drop=True)
+    ledger = ledger_df.copy().reset_index(drop=True)
+    bank["_matched"] = False
+    ledger["_matched"] = False
+
+    matches = []
+    for i, brow in bank.iterrows():
+        for j, lrow in ledger.iterrows():
+            if ledger.at[j, "_matched"]:
+                continue
+            if _strategy_agrees(left_strategy, right_strategy, brow, lrow):
+                amount_column = _first_amount_column(left_strategy, required=False)
+                matches.append({
+                    "bank_row": i,
+                    "ledger_row": j,
+                    "amount": (
+                        _numeric_or_none(brow[amount_column])
+                        if amount_column is not None else None
+                    ),
+                    "date_diff_days": _date_gap(left_strategy, right_strategy, brow, lrow),
+                })
+                bank.at[i, "_matched"] = True
+                ledger.at[j, "_matched"] = True
+                break
+
+    bank_only = bank[~bank["_matched"]].drop(columns=["_matched"])
+    ledger_only = ledger[~ledger["_matched"]].drop(columns=["_matched"])
+    return {
+        "matches": matches, "bank_only": bank_only, "ledger_only": ledger_only,
+        "bank_total": len(bank), "ledger_total": len(ledger),
+    }
+
+
+def _first_amount_column(
+    strategy: MatchStrategy, required: bool = True
+) -> str | None:
+    from app_files.services.bank_reconciliation.multiway import AMOUNT
+
+    for component in strategy.components:
+        if component.type == AMOUNT:
+            return component.column
+    if required:
+        raise ValueError("A match strategy must include an 'amount' component")
+    return None
+
+
+def _first_date_column(strategy: MatchStrategy) -> str | None:
+    """The strategy's date column, or ``None`` when it does not compare dates.
+
+    A reference-only strategy is legitimate, so a missing date is not an error.
+    """
+    from app_files.services.bank_reconciliation.multiway import DATE
+
+    for component in strategy.components:
+        if component.type == DATE:
+            return component.column
+    return None
+
+
+def _date_gap(
+    left_strategy: MatchStrategy,
+    right_strategy: MatchStrategy,
+    left: pd.Series,
+    right: pd.Series,
+) -> int:
+    from app_files.services.bank_reconciliation.multiway import (
+        DATE,
+        _as_date,
+    )
+
+    left_date_col = next(
+        (c.column for c in left_strategy.components if c.type == DATE), None
+    )
+    right_date_col = next(
+        (c.column for c in right_strategy.components if c.type == DATE), None
+    )
+    if left_date_col is None or right_date_col is None:
+        return 0
+    left_date = _as_date(left.get(left_date_col))
+    right_date = _as_date(right.get(right_date_col))
+    if left_date is None or right_date is None:
+        return 0
+    return abs((left_date - right_date).days)
+
+
+def _component_agrees_between(
+    component: Any,
+    left: pd.Series,
+    left_column: str,
+    right: pd.Series,
+    right_column: str,
+) -> bool:
+    """Compare one component using a column name per side.
+
+    ``_component_agrees`` reads the same column name from both rows, which is
+    wrong when a statement calls its date ``Posting Date`` and the ledger calls
+    it ``Date``. This keeps the comparison logic identical while letting each
+    side name its own column.
+    """
+    from app_files.services.bank_reconciliation.multiway import (
+        AMOUNT,
+        DATE,
+        _as_amount,
+        _as_date,
+        _normalise_text,
+    )
+
+    left_value = left.get(left_column)
+    right_value = right.get(right_column)
+    if component.type == AMOUNT:
+        left_amount = _as_amount(left_value)
+        right_amount = _as_amount(right_value)
+        if left_amount is None or right_amount is None:
+            return False
+        return abs(left_amount - right_amount) <= component.tolerance
+    if component.type == DATE:
+        left_date = _as_date(left_value)
+        right_date = _as_date(right_value)
+        if left_date is None or right_date is None:
+            return False
+        return abs((left_date - right_date).days) <= component.date_window_days
+    left_text = _normalise_text(left_value)
+    return bool(left_text) and left_text == _normalise_text(right_value)
+
+
+def _strategy_agrees(
+    left_strategy: MatchStrategy,
+    right_strategy: MatchStrategy,
+    left: pd.Series,
+    right: pd.Series,
+) -> bool:
+    """Every component must pass on both sides at its declared column.
+
+    The two strategies name the same component types but may point each type at
+    a different column, so the bank side is read with the bank strategy's column
+    and the ledger side with the ledger strategy's. A component that fails is a
+    failure: a match is a claim about both feeds.
+    """
+    left_by_type = {c.type: c for c in left_strategy.components}
+    right_by_type = {c.type: c for c in right_strategy.components}
+    if set(left_by_type) != set(right_by_type):
+        raise ValueError(
+            "The bank and ledger strategies must use the same component types: "
+            f"{sorted(left_by_type)} vs {sorted(right_by_type)}"
+        )
+    score = 0.0
+    for component_type, left_component in left_by_type.items():
+        right_component = right_by_type[component_type]
+        if not _component_agrees_between(
+            left_component, left, left_component.column, right, right_component.column
+        ):
+            return False
+        score += left_component.weight
+    return score + 1e-9 >= left_strategy.threshold
+
+
 def run_reconciliation(
     bank_bytes: bytes,
     ledger_bytes: bytes,
     bank_date_col: str, bank_amount_col: str,
     ledger_date_col: str, ledger_amount_col: str,
     date_tolerance_days: int = 2,
+    strategy: MatchStrategy | None = None,
+    ledger_strategy: MatchStrategy | None = None,
 ) -> dict[str, Any]:
     """Full pipeline from raw uploaded file bytes to a reconciliation result.
-    Returns cleaned frames, match results, and a summary dict."""
+    Returns cleaned frames, match results, and a summary dict.
+
+    With no ``strategy`` the frozen amount-and-date matcher runs, so an
+    existing caller is unaffected. A strategy lets a config's ``matching:``
+    block drive the comparison instead.
+    """
     bank_df = _read_statement(bank_bytes, "bank statement")
     ledger_df = _read_statement(ledger_bytes, "ledger")
 
-    bank_df[bank_amount_col] = bank_df[bank_amount_col].map(clean_currency_amount)
-    ledger_df[ledger_amount_col] = ledger_df[ledger_amount_col].map(clean_currency_amount)
-    bank_df[bank_date_col] = pd.to_datetime(bank_df[bank_date_col], errors="coerce")
-    ledger_df[ledger_date_col] = pd.to_datetime(ledger_df[ledger_date_col], errors="coerce")
+    # A strategy names the columns it compares, so when one is supplied those
+    # are the columns to clean; otherwise the explicit arguments are. A
+    # reference-only strategy has no amount column, which is fine — nothing to
+    # parse as currency.
+    bank_amount = (
+        _first_amount_column(strategy, required=False) if strategy else bank_amount_col
+    )
+    bank_date = _first_date_column(strategy) if strategy else bank_date_col
+    ledger_amount = (
+        _first_amount_column(ledger_strategy, required=False) if ledger_strategy
+        else (_first_amount_column(strategy, required=False) if strategy else ledger_amount_col)
+    )
+    ledger_date = (
+        _first_date_column(ledger_strategy) if ledger_strategy
+        else (_first_date_column(strategy) if strategy else ledger_date_col)
+    )
+
+    if bank_amount is not None:
+        bank_df[bank_amount] = bank_df[bank_amount].map(clean_currency_amount)
+    if ledger_amount is not None:
+        ledger_df[ledger_amount] = ledger_df[ledger_amount].map(clean_currency_amount)
+    if bank_date is not None:
+        bank_df[bank_date] = pd.to_datetime(bank_df[bank_date], errors="coerce")
+    if ledger_date is not None:
+        ledger_df[ledger_date] = pd.to_datetime(ledger_df[ledger_date], errors="coerce")
 
     before_bank, before_ledger = len(bank_df), len(ledger_df)
     bank_df = bank_df.drop_duplicates()
     ledger_df = ledger_df.drop_duplicates()
 
-    result = reconcile_transactions(
-        bank_df, ledger_df, bank_date_col, bank_amount_col, ledger_date_col, ledger_amount_col,
-        date_tolerance_days,
-    )
+    if strategy is None:
+        result = reconcile_transactions(
+            bank_df, ledger_df, bank_date_col, bank_amount_col, ledger_date_col,
+            ledger_amount_col, date_tolerance_days,
+        )
+    else:
+        result = reconcile_transactions_with_strategy(
+            bank_df, ledger_df, strategy=strategy, ledger_strategy=ledger_strategy
+        )
 
     summary = {
         "bank_transactions": result["bank_total"],

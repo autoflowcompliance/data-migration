@@ -173,3 +173,58 @@ class TestCompareTwoWayHelper:
         )
         assert mine.sources == ["bank", "ledger"]
         assert mine.matched_groups >= 1
+
+
+class TestConfigDrivenReconciliation:
+    """The real golden statement files, matched through a config's strategy.
+
+    The shipped ``bank_reconciliation`` config declares the frozen default as
+    YAML, so a run through the binding must reproduce the frozen result exactly.
+    A separate caller-supplied strategy must be able to change it.
+    """
+
+    def test_the_shipped_config_reproduces_the_frozen_result(self):
+        from app_files.services.bank_reconciliation import load_match_strategy
+
+        strategy = load_match_strategy("bank_reconciliation")
+        frozen = run_reconciliation(
+            BANK.read_bytes(), LEDGER.read_bytes(),
+            "Date", "Amount", "Date", "Amount", 2,
+        )
+        driven = run_reconciliation(
+            BANK.read_bytes(), LEDGER.read_bytes(),
+            "Date", "Amount", "Date", "Amount", 2,
+            strategy=strategy,
+        )
+        assert driven["summary"] == frozen["summary"]
+
+    def test_a_reference_strategy_changes_the_match_set(self, tmp_path):
+        from app_files.services.bank_reconciliation import load_match_strategy
+
+        # A looser amount-only strategy read from a config the binding parses,
+        # then confirm the counts differ from the frozen matcher.
+        config = tmp_path / "loose.yaml"
+        config.write_text(
+            "crm: Loose\nfields: []\n"
+            "matching:\n"
+            "  name: amount_window\n"
+            "  components:\n"
+            "    - type: amount\n      column: Amount\n      weight: 1.0\n"
+            "      tolerance: 5.0\n"
+            "  threshold: 1.0\n",
+            encoding="utf-8",
+        )
+        loose = load_match_strategy(config)
+        frozen = run_reconciliation(
+            BANK.read_bytes(), LEDGER.read_bytes(),
+            "Date", "Amount", "Date", "Amount", 0,
+        )
+        driven = run_reconciliation(
+            BANK.read_bytes(), LEDGER.read_bytes(),
+            "Date", "Amount", "Date", "Amount", 0,
+            strategy=loose,
+        )
+        # A 5.00 amount tolerance matches strictly more than the exact matcher
+        # on these fixtures, so the strategy demonstrably changed the outcome.
+        assert len(driven["matches"]) > len(frozen["matches"])
+        assert driven["summary"]["matched"] == len(driven["matches"])

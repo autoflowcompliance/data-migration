@@ -34,3 +34,19 @@ rules:
     max: 1000000
     severity: warning
     message: "Amount is unusually large for this account — check for a typo"
+
+# How a statement line is matched to a ledger line, as data rather than code.
+# This is the same amount-and-date rule the reconciler has always used, written
+# out so it can be tuned without touching Python. Remove the block and the
+# frozen default runs instead.
+matching:
+  name: amount_and_date
+  components:
+    - type: amount
+      column: Amount
+      weight: 1.0
+    - type: date
+      column: Date
+      weight: 1.0
+      date_window_days: 2
+  threshold: 2.0

@@ -260,3 +260,50 @@ The SQL writer deliberately keeps a column as `TEXT` when its values only look
 numeric but carry meaning in their formatting — `+14155552671` (a phone number)
 and `01234` (an account or zip code). Without that, SQL numeric affinity would
 silently store `14155552671` and `1234`.
+
+## Matching (bank reconciliation)
+
+A config can declare how a statement line is matched to a ledger line. This is
+the same match logic the reconciler has always used, written as data so it can
+be tuned without editing Python. Omit the block and the frozen amount-and-date
+default runs unchanged.
+
+```yaml
+matching:
+  name: amount_and_date
+  components:
+    - type: amount
+      column: Amount
+      weight: 1.0
+    - type: date
+      column: Date
+      weight: 1.0
+      date_window_days: 2
+  threshold: 2.0
+```
+
+Each component is weighted and scored; a pair matches when the passing weight
+reaches `threshold`. Component types are `amount`, `date`, `reference`, and
+`text`. A reference-only strategy can match on the reference alone, and a
+weighted strategy can let a strong amount agreement excuse a differing
+reference:
+
+```yaml
+matching:
+  name: reference_only
+  components:
+    - type: reference
+      column: Reference
+      weight: 1.0
+  threshold: 1.0
+```
+
+Run it from the command line, pointing `-c` at the config that holds the block:
+
+```bash
+python -m app_files.cli reconcile \
+  --statement statement.csv --ledger ledger.csv -c bank_reconciliation -o out
+```
+
+With no `matching:` block the config resolves to the frozen default, so a
+config that never asked for a strategy behaves exactly as before.

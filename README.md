@@ -55,6 +55,15 @@ names split into first and last, and so on.
 Mapping then lines the source columns up with a target system's schema. Columns
 are matched by alias, with fuzzy matching for headers that do not match exactly.
 
+Two more cleaners run when a config asks for them, both off by default so a
+config that never declared them is unaffected. Fuzzy dedupe merges rows that are
+near-duplicates rather than exact ones — `John Smith` and `Jon Smith` collapse at
+a similarity of 0.85 and stay apart at 0.95. Address and currency normalization
+canonicalise postal addresses and convert amounts to a chosen base currency,
+recording the rate and date used for every conversion so the original is still
+auditable. Both are configured in the same config file; see
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
 Five target configs ship today, and each one is a YAML file rather than code:
 
 `bank_reconciliation`, `hubspot`, `pipedrive`, `quickbooks`, `salesforce`
@@ -194,6 +203,19 @@ Quality history: 6 run(s) for contacts, trend declining
   anomaly: 1 ANOMALY(IES) outside the learned range for completeness
 ```
 
+Read the history back without opening the database:
+
+```bash
+# List every source that has recorded runs
+python -m app_files.cli quality
+
+# One source, with the trend dashboard written as HTML
+python -m app_files.cli quality contacts.csv -o reports
+```
+
+`-o` writes `<source>_quality_trend.html` — the same table that shows the
+direction (`improving`, `stable`, `declining`) and every recorded score.
+
 ### Lineage — prove what changed
 
 Every transformation is recorded as one row: source row index, output row index,
@@ -272,6 +294,21 @@ are ignored.
 
 Output is byte-identical to a batch run: the watcher is a trigger for the
 existing batch engine, not a second pipeline.
+
+### Reconcile a statement from the shell
+
+Reconciliation was reachable from the web page and from Python; a scheduled run
+now reaches it too:
+
+```bash
+python -m app_files.cli reconcile \
+  --statement statement.csv --ledger ledger.csv -c bank_reconciliation -o out
+```
+
+`-c` names the config that holds the `matching:` block, so the match logic is
+data. Three files come out: `missing_from_books.csv`, `recorded_but_never_cleared.csv`
+and `matched.csv`. See
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md#matching-bank-reconciliation).
 
 ### Rehearse a migration before committing
 

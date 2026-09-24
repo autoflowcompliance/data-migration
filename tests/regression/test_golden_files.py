@@ -34,6 +34,9 @@ def test_golden_files_are_present():
         "reconciliation_3way": {
             "bank.csv", "ledger.csv", "processor.csv", "expected_result.json",
         },
+        "match_strategy": {
+            "statement.csv", "ledger.csv", "config.yaml", "expected_matched.csv",
+        },
         "orchestration": {"jobs.json", "expected_transcript.json"},
         "compliance": {"controls.json"},
         "watcher": {"clean_data.csv", "outcome.txt"},
@@ -200,3 +203,50 @@ def test_cross_field_golden_fixture_scans_for_skipped_rules():
     rules = load_cross_field_rules(yaml.safe_load((folder / "rules.yaml").read_text()))
     assert rules, "the cross-field fixture must carry rules"
     assert all(rule.fields for rule in rules)
+
+
+def test_match_strategy_golden_output_is_unchanged():
+    """A config's ``matching:`` block produces a known match set.
+
+    The statement and ledger agree on no amount and on no date, so the frozen
+    matcher matches nothing. The reference strategy matches the two pairs whose
+    references agree. This golden pins that a YAML strategy actually changes the
+    outcome, and that the amount/date columns it does not use are left blank.
+    """
+    from app_files.services.bank_reconciliation.binding import load_match_strategy
+    from app_files.services.bank_reconciliation.reconciler import run_reconciliation
+
+    folder = GOLDEN / "match_strategy"
+    strategy = load_match_strategy(folder / "config.yaml")
+    assert strategy is not None and strategy.name == "reference_only"
+
+    result = run_reconciliation(
+        (folder / "statement.csv").read_bytes(),
+        (folder / "ledger.csv").read_bytes(),
+        bank_date_col="Date",
+        bank_amount_col="Amount",
+        ledger_date_col="Date",
+        ledger_amount_col="Amount",
+        strategy=strategy,
+    )
+    produced = pd.DataFrame(result["matches"])
+    # Round-trip through CSV the same way the CLI writes it, so the ``None``
+    # amount a reference-only strategy leaves behind lands as a blank cell.
+    produced_csv = produced.to_csv(index=False)
+    assert produced_csv == (folder / "expected_matched.csv").read_text()
+
+
+def test_match_strategy_golden_fixture_beats_the_frozen_default():
+    """If the default already matched, the fixture would prove nothing."""
+    from app_files.services.bank_reconciliation.reconciler import run_reconciliation
+
+    folder = GOLDEN / "match_strategy"
+    frozen = run_reconciliation(
+        (folder / "statement.csv").read_bytes(),
+        (folder / "ledger.csv").read_bytes(),
+        bank_date_col="Date",
+        bank_amount_col="Amount",
+        ledger_date_col="Date",
+        ledger_amount_col="Amount",
+    )
+    assert frozen["matches"] == [], "the fixture must differ under the default matcher"

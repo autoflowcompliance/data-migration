@@ -390,6 +390,171 @@ def run_drift_command(argv: list[str]) -> int:
     return 0
 
 
+def build_quality_parser() -> argparse.ArgumentParser:
+    """``python -m app_files.cli quality …`` — read a source's score history."""
+    parser = argparse.ArgumentParser(
+        prog="app_files.cli quality",
+        description=(
+            "Show the recorded quality history for a source. Runs must have "
+            "been recorded with --record-quality or --baseline first; this "
+            "reads the trend store those write to."
+        ),
+    )
+    parser.add_argument("source", nargs="?", default=None,
+                        help="source name (as passed to --record-quality); omit to list sources")
+    parser.add_argument("--html", type=Path, default=None,
+                        help="write the trend table to this HTML file")
+    parser.add_argument("-o", "--outdir", type=Path, default=None,
+                        help="write <source>_quality_trend.html here")
+    return parser
+
+
+def run_quality_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli quality …``.
+
+    The trend store was written by a run and readable only from Python, and
+    ``render_trend_html`` — the dashboard the spec asks for — had no caller, so
+    the history existed and nothing showed it. This surfaces both from one
+    command a buyer can put in a cron job.
+    """
+    from app_files.profiling import TrendStore, render_trend_html
+
+    args = build_quality_parser().parse_args(argv)
+    store = TrendStore()
+    sources = store.sources()
+
+    from app_files.profiling.binding import source_key
+
+    if args.source is None:
+        if not sources:
+            print("No quality history recorded yet. Run with --record-quality first.")
+            return 0
+        print(f"{len(sources)} source(s) with recorded runs:")
+        for name in sources:
+            points = store.trend(name)
+            print(f"  {name}: {len(points)} run(s), {points[-1].overall:.1f} latest")
+            _write_trend(render_trend_html(points, name), args, name)
+        return 0
+
+    name = source_key(args.source)
+    points = store.trend(name)
+    if not points:
+        print(
+            f"No recorded runs for {name!r}. "
+            "Record one with --record-quality first.",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"{name}: {len(points)} run(s)")
+    for point in points:
+        print(f"  {point.recorded_at[:19]}  {point.overall:.1f}  ({point.row_count} rows)")
+    _write_trend(render_trend_html(points, name), args, name)
+    return 0
+
+
+def _write_trend(html: str, args: argparse.Namespace, name: str) -> None:
+    target = args.html
+    if target is None and args.outdir is not None:
+        target = args.outdir / f"{name}_quality_trend.html"
+    if target is not None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(html, encoding="utf-8")
+        print(f"Wrote trend dashboard to {target}")
+
+
+def build_reconcile_parser() -> argparse.ArgumentParser:
+    """``python -m app_files.cli reconcile …`` — match a statement to a ledger."""
+    parser = argparse.ArgumentParser(
+        prog="app_files.cli reconcile",
+        description=(
+            "Reconcile a bank statement against a ledger. Both files are read "
+            "the same way the web page reads them. A config with a matching: "
+            "block drives the comparison; without one the amount-and-date "
+            "default runs."
+        ),
+    )
+    parser.add_argument("--statement", required=True, type=Path, help="bank statement CSV/PDF")
+    parser.add_argument("--ledger", required=True, type=Path, help="ledger CSV/PDF")
+    parser.add_argument("-c", "--crm", default="bank_reconciliation",
+                        help="config holding the matching: block (default bank_reconciliation)")
+    parser.add_argument("-o", "--outdir", type=Path, default=Path("output"))
+    parser.add_argument("--bank-date-col", default="Date")
+    parser.add_argument("--bank-amount-col", default="Amount")
+    parser.add_argument("--ledger-date-col", default=None)
+    parser.add_argument("--ledger-amount-col", default=None)
+    parser.add_argument("--tolerance", type=int, default=2)
+    return parser
+
+
+def run_reconcile_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli reconcile …``.
+
+    Reconciliation was reachable from the web page and from Python only, so a
+    scheduled or scripted run could not match a statement to a ledger. This
+    entry point also reads the config's ``matching:`` block, which is what makes
+    a YAML match strategy matter to anyone who never imports the package.
+    """
+    from app_files.services.bank_reconciliation.binding import (
+        MatchStrategyConfigError,
+        describe_match_strategy,
+        load_match_strategy,
+    )
+    from app_files.services.bank_reconciliation.reconciler import (
+        UnreadableStatementError,
+        run_reconciliation,
+    )
+
+    args = build_reconcile_parser().parse_args(argv)
+    try:
+        strategy = load_match_strategy(args.crm)
+    except MatchStrategyConfigError as exc:
+        print(f"Invalid matching configuration: {exc}", file=sys.stderr)
+        return 2
+
+    ledger_date = args.ledger_date_col or args.bank_date_col
+    ledger_amount = args.ledger_amount_col or args.bank_amount_col
+    try:
+        result = run_reconciliation(
+            args.statement.read_bytes(),
+            args.ledger.read_bytes(),
+            bank_date_col=args.bank_date_col,
+            bank_amount_col=args.bank_amount_col,
+            ledger_date_col=ledger_date,
+            ledger_amount_col=ledger_amount,
+            date_tolerance_days=args.tolerance,
+            strategy=strategy,
+        )
+    except UnreadableStatementError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    except KeyError as exc:
+        print(
+            f"Column {exc} named by the matching strategy was not found in the "
+            "statement or ledger.",
+            file=sys.stderr,
+        )
+        return 1
+
+    summary = result["summary"]
+    print(f"Strategy: {describe_match_strategy(strategy)}")
+    print(
+        f"{summary['bank_transactions']} statement row(s), "
+        f"{summary['ledger_transactions']} ledger row(s), "
+        f"{summary['matched']} matched"
+    )
+    print(
+        f"  missing from books: {summary['missing_from_books']}, "
+        f"recorded but never cleared: {summary['recorded_but_never_cleared']}"
+    )
+
+    args.outdir.mkdir(parents=True, exist_ok=True)
+    result["bank_only"].to_csv(args.outdir / "missing_from_books.csv", index=False)
+    result["ledger_only"].to_csv(args.outdir / "recorded_but_never_cleared.csv", index=False)
+    pd.DataFrame(result["matches"]).to_csv(args.outdir / "matched.csv", index=False)
+    print(f"Wrote reconciliation outputs to {args.outdir}")
+    return 0
+
+
 def build_migrate_parser() -> argparse.ArgumentParser:
     """``python -m app_files.cli migrate …`` — rehearse, then run, a migration.
 
@@ -631,6 +796,10 @@ def main(argv: list[str] | None = None) -> int:
         return run_pull_command(argv[1:])
     if argv and argv[0] == "drift":
         return run_drift_command(argv[1:])
+    if argv and argv[0] == "reconcile":
+        return run_reconcile_command(argv[1:])
+    if argv and argv[0] == "quality":
+        return run_quality_command(argv[1:])
     if argv and argv[0] == "migrate":
         return run_migrate_command(argv[1:])
     if argv and argv[0] == "jobs":

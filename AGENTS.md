@@ -227,6 +227,14 @@ a name containing `&` truncates itself and swallows the reference after it.
   DataFrame. It returns a dict; the counts are under `result["summary"]`.
   To reconcile a PDF, ingest it with `read_any` and call
   `reconcile_transactions` on the frame.
+- Match logic is YAML (`matching:` in the config), bound by
+  `services/bank_reconciliation/binding.load_match_strategy`. It returns `None`
+  when a config declares no block, and `run_reconciliation(strategy=None)` then
+  runs the frozen matcher — so a config without the block is byte-identical to
+  before. A strategy names a **column per side**, so bank and ledger can use
+  different source column names; `reconcile_transactions_with_strategy` is the
+  entry point. The reconciler is otherwise frozen: `reconcile_transactions` was
+  not edited, the strategy path is a sibling.
 - `read_any` needs `filename=` when given bytes, since the extension selects
   the adapter.
 - Blank values fail only a `required` rule. `range` / `length` /

@@ -1,0 +1,16 @@
+crm: Reference match fixture
+version: "1.0"
+fields:
+  - name: date
+    aliases: ["Date"]
+  - name: reference
+    aliases: ["Reference"]
+  - name: amount
+    aliases: ["Amount"]
+matching:
+  name: reference_only
+  components:
+    - type: reference
+      column: Reference
+      weight: 1.0
+  threshold: 1.0
