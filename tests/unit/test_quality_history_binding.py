@@ -107,6 +107,43 @@ class TestPinBaseline:
         assert len(TrendStore().trend("contacts")) == 2
 
 
+class TestAnomalyDetection:
+    def test_a_source_with_little_history_is_still_learning(self, home):
+        history = record_quality("contacts.csv", profile(GOOD))
+        assert history.anomaly is not None
+        assert history.anomaly.learning is True
+        assert history.anomalous is False
+
+    def test_enough_history_learns_a_range(self, home):
+        for _ in range(5):
+            record_quality("contacts.csv", profile(GOOD))
+        history = record_quality("contacts.csv", profile(GOOD))
+        assert history.anomaly.learning is False
+        assert history.anomalous is False
+
+    def test_a_run_outside_the_learned_range_is_an_anomaly(self, home):
+        for _ in range(5):
+            record_quality("contacts.csv", profile(GOOD))
+        history = record_quality("contacts.csv", profile(DEGRADED))
+        assert history.anomalous is True
+        assert "completeness" in [item.dimension for item in history.anomaly.anomalies]
+
+    def test_the_anomaly_does_not_use_the_current_run_as_a_sample(self, home):
+        """The range is learned before this run is recorded, so a single wild
+        run cannot widen the range that would judge it."""
+        for _ in range(5):
+            record_quality("contacts.csv", profile(GOOD))
+        history = record_quality("contacts.csv", profile(DEGRADED))
+        assert history.anomaly.samples == 5
+        assert history.anomalous is True
+
+    def test_the_summary_lists_the_anomalous_dimensions(self, home):
+        for _ in range(5):
+            record_quality("contacts.csv", profile(GOOD))
+        summary = record_quality("contacts.csv", profile(DEGRADED)).summary()
+        assert "completeness" in summary["anomalies"]
+
+
 class TestInjectedStore:
     def test_an_explicit_store_is_used(self, home, tmp_path):
         store = TrendStore(path=tmp_path / "elsewhere.db")

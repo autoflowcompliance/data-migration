@@ -767,6 +767,12 @@ def main(argv: list[str] | None = None) -> int:
                     f"fell past baseline ({comparison.overall_baseline} -> "
                     f"{comparison.overall_current})"
                 )
+            anomaly = quality_history.anomaly
+            if anomaly is not None and not anomaly.clean:
+                print(
+                    f"  anomaly: {anomaly.status} outside the learned range for "
+                    f"{', '.join(item.dimension for item in anomaly.anomalies)}"
+                )
     if args.strict_rules and failures_exceed(built, max_failures=0):
         print(
             f"--strict-rules: {built.total_rule_failures} declared rule failure(s).",

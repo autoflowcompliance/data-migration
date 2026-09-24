@@ -183,6 +183,17 @@ another folder continues the same history. `--fail-on-regression` is how a
 scheduled run refuses to deliver a file that has rotted since the last accepted
 one.
 
+Once a source has five recorded runs, the same history learns a normal range
+per dimension and reports a run that falls outside it — an anomaly surfaces
+without anyone writing a rule for it. The learning window is the most recent 30
+runs, and the range is mean ± three standard deviations (with a floor on the
+spread, so a perfectly stable source does not flag a one-point wobble):
+
+```
+Quality history: 6 run(s) for contacts, trend declining
+  anomaly: 1 ANOMALY(IES) outside the learned range for completeness
+```
+
 ### Lineage — prove what changed
 
 Every transformation is recorded as one row: source row index, output row index,

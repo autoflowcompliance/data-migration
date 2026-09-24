@@ -27,6 +27,10 @@ from app_files.profiling.baseline import (
     BaselineComparison,
     compare_to_stored_baseline,
 )
+from app_files.profiling.dimension_anomaly import (
+    DimensionAnomalyReport,
+    detect_dimension_anomalies,
+)
 from app_files.profiling.profiler import Profile
 from app_files.profiling.trends import QualityPoint, TrendStore, trend_direction
 
@@ -46,6 +50,7 @@ class QualityHistory:
     recorded: QualityPoint
     history: list[QualityPoint] = field(default_factory=list)
     comparison: BaselineComparison | None = None
+    anomaly: DimensionAnomalyReport | None = None
 
     @property
     def trend(self) -> str:
@@ -54,6 +59,10 @@ class QualityHistory:
     @property
     def alerting(self) -> bool:
         return self.comparison is not None and self.comparison.alerting
+
+    @property
+    def anomalous(self) -> bool:
+        return self.anomaly is not None and not self.anomaly.clean
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -66,6 +75,9 @@ class QualityHistory:
             "regressed": list(self.comparison.regressed_dimensions)
             if self.comparison is not None
             else [],
+            "anomalies": [anomaly.dimension for anomaly in self.anomaly.anomalies]
+            if self.anomaly is not None
+            else [],
         }
 
 
@@ -75,15 +87,20 @@ def record_quality(
     store: TrendStore | None = None,
     threshold: float = DEFAULT_DROP_THRESHOLD,
 ) -> QualityHistory:
-    """Record this run's score and compare it against the source's baseline.
+    """Record this run's score and compare it against the source's history.
 
     Recording happens first, so the run just made is part of the history the
-    trend is read from. The comparison uses the baseline that was pinned before
-    this run, so a run cannot become its own baseline.
+    trend is read from. The comparison and the anomaly range both use the
+    history as it stood *before* this run, so a run can never become its own
+    baseline or widen the range it is judged against.
     """
     store = store if store is not None else TrendStore()
     key = source_key(source)
     comparison = compare_to_stored_baseline(key, profile_result, store, threshold=threshold)
+    # Layer 5's anomaly detector was the same as the trend store: complete, and
+    # with no caller, so a source that started producing scores outside
+    # anything it normally produced went unremarked unless someone wrote a rule.
+    anomaly = detect_dimension_anomalies(key, profile_result, store)
     run_id = store.record(key, profile_result)
     return QualityHistory(
         source=key,
@@ -91,6 +108,7 @@ def record_quality(
         recorded=store.latest(key) or _point_from(run_id, key, profile_result),
         history=store.trend(key),
         comparison=comparison,
+        anomaly=anomaly,
     )
 
 
