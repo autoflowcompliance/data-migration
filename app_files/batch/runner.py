@@ -35,6 +35,8 @@ class BatchItem:
     score: float = 0.0
     errors: int = 0
     warnings: int = 0
+    rule_failures: int = 0
+    rules_run: int = 0
     error: str | None = None
     output_dir: str | None = None
 
@@ -51,6 +53,8 @@ class BatchItem:
             "score": self.score,
             "errors": self.errors,
             "warnings": self.warnings,
+            "rule_failures": self.rule_failures,
+            "rules_run": self.rules_run,
             "error": self.error or "",
             "output_dir": self.output_dir or "",
         }
@@ -145,6 +149,22 @@ def process_one(
         )
         out_dir.mkdir(parents=True, exist_ok=True)
         write_deliverables(result, out_dir, output_format=output_format)
+
+        from app_files.rules.binding import apply_configured_rules
+
+        # Config rules were previously a UI-only step, so a batch run's issues
+        # CSV and report omitted every rule failure. Apply them now and rewrite
+        # the two artifacts rendered from the issue list, so a batch file shows
+        # what the single-file CLI shows.
+        built = apply_configured_rules(
+            result, template,
+            project_name=f"{project_name} — {path.stem}",
+            source_filename=path.name,
+        )
+        if built.rules:
+            (out_dir / "qa_report.html").write_text(built.qa_report_html, encoding="utf-8")
+            result.validation.issues_frame().to_csv(out_dir / "issues.csv", index=False)
+
         summary = result.summary()
         return BatchItem(
             file=path.name,
@@ -154,6 +174,8 @@ def process_one(
             score=float(profile(result.clean_frame).overall),
             errors=int(summary.get("errors", 0)),
             warnings=int(summary.get("warnings", 0)),
+            rule_failures=int(built.rule_result.total_failures),
+            rules_run=int(built.rule_result.rules_run),
             output_dir=str(out_dir),
         )
     except Exception as exc:  # noqa: BLE001 - one bad file must not sink the batch

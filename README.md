@@ -208,9 +208,15 @@ python -m app_files.cli -i app_files/samples/messy_contacts.csv -c hubspot -o ou
 ```
 
 ```
-7 rows in, 6 out, quality score 66.7%, 1 errors, 1 warnings
+7 rows in, 6 out, quality score 66.7%, 1 errors, 2 warnings
+Rules: 2 of 2 run, 1 failure(s)
 Wrote deliverables to output
 ```
+
+The `Rules:` line is the config's own `rules:` block being applied — the same
+rules the web UI runs. They reach `issues.csv` and the QA report, and are
+advisory by default; add `--strict-rules` to fail the run when a declared rule
+fails. See [docs/RULES.md](docs/RULES.md#rules-in-an-unattended-run).
 
 ### Watch a folder
 

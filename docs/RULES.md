@@ -160,6 +160,48 @@ for issue in result.issues:
 ```
 
 `run_rules_for` accepts a config name (`"hubspot"`) or a path to a YAML file.
+
+## Rules in an unattended run
+
+A config's `rules:` block runs automatically in every entry point — the CLI,
+the batch engine and the web UI — not only when you call `run_rules_for`
+yourself. The failures land in the same issue list the core validator fills, so
+they appear in `issues.csv`, in the QA report and in the quality score:
+
+```bash
+python -m app_files.cli -i contacts.csv -c hubspot -o out/
+# 7 rows in, 6 out, quality score 66.7%, 1 errors, 2 warnings
+# Rules: 2 of 2 run, 1 failure(s)
+```
+
+A rule failure is **advisory by default** — it is reported, not enforced, so a
+run whose core validation passes still exits 0. Add `--strict-rules` to make a
+declared failure fail the run (exit 1); it works for both the single-file and
+`batch` commands:
+
+```bash
+python -m app_files.cli batch --in inbox/ --template hubspot --out out/ --strict-rules
+```
+
+The batch `summary.csv` gains two columns, `rules_run` and `rule_failures`, one
+row per file.
+
+In Python, `run_configured` returns the pipeline result with the config's rules
+already applied, and `apply_configured_rules` does the same on top of a result
+you ran yourself (pass the same `project_name` and `source_filename` so the
+re-rendered report keeps its header):
+
+```python
+from app_files.rules.binding import run_configured, failures_exceed
+
+built = run_configured(source_frame, "hubspot", project_name="Acme")
+print(built.rule_result.rules_run, built.rule_result.total_failures)
+print(failures_exceed(built))   # True when anything declared failed
+```
+
+A config with no `rules:` block behaves exactly as the plain pipeline did — same
+clean data, same report, byte for byte.
+
 ## Cross-field rules
 
 Single-field rules judge one value. Some rules span columns: `close_date` must

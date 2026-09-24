@@ -49,6 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--audit-key", default=None, help="unique key column for the audit")
     parser.add_argument("--date-dayfirst", action="store_true", 
                        help="Parse dates with day first (DD/MM/YYYY instead of MM/DD/YYYY)")
+    parser.add_argument("--strict-rules", action="store_true",
+                       help="Exit non-zero when a rule the config declares fails")
     return parser
 
 
@@ -67,6 +69,8 @@ def build_batch_parser() -> argparse.ArgumentParser:
                         choices=["csv", "excel", "json", "sql"],
                         help="clean-data format for each file")
     parser.add_argument("--project", default="Batch run")
+    parser.add_argument("--strict-rules", action="store_true",
+                        help="Exit non-zero when a rule the config declares fails")
     return parser
 
 
@@ -238,9 +242,12 @@ def run_batch_command(argv: list[str]) -> int:
 
     for item in result.items:
         if item.ok:
+            rule_note = (
+                f", {item.rule_failures} rule failure(s)" if item.rule_failures else ""
+            )
             print(
                 f"  ok    {item.file}: {item.rows_in} in, {item.rows_out} out, "
-                f"score {item.score}%"
+                f"score {item.score}%{rule_note}"
             )
         else:
             print(f"  FAIL  {item.file}: {item.error}", file=sys.stderr)
@@ -251,7 +258,18 @@ def run_batch_command(argv: list[str]) -> int:
     )
     print(f"Summary:   {Path(result.output_dir) / 'summary.csv'}")
     print(f"Dashboard: {Path(result.output_dir) / 'dashboard.html'}")
-    return 1 if result.failed else 0
+    if result.failed:
+        return 1
+    if args.strict_rules:
+        offenders = [item.file for item in result.items if item.rule_failures]
+        if offenders:
+            print(
+                f"--strict-rules: {len(offenders)} file(s) had declared rule failures: "
+                f"{', '.join(offenders)}",
+                file=sys.stderr,
+            )
+            return 1
+    return 0
 
 
 def build_drift_parser() -> argparse.ArgumentParser:
@@ -345,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.date_dayfirst:
         cleaning_config.date_first = True
 
+    from app_files.rules.binding import apply_configured_rules, failures_exceed
+
     result = run_pipeline(
         source=_read_csv(args.input),
         crm=args.crm,
@@ -352,11 +372,19 @@ def main(argv: list[str] | None = None) -> int:
         project_name=args.project,
         source_filename=args.input.name,
     )
+    # Layer 4's config rules used to run only in the web UI, so an unattended
+    # run's issues.csv and score omitted them entirely. Apply them here on top
+    # of the result we already have (never re-running the pipeline, which would
+    # drop the cleaning config above).
+    built = apply_configured_rules(
+        result, args.crm, project_name=args.project, source_filename=args.input.name
+    )
+    rule_outcome = built.rule_result
     result.clean_frame.to_csv(args.outdir / "clean_data.csv", index=False)
     result.mapping_log().to_csv(args.outdir / "mapping_log.csv", index=False)
     result.cleaning_log().to_csv(args.outdir / "cleaning_log.csv", index=False)
     result.validation.issues_frame().to_csv(args.outdir / "issues.csv", index=False)
-    (args.outdir / "qa_report.html").write_text(result.qa_report_html, encoding="utf-8")
+    (args.outdir / "qa_report.html").write_text(built.qa_report_html, encoding="utf-8")
 
     summary = result.summary()
     print(
@@ -364,6 +392,13 @@ def main(argv: list[str] | None = None) -> int:
         f"quality score {summary['quality_score']}%, "
         f"{summary['errors']} errors, {summary['warnings']} warnings"
     )
+    if built.rules:
+        print(
+            f"Rules: {rule_outcome.rules_run} of {len(built.rules)} run, "
+            f"{rule_outcome.total_failures} failure(s)"
+        )
+        if built.unmatched_rules:
+            print(f"  unmatched rules: {', '.join(built.unmatched_rules)}")
 
     if args.audit_export:
         if not args.audit_key:
@@ -385,6 +420,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     print(f"Wrote deliverables to {args.outdir}")
+    if args.strict_rules and failures_exceed(built, max_failures=0):
+        print(
+            f"--strict-rules: {rule_outcome.total_failures} declared rule failure(s).",
+            file=sys.stderr,
+        )
+        return 1
     return 0 if result.validation.valid else 1
 
 

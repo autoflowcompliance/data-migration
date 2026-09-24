@@ -1,0 +1,4 @@
+firstname,lastname,email,phone,company,jobtitle,website,address,city,state,zip,country,lifecyclestage,hs_lead_status,createdate
+Ada,Lovelace,ada@example.com,+14155550101,,,,,,,,,lead,,
+Grace,Hopper,grace@example.com,not-a-phone,,,,,,,,,lead,,
+Alan,Turing,alan@example.com,+14155550103,,,,,,,,,lead,,

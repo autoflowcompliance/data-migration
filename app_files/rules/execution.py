@@ -189,20 +189,26 @@ def run_with_rules(
     project_name: str = "Data migration",
     source_filename: str = "upload.csv",
     run_structural_check: bool = True,
+    result: PipelineResult | None = None,
 ) -> BuiltRuleRun:
     """Clean, map, validate, then apply ``rules`` and re-render the report.
 
     ``crm`` still selects the mapping config — the buyer's rules are additive on
     top of it, not a replacement for it.
+
+    Pass ``result`` when the caller has already run the pipeline with options
+    this function does not take (a cleaning config, say). The supplied result is
+    used as-is instead of running the pipeline again, so those options survive.
     """
     rules = list(rules)
-    result = run_pipeline(
-        source,
-        crm=crm,
-        project_name=project_name,
-        source_filename=source_filename,
-        run_structural_check=run_structural_check,
-    )
+    if result is None:
+        result = run_pipeline(
+            source,
+            crm=crm,
+            project_name=project_name,
+            source_filename=source_filename,
+            run_structural_check=run_structural_check,
+        )
     outcome, unmatched = apply_rules(result, rules)
     profile_result = profile(result.clean_frame)
     structural = (

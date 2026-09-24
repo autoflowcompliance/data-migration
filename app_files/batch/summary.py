@@ -16,6 +16,8 @@ COLUMNS = [
     "score",
     "errors",
     "warnings",
+    "rule_failures",
+    "rules_run",
     "error",
     "output_dir",
 ]
