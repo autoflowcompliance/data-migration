@@ -1,0 +1,12 @@
+crm: Contacts
+version: "1.0"
+fields:
+  - name: first_name
+    aliases: ["First Name"]
+  - name: last_name
+    aliases: ["Last Name"]
+dedupe:
+  rules:
+    - columns: [first_name, last_name]
+      threshold: 0.85
+      metric: jaro_winkler

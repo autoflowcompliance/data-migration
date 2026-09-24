@@ -21,6 +21,7 @@ COLUMNS = [
     "privacy_masked",
     "addresses_normalised",
     "amounts_converted",
+    "duplicates_removed",
     "error",
     "output_dir",
 ]

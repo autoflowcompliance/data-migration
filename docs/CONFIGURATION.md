@@ -99,6 +99,39 @@ An unrecognised address is left alone, not rewritten. A rate with no matching
 entry leaves its amount unconverted and counted, so a missing rate is visible
 rather than silently zeroing the value. A rate must be positive.
 
+### `dedupe`
+
+An optional block that folds near-duplicate rows out of a copy of the pipeline
+output using fuzzy matching, for the cases where the cleaner's exact-match
+dedupe is too strict (`"John Smith"` and `"Jon Smith"` are the same person).
+Bound in unattended runs: the filtered data is written as `deduped_data.csv`
+and every merge to `duplicates_removed.csv` with the score that drove it.
+`clean_data.csv` is never rewritten.
+
+```yaml
+dedupe:
+  rules:
+    - columns: [first_name, last_name]   # every compared column
+      threshold: 0.85                    # 0 < threshold <= 1, default 0.9
+      metric: jaro_winkler               # or levenshtein
+      require_all: true                  # false: one matching column is enough
+      max_cluster_size: 50               # optional safety cap
+```
+
+| Key | Meaning |
+| --- | --- |
+| `rule` / `rules` | One rule, or a list of rules applied in order. |
+| `columns` | The columns to compare. |
+| `threshold` | How close two rows must be to count as one. |
+| `metric` | `jaro_winkler` (default) or `levenshtein`. |
+| `require_all` | `true`: every column must match. `false`: one is enough. |
+| `max_cluster_size` | Stop with an error rather than fold more than this many rows into one survivor. |
+| `enabled` | Set `false` to keep the block but turn it off. |
+
+Jaro-Winkler rates any two values sharing a long prefix as similar, so a column
+of serial-number-shaped values can legitimately collapse; the merges are
+recorded, and `max_cluster_size` is the backstop.
+
 ## Adding a new CRM
 
 1. Look at your source file's header row and decide the target column names.

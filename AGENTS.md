@@ -166,6 +166,10 @@ a name containing `&` truncates itself and swallows the reference after it.
   under it. A new state-writing layer that hardcodes a path under the repo root
   will litter the working tree and fail the portability tests in
   `tests/unit/test_market_layers.py` (`test_orders_storage_honours_autoflow_home`).
+- A config's `dedupe:` block **is** bound in unattended runs too
+  (`app_files/dedupe/binding.apply_configured_dedupe`): `deduped_data.csv` and
+  `duplicates_removed.csv` are written beside the pipeline's own output, which
+  is never rewritten. Same additive contract as privacy and normalization.
 - A config's `normalization:` block **is** bound in unattended runs (CLI and
   batch) too: `app_files/normalization/binding.apply_configured_normalization`
   writes `normalized_data.csv` and `currency_conversions.csv` beside the

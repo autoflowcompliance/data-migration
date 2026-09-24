@@ -363,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.date_dayfirst:
         cleaning_config.date_first = True
 
+    from app_files.dedupe.binding import apply_configured_dedupe
+    from app_files.dedupe.engine import DedupeConfigError
     from app_files.normalization.binding import (
         NormalizationConfigError,
         apply_configured_normalization,
@@ -427,6 +429,19 @@ def main(argv: list[str] | None = None) -> int:
         conversions = normalization.conversions_frame()
         if not conversions.empty:
             conversions.to_csv(args.outdir / "currency_conversions.csv", index=False)
+    # A config-declared ``dedupe:`` block folds near-duplicate rows out of a
+    # copy. The pipeline's own clean_data.csv (and the normalised copy) is left
+    # as-is, so a config without the block is byte-identical to before.
+    try:
+        dedupe = apply_configured_dedupe(result.clean_frame, args.crm)
+    except DedupeConfigError as exc:
+        print(f"Invalid dedupe configuration: {exc}", file=sys.stderr)
+        return 2
+    if dedupe is not None:
+        dedupe.frame.to_csv(args.outdir / "deduped_data.csv", index=False)
+        merges = dedupe.merges_frame()
+        if not merges.empty:
+            merges.to_csv(args.outdir / "duplicates_removed.csv", index=False)
     (args.outdir / "qa_report.html").write_text(qa_html, encoding="utf-8")
 
     summary = result.summary()
@@ -456,6 +471,11 @@ def main(argv: list[str] | None = None) -> int:
             f"Normalization: {counts['addresses_normalised']} address(es) canonicalised, "
             f"{counts['amounts_converted']} amount(s) converted"
             + (f", {counts['amounts_failed']} unconverted" if counts["amounts_failed"] else "")
+        )
+    if dedupe is not None:
+        print(
+            f"Dedupe: {dedupe.duplicates_removed} near-duplicate row(s) removed "
+            f"from {dedupe.summary()['rows_in']}"
         )
 
     if args.audit_export:
