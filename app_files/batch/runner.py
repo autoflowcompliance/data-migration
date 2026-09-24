@@ -37,6 +37,7 @@ class BatchItem:
     warnings: int = 0
     rule_failures: int = 0
     rules_run: int = 0
+    privacy_masked: int = 0
     error: str | None = None
     output_dir: str | None = None
 
@@ -55,6 +56,7 @@ class BatchItem:
             "warnings": self.warnings,
             "rule_failures": self.rule_failures,
             "rules_run": self.rules_run,
+            "privacy_masked": self.privacy_masked,
             "error": self.error or "",
             "output_dir": self.output_dir or "",
         }
@@ -150,6 +152,8 @@ def process_one(
         out_dir.mkdir(parents=True, exist_ok=True)
         write_deliverables(result, out_dir, output_format=output_format)
 
+        from app_files.privacy.binding import apply_configured_privacy
+        from app_files.privacy.report import inject_pii_report
         from app_files.rules.binding import apply_configured_rules
 
         # Config rules were previously a UI-only step, so a batch run's issues
@@ -161,8 +165,18 @@ def process_one(
             project_name=f"{project_name} — {path.stem}",
             source_filename=path.name,
         )
-        if built.rules or built.cross_field_rules:
-            (out_dir / "qa_report.html").write_text(built.qa_report_html, encoding="utf-8")
+        qa_html = built.qa_report_html
+        # A config-declared ``privacy:`` block masks the pipeline's output here
+        # too, so a batch run delivers the same protected data the single-file
+        # CLI does. A template without the block writes nothing extra.
+        privacy = apply_configured_privacy(result.clean_frame, template)
+        if privacy is not None:
+            privacy.masked_frame.to_csv(out_dir / "masked_data.csv", index=False)
+            qa_html = inject_pii_report(
+                qa_html, privacy.report, privacy.mask_result.summary()
+            )
+        if built.rules or built.cross_field_rules or privacy is not None:
+            (out_dir / "qa_report.html").write_text(qa_html, encoding="utf-8")
             result.validation.issues_frame().to_csv(out_dir / "issues.csv", index=False)
 
         summary = result.summary()
@@ -177,6 +191,7 @@ def process_one(
             rule_failures=int(built.total_rule_failures),
             rules_run=int(built.total_rules_run),
             output_dir=str(out_dir),
+            privacy_masked=int(privacy.total_masked) if privacy else 0,
         )
     except Exception as exc:  # noqa: BLE001 - one bad file must not sink the batch
         return BatchItem(file=path.name, status="failed", error=f"{type(exc).__name__}: {exc}")

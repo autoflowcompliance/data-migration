@@ -166,6 +166,12 @@ a name containing `&` truncates itself and swallows the reference after it.
   under it. A new state-writing layer that hardcodes a path under the repo root
   will litter the working tree and fail the portability tests in
   `tests/unit/test_market_layers.py` (`test_orders_storage_honours_autoflow_home`).
+- A config's `privacy:` block **is** bound in unattended runs (CLI and batch):
+  `app_files/privacy/binding.apply_configured_privacy` masks the frame the
+  pipeline produced and the entry points write `masked_data.csv` plus the
+  privacy card. `clean_data.csv` is never rewritten, so a config with no
+  `privacy:` block stays byte-identical to the frozen pipeline. Privacy *does*
+  need binding in every new entry point — it is not applied by `run_pipeline`.
 - `run_pipeline` does **not** execute the config's `rules:` block. It validates
   the mapped frame only. Rules are run separately by the caller with
   `run_rules_for(frame, crm)`. A config passed as `crm` whose rules never get

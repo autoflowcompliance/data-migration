@@ -363,6 +363,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.date_dayfirst:
         cleaning_config.date_first = True
 
+    from app_files.privacy.binding import apply_configured_privacy
+    from app_files.privacy.config import PrivacyConfigError
+    from app_files.privacy.report import inject_pii_report
     from app_files.rules.binding import apply_configured_rules, failures_exceed
 
     result = run_pipeline(
@@ -389,7 +392,25 @@ def main(argv: list[str] | None = None) -> int:
     result.mapping_log().to_csv(args.outdir / "mapping_log.csv", index=False)
     result.cleaning_log().to_csv(args.outdir / "cleaning_log.csv", index=False)
     result.validation.issues_frame().to_csv(args.outdir / "issues.csv", index=False)
-    (args.outdir / "qa_report.html").write_text(built.qa_report_html, encoding="utf-8")
+    qa_html = built.qa_report_html
+    # A config-declared ``privacy:`` block is the buyer saying PII must not
+    # reach a destination. Mask the frame the pipeline produced and write the
+    # masked copy and its card beside the original; a config without the block
+    # writes nothing extra and its output is byte-identical to before.
+    try:
+        privacy = apply_configured_privacy(result.clean_frame, args.crm)
+    except PrivacyConfigError as exc:
+        # Fail closed, not silent: a typo in a privacy block must stop the run
+        # rather than let unmasked PII through while reporting success.
+        print(f"Invalid privacy configuration: {exc}", file=sys.stderr)
+        return 2
+    if privacy is not None:
+        privacy.masked_frame.to_csv(args.outdir / "masked_data.csv", index=False)
+        (args.outdir / "privacy_report.html").write_text(
+            privacy.report_html, encoding="utf-8"
+        )
+        qa_html = inject_pii_report(qa_html, privacy.report, privacy.mask_result.summary())
+    (args.outdir / "qa_report.html").write_text(qa_html, encoding="utf-8")
 
     summary = result.summary()
     print(
@@ -406,6 +427,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         if unmatched:
             print(f"  unmatched rules: {', '.join(unmatched)}")
+    if privacy is not None:
+        counts = privacy.summary()
+        print(
+            f"Privacy: {counts['detected']} value(s) detected, "
+            f"{counts['masked']} masked in {', '.join(counts['columns']) or 'no columns'}"
+        )
 
     if args.audit_export:
         if not args.audit_key:

@@ -65,7 +65,12 @@ masked while the sentence around it survives.
 ## Configuration
 
 The layer reads a `privacy:` block. It can sit in a CRM config alongside
-`fields:` and `rules:`, or in a config file of its own:
+`fields:` and `rules:`, or in a config file of its own. When it sits in a CRM
+config, an unattended run honours it: the CLI and the batch engine read the
+block, mask the frame the pipeline produced, and write `masked_data.csv` beside
+`clean_data.csv` (and the card into `privacy_report.html`). The pipeline's own
+`clean_data.csv` is never rewritten, so a config without a `privacy:` block is
+byte-identical to before the binding existed.
 
 ```yaml
 privacy:
@@ -121,6 +126,27 @@ The token is `HMAC(key, value)`, so it is stable across runs. The original is
 sealed with the same key and written to the vault. The vault file is created
 `0600`, and reading an entry with the wrong key fails an integrity check
 instead of returning garbage.
+
+## Privacy in an unattended run
+
+A config that declares `privacy:` protects the data automatically, in the CLI
+and in a batch run:
+
+```bash
+python -m app_files.cli -i contacts.csv -c my_config.yaml -o out/
+# 2 rows in, 2 out, quality score 100.0%, 0 errors, 0 warnings
+# Privacy: 5 value(s) detected, 5 masked in email, phone, notes
+```
+
+The run writes `masked_data.csv` (the protected frame), `privacy_report.html`
+(the card), and appends the card to `qa_report.html`. `clean_data.csv` keeps the
+unmasked values, because the frozen pipeline's output is not rewritten; hand
+`masked_data.csv` to your destination. A batch run writes a masked copy per
+file and records `privacy_masked` per file in `summary.csv`.
+
+A malformed `privacy:` block raises rather than being ignored. An ignored block
+would let PII reach the output while the run reported success, which is the one
+outcome this layer exists to prevent.
 
 ## Reading the report
 

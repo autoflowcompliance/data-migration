@@ -1,0 +1,6 @@
+column,kind,value,start,end
+email,email,ann.smith@example.com,0,21
+email,email,bob@example.com,0,15
+phone,phone,+16174983000,0,12
+phone,phone,+15128765432,0,12
+notes,email,ann.smith@example.com,5,26

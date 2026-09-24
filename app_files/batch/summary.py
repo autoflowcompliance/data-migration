@@ -18,6 +18,7 @@ COLUMNS = [
     "warnings",
     "rule_failures",
     "rules_run",
+    "privacy_masked",
     "error",
     "output_dir",
 ]
