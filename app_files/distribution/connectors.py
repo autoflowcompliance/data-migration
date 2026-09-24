@@ -30,6 +30,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
+from urllib.parse import quote
 
 DEFAULT_TIMEOUT = 60
 
@@ -547,21 +548,549 @@ class OneDriveConnector(Connector):
         )
 
 
+# ------------------------------------------------------ Google Cloud Storage
+_GCS_BASE = "https://storage.googleapis.com/storage/v1"
+_GCS_UPLOAD_BASE = "https://storage.googleapis.com/upload/storage/v1"
+
+
+class GoogleCloudStorageConnector(GoogleConnector):
+    """Google Cloud Storage through the JSON API, sharing Google's OAuth flow.
+
+    Reuses the Sheets/Drive token handling, so the same three credential shapes
+    work: a ready ``GOOGLE_ACCESS_TOKEN``, or a refresh-token triple.
+    """
+
+    provider = "gcs"
+
+    def __init__(
+        self,
+        bucket: str = "",
+        key: str = "",
+        client: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.bucket = bucket
+        self.key = key
+        self._client = client
+
+    def credential_vars(self) -> list[str]:
+        return super().credential_vars()
+
+    def list_files(self, prefix: str = "", limit: int = 200) -> ConnectorListing:
+        if not self.bucket:
+            raise ConnectorError("Google Cloud Storage needs a bucket name.")
+        response = self.transport(
+            "GET",
+            f"{_GCS_BASE}/b/{self.bucket}/o",
+            headers=self.headers(),
+            params={"prefix": prefix, "maxResults": limit},
+        )
+        if getattr(response, "status_code", 0) != 200:
+            raise ConnectorError(
+                f"Google Cloud Storage returned HTTP "
+                f"{getattr(response, 'status_code', 'unknown')} listing {self.bucket!r}."
+            )
+        files = [
+            {
+                "name": item.get("name", ""),
+                "size": str(item.get("size", "")),
+                "modified": item.get("updated", ""),
+            }
+            for item in response.json().get("items", [])
+        ]
+        return ConnectorListing(provider=self.provider, files=files)
+
+    def fetch(self, key: str | None = None) -> ConnectorFile:
+        target = key or self.key
+        if not self.bucket or not target:
+            raise ConnectorError("Google Cloud Storage needs both a bucket and a key.")
+        # The object name is percent-encoded in the path, since a GCS key may
+        # contain '/' and other characters a URL path treats specially.
+        response = self.transport(
+            "GET",
+            f"{_GCS_BASE}/b/{self.bucket}/o/{quote(target, safe='')}",
+            headers=self.headers(),
+            params={"alt": "media"},
+        )
+        if getattr(response, "status_code", 0) != 200:
+            raise ConnectorError(
+                f"Could not read gs://{self.bucket}/{target}: HTTP "
+                f"{getattr(response, 'status_code', 'unknown')}."
+            )
+        return ConnectorFile(
+            name=os.path.basename(target) or "gcs_object",
+            data=response.content,
+            provider=self.provider,
+            location=f"gs://{self.bucket}/{target}",
+            content_type=response.headers.get("Content-Type", ""),
+        )
+
+
+# ----------------------------------------------------------------- Azure Blob
+class AzureBlobConnector(Connector):
+    """Azure Blob Storage.
+
+    Supports the common shared-key scheme (``AZURE_STORAGE_ACCOUNT`` +
+    ``AZURE_STORAGE_KEY``) and a ready bearer token (``AZURE_STORAGE_TOKEN``,
+    for managed identity / Entra ID). Shared-key signing is computed here so the
+    request is genuinely authenticated, not a placeholder header.
+    """
+
+    provider = "azure_blob"
+    API_VERSION = "2021-08-06"
+
+    def __init__(
+        self,
+        container: str = "",
+        blob: str = "",
+        account: str = "",
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.container = container
+        self.blob = blob
+        self.account = account or self.env("AZURE_STORAGE_ACCOUNT") or ""
+
+    def credential_vars(self) -> list[str]:
+        if self.env("AZURE_STORAGE_TOKEN"):
+            return ["AZURE_STORAGE_TOKEN"]
+        return ["AZURE_STORAGE_ACCOUNT", "AZURE_STORAGE_KEY"]
+
+    def base_url(self) -> str:
+        if not self.account:
+            raise MissingCredentials(self.provider, "AZURE_STORAGE_ACCOUNT", "account name")
+        return f"https://{self.account}.blob.core.windows.net"
+
+    def _shared_key_headers(
+        self, method: str, url: str, content_length: int = 0
+    ) -> dict[str, str]:
+        """Build the Authorization header Azure's shared-key scheme requires."""
+        import base64
+        import hashlib
+        import hmac
+        from urllib.parse import urlparse
+
+        account = self.account
+        key = self.require("AZURE_STORAGE_KEY", "storage account key")
+        parsed = urlparse(url)
+        # The canonicalised resource must include every query parameter, sorted.
+        if parsed.query:
+            pairs = sorted(parsed.query.split("&"))
+            query = "\n" + "\n".join(parsed.path + "?" + p for p in pairs)
+        else:
+            query = "\n" + parsed.path
+
+        canonical = "\n".join(
+            [
+                method.upper(),
+                "",  # Content-Encoding
+                "",  # Content-Language
+                str(content_length) if content_length else "",  # Content-Length
+                "",  # Content-MD5
+                "",  # Content-Type
+                "",  # Date
+                "",  # If-Modified-Since
+                "",  # If-Match
+                "",  # If-None-Match
+                "",  # If-Unmodified-Since
+                "",  # Range
+            ]
+        )
+        string_to_sign = (
+            canonical
+            + "\n"
+            + f"x-ms-date:{_rfc1123()}\n"
+            + f"x-ms-version:{self.API_VERSION}\n"
+            + query
+        )
+        signature = base64.b64encode(
+            hmac.new(
+                base64.b64decode(key), string_to_sign.encode("utf-8"), hashlib.sha256
+            ).digest()
+        ).decode()
+        return {
+            "x-ms-date": _rfc1123(),
+            "x-ms-version": self.API_VERSION,
+            "Authorization": f"SharedKey {account}:{signature}",
+        }
+
+    def _headers(self, method: str, url: str, content_length: int = 0) -> dict[str, str]:
+        token = self.env("AZURE_STORAGE_TOKEN")
+        if token:
+            return {
+                "Authorization": f"Bearer {token}",
+                "x-ms-version": self.API_VERSION,
+            }
+        return self._shared_key_headers(method, url, content_length)
+
+    def list_files(self, prefix: str = "", limit: int = 200) -> ConnectorListing:
+        if not self.container:
+            raise ConnectorError("Azure Blob needs a container name.")
+        url = f"{self.base_url()}/{self.container}"
+        params = {"restype": "container", "comp": "list", "maxresults": limit}
+        if prefix:
+            params["prefix"] = prefix
+        response = self.transport(
+            "GET", url, headers=self._headers("GET", url), params=params
+        )
+        if getattr(response, "status_code", 0) != 200:
+            raise ConnectorError(
+                f"Azure Blob returned HTTP {getattr(response, 'status_code', 'unknown')} "
+                f"listing container {self.container!r}."
+            )
+        files = [
+            {
+                "name": item.get("Name", ""),
+                "size": str(item.get("Properties", {}).get("Content-Length", "")),
+                "modified": item.get("Properties", {}).get("Last-Modified", ""),
+            }
+            for item in response.json().get("Blobs", {}).get("Blob", [])
+        ]
+        return ConnectorListing(provider=self.provider, files=files)
+
+    def fetch(self, blob: str | None = None) -> ConnectorFile:
+        target = blob or self.blob
+        if not self.container or not target:
+            raise ConnectorError("Azure Blob needs both a container and a blob name.")
+        url = f"{self.base_url()}/{self.container}/{quote(target, safe='/')}"
+        response = self.transport("GET", url, headers=self._headers("GET", url))
+        if getattr(response, "status_code", 0) != 200:
+            raise ConnectorError(
+                f"Could not read Azure blob {self.container}/{target}: HTTP "
+                f"{getattr(response, 'status_code', 'unknown')}."
+            )
+        return ConnectorFile(
+            name=os.path.basename(target) or "azure_blob",
+            data=response.content,
+            provider=self.provider,
+            location=f"azure://{self.account}/{self.container}/{target}",
+            content_type=response.headers.get("Content-Type", ""),
+        )
+
+
+def _rfc1123() -> str:
+    from email.utils import formatdate
+
+    return formatdate(usegmt=True)
+
+
+# ---------------------------------------------------------------- Slack (push)
+class SlackConnector(Connector):
+    """Slack incoming webhook — a delivery *destination*, not a file source.
+
+    Slack is where a migration's result should land ("cleaned 1,204 rows,
+    quality 92"), so this connector carries a *write* rather than a fetch. It
+    keeps the same credential-reporting contract as the others.
+    """
+
+    provider = "slack"
+
+    def __init__(self, webhook_url: str = "", **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.webhook_url = webhook_url or self.env("SLACK_WEBHOOK_URL") or ""
+
+    def credential_vars(self) -> list[str]:
+        return ["SLACK_WEBHOOK_URL"]
+
+    def send(self, text: str, blocks: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        if not self.webhook_url:
+            raise MissingCredentials(self.provider, "SLACK_WEBHOOK_URL", "incoming webhook")
+        payload: dict[str, Any] = {"text": text}
+        if blocks:
+            payload["blocks"] = blocks
+        response = self.transport(
+            "POST", self.webhook_url, json=payload, headers={"Content-Type": "application/json"}
+        )
+        status = getattr(response, "status_code", 0)
+        if status != 200:
+            raise ConnectorError(
+                f"Slack rejected the message with HTTP {status or 'unknown'}. "
+                f"Check the webhook URL is still valid."
+            )
+        return {"provider": self.provider, "delivered": True, "status": status}
+
+
+# ------------------------------------------------------ HubSpot (read contact)
+_HUBSPOT_BASE = "https://api.hubapi.com"
+
+
+class HubSpotConnector(Connector):
+    """HubSpot CRM: read a contact list's page of records as a CSV.
+
+    This is the "already uses HubSpot" path — pull existing contacts back in for
+    a quality audit, or diff before an import.
+    """
+
+    provider = "hubspot"
+
+    def __init__(
+        self,
+        object_type: str = "contacts",
+        properties: list[str] | None = None,
+        limit: int = 100,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.object_type = object_type
+        self.properties = properties or []
+        self.limit = limit
+
+    def credential_vars(self) -> list[str]:
+        return ["HUBSPOT_TOKEN"]
+
+    def headers(self) -> dict[str, str]:
+        token = self.require("HUBSPOT_TOKEN", "private app token")
+        return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+    def fetch(
+        self,
+        object_type: str | None = None,
+        properties: list[str] | None = None,
+        limit: int | None = None,
+    ) -> ConnectorFile:
+        kind = object_type or self.object_type
+        props = properties or self.properties
+        count = limit or self.limit
+        params: dict[str, Any] = {"limit": count, "archived": "false"}
+        if props:
+            params["properties"] = ",".join(props)
+        response = self.transport(
+            "GET", f"{_HUBSPOT_BASE}/crm/v3/objects/{kind}", headers=self.headers(), params=params
+        )
+        status = getattr(response, "status_code", 0)
+        if status != 200:
+            raise ConnectorError(
+                f"HubSpot returned HTTP {status or 'unknown'} reading {kind!r}. "
+                f"Check the token scope."
+            )
+        results = response.json().get("results", [])
+        rows = []
+        columns: list[str] = ["id"]
+        for record in results:
+            row = {"id": record.get("id", "")}
+            for key, value in (record.get("properties") or {}).items():
+                if key not in columns:
+                    columns.append(key)
+                row[key] = value
+            rows.append(row)
+        csv_text = _dicts_to_csv(columns, rows)
+        return ConnectorFile(
+            name=f"hubspot_{kind}.csv",
+            data=csv_text.encode("utf-8"),
+            provider=self.provider,
+            location=f"hubspot://{kind}",
+            content_type="text/csv",
+        )
+
+
+# ------------------------------------------------------ Salesforce (SOQL read)
+_SALESFORCE_VERSION = "v59.0"
+
+
+class SalesforceConnector(Connector):
+    """Salesforce: run a SOQL query and return the records as CSV.
+
+    Uses the REST query endpoint. An instance URL is required — Salesforce
+    tokens are issued per-org, so there is no single global host.
+    """
+
+    provider = "salesforce"
+
+    def __init__(self, instance_url: str = "", query: str = "", **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.instance_url = (instance_url or self.env("SALESFORCE_INSTANCE_URL") or "").rstrip("/")
+        self.query = query
+
+    def credential_vars(self) -> list[str]:
+        return ["SALESFORCE_TOKEN", "SALESFORCE_INSTANCE_URL"]
+
+    def headers(self) -> dict[str, str]:
+        token = self.require("SALESFORCE_TOKEN", "connected-app access token")
+        return {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+
+    def fetch(self, query: str | None = None) -> ConnectorFile:
+        soql = query or self.query
+        if not soql:
+            raise ConnectorError("Salesforce needs a SOQL query, e.g. 'SELECT Id, Email FROM Contact'.")
+        if not self.instance_url:
+            raise MissingCredentials(
+                self.provider, "SALESFORCE_INSTANCE_URL", "org instance URL"
+            )
+        response = self.transport(
+            "GET",
+            f"{self.instance_url}/services/data/{_SALESFORCE_VERSION}/query",
+            headers=self.headers(),
+            params={"q": soql},
+        )
+        status = getattr(response, "status_code", 0)
+        if status != 200:
+            raise ConnectorError(
+                f"Salesforce returned HTTP {status or 'unknown'} running the query. "
+                f"Check the SOQL and the token scope."
+            )
+        payload = response.json()
+        records = payload.get("records", [])
+        # Salesforce records carry an attributes block that is not real data.
+        columns: list[str] = []
+        flat_rows = []
+        for record in records:
+            clean = {k: v for k, v in record.items() if k != "attributes" and not isinstance(v, dict)}
+            for key in clean:
+                if key not in columns:
+                    columns.append(key)
+            flat_rows.append(clean)
+        csv_text = _dicts_to_csv(columns, flat_rows)
+        return ConnectorFile(
+            name="salesforce_query.csv",
+            data=csv_text.encode("utf-8"),
+            provider=self.provider,
+            location=f"salesforce://query?{soql[:60]}",
+            content_type="text/csv",
+        )
+
+
+class SFTPConnector(Connector):
+    """SFTP: pull a file from a secure file-transfer endpoint.
+
+    SFTP is not an HTTP service, so this takes an injectable ``client`` — the
+    object returned by ``paramiko.SSHClient().open_sftp()``. Production passes
+    nothing and the connector builds a real paramiko client; tests pass a fake
+    with the same four methods, so host, auth, path and retry handling are all
+    exercised without a live server.
+
+    Reads are opened binary and returned whole, matching every other connector,
+    so callers of :func:`pull` do not branch on provider.
+    """
+
+    provider = "sftp"
+
+    def __init__(
+        self,
+        host: str = "",
+        path: str = "",
+        port: int = 22,
+        username: str = "",
+        client: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.host = host or self.env("SFTP_HOST") or ""
+        self.port = int(port or self.env("SFTP_PORT") or 22)
+        self.username = username or self.env("SFTP_USER") or ""
+        self.path = path
+        self._client = client
+
+    def credential_vars(self) -> list[str]:
+        # A key file or an SSH agent is also valid, so the password is advisory.
+        return ["SFTP_HOST", "SFTP_USER"]
+
+    def client(self) -> Any:
+        if self._client is not None:
+            return self._client
+        try:
+            import paramiko
+        except ImportError as exc:
+            raise ConnectorError(
+                "SFTP needs the paramiko library. Install it with: pip install paramiko"
+            ) from exc
+        if not self.host:
+            raise MissingCredentials(self.provider, "SFTP_HOST", "remote hostname")
+        transport = paramiko.Transport((self.host, self.port))
+        key_path = self.env("SFTP_KEY")
+        try:
+            if key_path:
+                transport.connect(username=self.username, pkey=paramiko.RSAKey.from_private_key_file(key_path))
+            else:
+                password = self.require("SFTP_PASSWORD", "SFTP password or key file")
+                transport.connect(username=self.username, password=password)
+            self._client = paramiko.SFTPClient.from_transport(transport)
+        except Exception as exc:  # noqa: BLE001 - paramiko raises many auth errors
+            transport.close()
+            raise ConnectorError(
+                f"Could not connect to {self.host}:{self.port}: {type(exc).__name__}: {exc}"
+            ) from exc
+        return self._client
+
+    def list_files(self, directory: str = "", limit: int = 200) -> ConnectorListing:
+        target = directory or (os.path.dirname(self.path) or ".")
+        client = self.client()
+        try:
+            entries = client.listdir_attr(target)
+        except Exception as exc:  # noqa: BLE001
+            raise ConnectorError(f"Could not list {target} on {self.host}: {exc}") from exc
+        import stat as stat_module
+
+        files = [
+            {
+                "name": os.path.join(target, entry.filename),
+                "size": str(getattr(entry, "st_size", 0)),
+                "modified": str(getattr(entry, "st_mtime", "")),
+            }
+            for entry in entries[:limit]
+            if not stat_module.S_ISDIR(getattr(entry, "st_mode", 0))
+        ]
+        return ConnectorListing(provider=self.provider, files=files)
+
+    def fetch(self, path: str | None = None) -> ConnectorFile:
+        target = path or self.path
+        if not target:
+            raise ConnectorError("SFTP needs a remote path.")
+        client = self.client()
+        try:
+            with client.open(target, "rb") as handle:
+                data = handle.read()
+        except Exception as exc:  # noqa: BLE001
+            raise ConnectorError(
+                f"Could not read {target} on {self.host}: {type(exc).__name__}: {exc}"
+            ) from exc
+        return ConnectorFile(
+            name=os.path.basename(target) or "sftp_file",
+            data=data,
+            provider=self.provider,
+            location=f"sftp://{self.host}/{target.lstrip('/')}",
+            content_type="",
+        )
+
+
+def _dicts_to_csv(columns: list[str], rows: list[dict[str, Any]]) -> str:
+    import csv
+
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=columns, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({key: row.get(key, "") for key in columns})
+    return buffer.getvalue()
+
+
 # ------------------------------------------------------------------ registry
 CONNECTORS: dict[str, type[Connector]] = {
     "s3": S3Connector,
+    "gcs": GoogleCloudStorageConnector,
+    "azure_blob": AzureBlobConnector,
     "google_sheets": GoogleSheetsConnector,
     "google_drive": GoogleDriveConnector,
     "dropbox": DropboxConnector,
     "onedrive": OneDriveConnector,
+    "hubspot": HubSpotConnector,
+    "salesforce": SalesforceConnector,
+    "slack": SlackConnector,
+    "sftp": SFTPConnector,
 }
 
 PROVIDER_LABELS = {
     "s3": "Amazon S3 / S3-compatible",
+    "gcs": "Google Cloud Storage",
+    "azure_blob": "Azure Blob Storage",
     "google_sheets": "Google Sheets",
     "google_drive": "Google Drive",
     "dropbox": "Dropbox",
     "onedrive": "OneDrive / SharePoint",
+    "hubspot": "HubSpot CRM",
+    "salesforce": "Salesforce",
+    "slack": "Slack (notification destination)",
+    "sftp": "SFTP / secure file transfer",
 }
 
 
@@ -596,7 +1125,10 @@ def pull(provider: str, **kwargs: Any) -> ConnectorFile:
     """Fetch from a provider in one call: ``pull('s3', bucket='b', key='k.csv')``."""
     fetch_kwargs = {
         key: kwargs.pop(key)
-        for key in ("key", "file_id", "file_name", "path", "item_path", "spreadsheet_id", "sheet_name")
+        for key in (
+            "key", "file_id", "file_name", "path", "item_path",
+            "spreadsheet_id", "sheet_name", "blob",
+        )
         if key in kwargs
     }
     connector = get_connector(provider, **kwargs)

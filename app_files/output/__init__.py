@@ -13,25 +13,51 @@ from app_files.output.formats import (
     normalise_format,
     output_filename,
     write_any,
+    write_any_extended,
 )
 from app_files.output.inmemory import Payload, to_bytes
 from app_files.output.json_writer import write as write_json
+from app_files.output.plugins import (
+    ENTRY_POINT_GROUP,
+    Plugin,
+    PluginError,
+    available_formats,
+    clear_plugins,
+    get_plugin,
+    load_entry_point_plugins,
+    plugin_report,
+    register_plugin,
+    unregister_plugin,
+    write_with_plugin,
+)
 from app_files.output.sql_writer import write as write_sql
 
 __all__ = [
+    "ENTRY_POINT_GROUP",
     "FORMATS",
     "Format",
     "Payload",
+    "Plugin",
+    "PluginError",
+    "available_formats",
+    "clear_plugins",
     "csv_writer",
     "excel_writer",
+    "get_plugin",
     "json_writer",
+    "load_entry_point_plugins",
     "normalise_format",
     "output_filename",
+    "plugin_report",
+    "register_plugin",
     "sql_writer",
     "to_bytes",
+    "unregister_plugin",
     "write_any",
+    "write_any_extended",
     "write_csv",
     "write_excel",
     "write_json",
     "write_sql",
+    "write_with_plugin",
 ]

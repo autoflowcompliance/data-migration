@@ -79,6 +79,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--audit-key", default=None, help="unique key column for the audit")
     parser.add_argument("--date-dayfirst", action="store_true", 
                        help="Parse dates with day first (DD/MM/YYYY instead of MM/DD/YYYY)")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run the pipeline and print what it would write, without writing it.",
+    )
+    parser.add_argument(
+        "--rollback",
+        type=Path,
+        default=None,
+        help="Also write a rollback file (JSON) recording every change and removal.",
+    )
+    parser.add_argument(
+        "--runbook",
+        type=Path,
+        default=None,
+        help="Also write a cutover runbook (Markdown) for this migration.",
+    )
     return parser
 
 
@@ -164,6 +181,26 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run_single_file(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
+
+    # A dry run must not create the output directory, or "nothing was written"
+    # would be false the moment the directory appears.
+    if args.dry_run:
+        from app_files.safety import dry_run
+
+        source = _read_csv(args.input)
+        plan = dry_run(source, args.crm, cleaning_config=load_cleaning_config(args.cleaning_config))
+        print(
+            f"DRY RUN — {plan.rows_in} rows in, {plan.rows_out} out "
+            f"({plan.row_drop} dropped, {plan.duplicates_removed} duplicate(s)), "
+            f"quality score {plan.quality_score}%, {plan.issues} issue(s)"
+        )
+        print("Would write:")
+        for entry in plan.outputs:
+            rows = f" ({entry['rows']} rows)" if "rows" in entry else ""
+            print(f"  {entry['name']}: {entry['filename']}{rows}")
+        print("No files were written.")
+        return 0
+
     args.outdir.mkdir(parents=True, exist_ok=True)
 
     # Load cleaning config and apply date_first preference
@@ -190,6 +227,23 @@ def _run_single_file(argv: list[str]) -> int:
         f"quality score {summary['quality_score']}%, "
         f"{summary['errors']} errors, {summary['warnings']} warnings"
     )
+
+    if args.rollback or args.runbook:
+        from app_files.safety import build_cutover_runbook, build_rollback_file
+
+        rollback = build_rollback_file(
+            _read_csv(args.input),
+            args.crm,
+            source_filename=args.input.name,
+            cleaning_config=cleaning_config,
+        )
+        if args.rollback:
+            rollback.write(args.rollback)
+            print(f"Rollback file: {args.rollback} ({len(rollback.entries)} entries)")
+        if args.runbook:
+            content = build_cutover_runbook(rollback, output_dir=str(args.outdir))
+            args.runbook.write_text(content, encoding="utf-8")
+            print(f"Cutover runbook: {args.runbook}")
 
     if args.audit_export:
         if not args.audit_key:

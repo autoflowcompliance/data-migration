@@ -8,6 +8,7 @@ and wizard tests relocate ``AUTOFLOW_HOME`` to a temporary directory.
 
 from __future__ import annotations
 
+import base64
 import io
 import json
 from pathlib import Path
@@ -143,13 +144,20 @@ class _Response:
         return self._payload
 
 
-def test_five_connectors_are_registered():
+def test_connectors_are_registered():
+    # Catalogue, cloud storage, and SaaS destinations/sources.
     assert set(available_connectors()) == {
         "s3",
+        "gcs",
+        "azure_blob",
         "google_sheets",
         "google_drive",
         "dropbox",
         "onedrive",
+        "hubspot",
+        "salesforce",
+        "slack",
+        "sftp",
     }
 
 
@@ -220,7 +228,7 @@ def test_missing_credentials_are_named():
 
 def test_credential_report_covers_every_provider():
     report = credential_report(environ={})
-    assert len(report) == 5
+    assert len(report) == len(available_connectors())
     assert all(entry["ready"] is False for entry in report)
 
 
@@ -238,6 +246,152 @@ def test_s3_uses_injected_client():
     fetched = connector.fetch()
     assert fetched.location == "s3://b/contacts.csv"
     assert fetched.data.startswith(b"email")
+
+
+# ------------------------------------------------- cloud storage & SaaS D
+def test_gcs_fetch_builds_authenticated_request():
+    seen = {}
+
+    def transport(method, url, **kwargs):
+        seen["url"] = url
+        seen["headers"] = kwargs.get("headers", {})
+        return _Response(body=b"email\na@b.c\n", headers={"Content-Type": "text/csv"})
+
+    connector = get_connector(
+        "gcs",
+        bucket="my-bucket",
+        key="clients/acme/contacts.csv",
+        transport=transport,
+        environ={"GOOGLE_ACCESS_TOKEN": "tok"},
+    )
+    fetched = connector.fetch()
+    assert fetched.location == "gs://my-bucket/clients/acme/contacts.csv"
+    assert seen["headers"]["Authorization"] == "Bearer tok"
+    # The object key is percent-encoded into the path.
+    assert "clients%2Facme%2Fcontacts.csv" in seen["url"]
+
+
+def test_gcs_lists_objects():
+    connector = get_connector(
+        "gcs",
+        bucket="b",
+        transport=lambda *a, **k: _Response(
+            payload={"items": [{"name": "a.csv", "size": "12"}]}
+        ),
+        environ={"GOOGLE_ACCESS_TOKEN": "tok"},
+    )
+    listing = connector.list_files()
+    assert listing.names() == ["a.csv"]
+
+
+def test_azure_blob_shared_key_headers_are_signed():
+    seen = {}
+
+    def transport(method, url, **kwargs):
+        seen["url"] = url
+        seen["headers"] = kwargs.get("headers", {})
+        return _Response(body=b"email\na@b.c\n")
+
+    connector = get_connector(
+        "azure_blob",
+        container="crm",
+        blob="acme.csv",
+        account="myacct",
+        transport=transport,
+        environ={"AZURE_STORAGE_KEY": base64.b64encode(b"secret-key").decode()},
+    )
+    fetched = connector.fetch()
+    assert fetched.location == "azure://myacct/crm/acme.csv"
+    assert seen["headers"]["Authorization"].startswith("SharedKey myacct:")
+    assert seen["headers"]["x-ms-version"] == "2021-08-06"
+    assert seen["url"].startswith("https://myacct.blob.core.windows.net/crm/acme.csv")
+
+
+def test_azure_blob_accepts_a_bearer_token():
+    seen = {}
+    connector = get_connector(
+        "azure_blob",
+        container="c",
+        blob="b.csv",
+        account="acct",
+        transport=lambda m, u, **k: (seen.update(k.get("headers", {})) or _Response(body=b"x\n")),
+        environ={"AZURE_STORAGE_TOKEN": "tok"},
+    )
+    connector.fetch()
+    assert seen["Authorization"] == "Bearer tok"
+
+
+def test_azure_blob_missing_key_is_named():
+    connector = get_connector("azure_blob", container="c", blob="b.csv", account="a", environ={})
+    with pytest.raises(MissingCredentials):
+        connector.fetch()
+
+
+def test_hubspot_fetch_converts_records_to_csv():
+    payload = {
+        "results": [
+            {"id": "1", "properties": {"email": "ann@x.com", "firstname": "Ann"}},
+            {"id": "2", "properties": {"email": "bob@x.com", "firstname": "Bob"}},
+        ]
+    }
+    connector = get_connector(
+        "hubspot",
+        transport=lambda *a, **k: _Response(payload=payload),
+        environ={"HUBSPOT_TOKEN": "tok"},
+    )
+    fetched = connector.fetch()
+    assert fetched.name == "hubspot_contacts.csv"
+    frame = fetched.as_frame()
+    assert frame["email"].tolist() == ["ann@x.com", "bob@x.com"]
+
+
+def test_salesforce_fetch_returns_query_records():
+    payload = {
+        "records": [
+            {"attributes": {"type": "Contact"}, "Id": "003", "Email": "a@b.c"},
+        ]
+    }
+    connector = get_connector(
+        "salesforce",
+        instance_url="https://myorg.my.salesforce.com",
+        query="SELECT Id, Email FROM Contact",
+        transport=lambda *a, **k: _Response(payload=payload),
+        environ={"SALESFORCE_TOKEN": "tok"},
+    )
+    fetched = connector.fetch()
+    frame = fetched.as_frame()
+    assert list(frame.columns) == ["Id", "Email"]  # attributes dropped
+    assert frame["Email"].tolist() == ["a@b.c"]
+
+
+def test_salesforce_needs_an_instance_url():
+    connector = get_connector(
+        "salesforce",
+        query="SELECT Id FROM Contact",
+        transport=lambda *a, **k: _Response(payload={}),
+        environ={"SALESFORCE_TOKEN": "tok"},
+    )
+    with pytest.raises(MissingCredentials):
+        connector.fetch()
+
+
+def test_slack_send_posts_to_the_webhook():
+    seen = {}
+    connector = get_connector(
+        "slack",
+        webhook_url="https://hooks.slack.com/services/x",
+        transport=lambda m, u, **k: (seen.update({"url": u, "json": k.get("json")}) or _Response(body=b"ok")),
+        environ={},
+    )
+    result = connector.send("Cleaned 1,204 rows")
+    assert result["delivered"] is True
+    assert seen["json"]["text"] == "Cleaned 1,204 rows"
+
+
+def test_slack_without_a_webhook_reports_missing_credentials():
+    connector = get_connector("slack", environ={})
+    with pytest.raises(MissingCredentials):
+        connector.send("hi")
 
 
 # ---------------------------------------------------------- workspaces C3/F9

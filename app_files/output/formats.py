@@ -82,3 +82,26 @@ def write_any(
     if path.suffix.lower() != FORMATS[canonical].extension:
         path = path.with_suffix(FORMATS[canonical].extension)
     return FORMATS[canonical].writer(df, path, **kwargs)
+
+
+def write_any_extended(
+    df: pd.DataFrame, path: str | Path, output_format: str = "csv", **kwargs
+) -> Path:
+    """Like :func:`write_any`, but also accepts a registered plugin format.
+
+    The built-ins are tried first so their behaviour is unchanged; a name that
+    is neither built-in nor a registered plugin still raises the same
+    ``ValueError`` listing the built-ins, now with the plugins appended.
+    """
+    from app_files.output.plugins import available_formats, write_with_plugin
+
+    name = str(output_format or "csv").strip().lower()
+    try:
+        return write_any(df, path, output_format, **kwargs)
+    except ValueError:
+        if name in available_formats():
+            return write_with_plugin(name, df, path)
+        raise ValueError(
+            f"Unknown output format {output_format!r}. "
+            f"Choose one of: {', '.join(available_formats())}"
+        ) from None
