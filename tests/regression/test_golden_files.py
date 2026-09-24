@@ -30,6 +30,7 @@ def test_golden_files_are_present():
         "bank_statement": {"input.csv", "expected_bank_only.csv"},
         "ledger": {"input.csv", "expected_ledger_only.csv"},
         "pii": {"input.csv", "expected_masked.csv"},
+        "cross_field": {"input.csv", "rules.yaml", "expected_failures.json"},
     }.items():
         folder = GOLDEN / name
         assert folder.is_dir(), f"missing golden folder: {name}"
@@ -136,3 +137,54 @@ def test_pii_golden_input_is_fully_masked():
 
     rescan = detect_frame(mask_frame(source, config).frame, config)
     assert rescan.total == 0, "masked golden output must scan clean"
+
+
+def test_cross_field_golden_failures_are_unchanged():
+    """Known rows in, known cross-field failures out.
+
+    The fixture pins two things at once: a rule with a custom message, and a
+    severity that is not the default. Adding cross-field rules to the codebase
+    must not quietly change which rows fail.
+    """
+    import json
+
+    import yaml
+
+    from app_files.rules import load_cross_field_rules, run_cross_field_rules
+
+    folder = GOLDEN / "cross_field"
+    source = read_any(folder / "input.csv")
+    result = run_pipeline(source, crm="hubspot", run_structural_check=False)
+    rules = load_cross_field_rules(yaml.safe_load((folder / "rules.yaml").read_text()))
+    outcome = run_cross_field_rules(result.clean_frame, rules)
+
+    produced = {
+        "rules_run": outcome.rules_run,
+        "total_failures": outcome.total_failures,
+        "failures_by_rule": outcome.failures_by_rule,
+        "skipped_rules": outcome.skipped_rules,
+        "issues": [
+            {
+                "row": issue.row,
+                "field": issue.field,
+                "check": issue.check,
+                "severity": issue.severity,
+                "message": issue.message,
+            }
+            for issue in outcome.issues
+        ],
+    }
+    expected = json.loads((folder / "expected_failures.json").read_text())
+    assert produced == expected
+
+
+def test_cross_field_golden_fixture_scans_for_skipped_rules():
+    """A golden run that silently skipped a rule would make the fixture a lie."""
+    import yaml
+
+    from app_files.rules import load_cross_field_rules
+
+    folder = GOLDEN / "cross_field"
+    rules = load_cross_field_rules(yaml.safe_load((folder / "rules.yaml").read_text()))
+    assert rules, "the cross-field fixture must carry rules"
+    assert all(rule.fields for rule in rules)

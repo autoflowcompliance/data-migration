@@ -160,3 +160,73 @@ for issue in result.issues:
 ```
 
 `run_rules_for` accepts a config name (`"hubspot"`) or a path to a YAML file.
+## Cross-field rules
+
+Single-field rules judge one value. Some rules span columns: `close_date` must
+not precede `open_date`; `total` must equal `subtotal + tax`. Declare those under
+a top-level `cross_field:` list:
+
+```yaml
+cross_field:
+  - name: close_after_open
+    type: date_order
+    fields: [open_date, close_date]
+    severity: error
+
+  - name: total_matches_parts
+    type: sum_equals
+    fields: [total, subtotal, tax]
+    tolerance: 0.01
+
+  - name: discount_below_total
+    type: compare
+    fields: [discount, total]
+    operator: "<"
+```
+
+| Type | Fields | Meaning |
+| --- | --- | --- |
+| `date_order` | `[earlier, later]` | `earlier` must be on or before `later`. |
+| `sum_equals` | `[total, part, ...]` | `total` must equal the sum of the parts, within `tolerance`. |
+| `compare` | `[left, right]` | The declared `operator` must hold. |
+
+`compare` requires an `operator` of `<`, `<=`, `==`, `!=`, `>` or `>=`.
+`sum_equals` needs a total plus at least two parts. A `message` overrides the
+generated failure text, and `date_format` pins date parsing when a column is
+ambiguous.
+
+A cross-field rule is evaluated row by row and reports one `Issue` per failing
+row, under the check name `cross_field:<rule name>`. Those issues are the same
+type the single-field rules produce, so they appear in the issues CSV and the QA
+report with nothing extra to wire up.
+
+Two things a rule will not do:
+
+- A rule whose columns are not in the frame is reported in `skipped_rules`
+  rather than raising or silently passing.
+- A row with a blank in any referenced column is skipped. Empty values belong to
+  the completeness check; failing them here would count one problem twice.
+
+## Rule versioning and sandbox
+
+Rule sets are versioned under `AUTOFLOW_HOME/rules`, one JSON file per set. No
+rule set reaches production without a sandbox run first:
+
+```python
+from app_files.rules import SandboxStore
+
+store = SandboxStore()
+version = store.save_version("crm_rules", cross_field=rules, note="stricter close date")
+
+# Run the candidate against recent files. This never promotes.
+outcome = store.sandbox_run("crm_rules", version.version, [recent_frame])
+print(outcome.failures, outcome.failures_by_rule)
+
+store.promote("crm_rules", version.version)      # needs the sandbox run above
+store.rollback_to("crm_rules", 1)                # restores v1 as a new version
+```
+
+Versions are append-only. Promoting a new version marks the previous one
+`superseded`; rolling back writes the earlier rules as a new version rather than
+deleting the version it replaced. `store.history("crm_rules")` lists every
+version with its status, timestamp and sandbox runs.

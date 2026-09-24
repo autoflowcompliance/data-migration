@@ -86,6 +86,43 @@ list the built-in validators write to, so they appear in the issues CSV and the
 QA report with nothing extra to wire up. Full reference in
 [docs/RULES.md](docs/RULES.md).
 
+A second block, `cross_field:`, holds rules that read more than one column:
+`close_date` must not precede `open_date`, `total` must equal
+`subtotal + tax`. They produce the same `Issue` objects as the single-field
+rules, so they flow into the same report.
+
+```yaml
+cross_field:
+  - name: close_after_open
+    type: date_order
+    fields: [open_date, close_date]
+
+  - name: total_matches_parts
+    type: sum_equals
+    fields: [total, subtotal, tax]
+    tolerance: 0.01
+```
+
+Three cross-field types: `date_order`, `sum_equals`, `compare` (with an
+operator of `<`, `<=`, `==`, `!=`, `>` or `>=`). A rule whose columns are
+missing from the frame is reported as skipped rather than dropped; a row with a
+blank in any referenced column is skipped, because empty is the completeness
+check's job.
+
+Rule sets are versioned under `AUTOFLOW_HOME/rules`. A new version starts as a
+draft, runs in a sandbox against sample frames, and only then can be promoted to
+production. Rolling back restores an earlier version as a *new* version, so the
+history survives the reversal.
+
+```python
+from app_files.rules import SandboxStore
+
+store = SandboxStore()
+version = store.save_version("crm_rules", cross_field=rules, note="stricter close date")
+store.sandbox_run("crm_rules", version.version, [recent_frame])
+store.promote("crm_rules", version.version)   # refuses without a sandbox run
+```
+
 ### Privacy — find and mask personal data
 
 A separate layer finds personally identifiable information and replaces it

@@ -1,0 +1,11 @@
+cross_field:
+  - name: phone_below_zip
+    type: compare
+    fields: [phone, zip]
+    operator: "<"
+    message: "phone must stay below zip"
+  - name: zip_below_phone
+    type: compare
+    fields: [zip, phone]
+    operator: "<"
+    severity: warning

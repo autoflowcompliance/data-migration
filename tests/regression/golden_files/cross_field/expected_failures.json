@@ -1,0 +1,25 @@
+{
+  "rules_run": 2,
+  "total_failures": 2,
+  "failures_by_rule": {
+    "phone_below_zip": 1,
+    "zip_below_phone": 1
+  },
+  "skipped_rules": [],
+  "issues": [
+    {
+      "row": 0,
+      "field": "phone",
+      "check": "cross_field:phone_below_zip",
+      "severity": "error",
+      "message": "phone must stay below zip"
+    },
+    {
+      "row": 2,
+      "field": "zip",
+      "check": "cross_field:zip_below_phone",
+      "severity": "warning",
+      "message": "zip < phone was violated on this row"
+    }
+  ]
+}
