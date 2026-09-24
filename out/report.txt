@@ -1,0 +1,10 @@
+Pre-migration analysis: contacts.csv
+============================================================
+Rows: 3   Columns: 3
+Overall quality: 100.0
+Mapping confidence: 0.62
+Ready to migrate: yes
+
+Issues
+------------------------------------------------------------
+None found.
