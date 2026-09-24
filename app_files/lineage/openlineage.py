@@ -159,7 +159,10 @@ def validate_openlineage(event: dict[str, Any]) -> None:
     Schema evaluation, so it has no dependency and fails with a message that
     names the missing key.
     """
-    required = ("eventType", "eventTime", "producer", "schemaURL", "run", "job", "inputs", "outputs")
+    required = (
+        "eventType", "eventTime", "producer", "schemaURL",
+        "run", "job", "inputs", "outputs",
+    )
     missing = [key for key in required if key not in event]
     if missing:
         raise ValueError(f"OpenLineage event is missing: {', '.join(missing)}")

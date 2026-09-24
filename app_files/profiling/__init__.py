@@ -1,12 +1,5 @@
 """Profiling layer: five-dimension data quality scoring."""
 
-from app_files.profiling.dimensions import DIMENSIONS, evaluable_dimensions
-from app_files.profiling.profiler import (
-    DIMENSION_NAMES,
-    Profile,
-    profile,
-    scorecard_rows,
-)
 from app_files.profiling.baseline import (
     DEFAULT_DROP_THRESHOLD,
     BaselineComparison,
@@ -21,6 +14,13 @@ from app_files.profiling.dimension_anomaly import (
     DimensionRange,
     detect_dimension_anomalies,
     learn_ranges,
+)
+from app_files.profiling.dimensions import DIMENSIONS, evaluable_dimensions
+from app_files.profiling.profiler import (
+    DIMENSION_NAMES,
+    Profile,
+    profile,
+    scorecard_rows,
 )
 from app_files.profiling.report import (
     profile_and_render,

@@ -22,11 +22,12 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from app_files.profiling.profiler import DIMENSION_NAMES, Profile
 

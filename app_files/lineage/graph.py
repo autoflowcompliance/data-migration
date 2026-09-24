@@ -19,8 +19,9 @@ frozen layer is untouched.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any
 
 from app_files.lineage.tracker import LineageTracker
 
@@ -131,7 +132,9 @@ class LineageGraph:
                 seen[(edge.field, edge.after)] = ValueNode(edge.field, edge.after)
         return sorted(seen.values(), key=lambda node: (node.field, node.value))
 
-    def ancestry(self, field_name: str, value: str, max_depth: int = 50) -> list[TransformationEdge]:
+    def ancestry(
+        self, field_name: str, value: str, max_depth: int = 50
+    ) -> list[TransformationEdge]:
         """Walk backwards: the chain of edges that produced ``value``.
 
         Follows ``before -> after`` links within the field until it reaches a
@@ -157,7 +160,9 @@ class LineageGraph:
             current = edge.before
         return list(reversed(chain))
 
-    def descendants(self, field_name: str, value: str, max_depth: int = 50) -> list[TransformationEdge]:
+    def descendants(
+        self, field_name: str, value: str, max_depth: int = 50
+    ) -> list[TransformationEdge]:
         """Walk forwards: every edge reachable from ``value`` as its input."""
         chain: list[TransformationEdge] = []
         seen: set[tuple[str, str]] = set()
