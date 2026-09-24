@@ -85,6 +85,63 @@ class TestCloudLicenseTool:
         assert "not a trial" in out.err
 
 
+# ------------------------------------------------------- watch CLI
+class TestWatchCli:
+    @pytest.fixture(autouse=True)
+    def _isolated_home(self, tmp_path, monkeypatch):
+        """State is on disk by design, so it must not leak between tests."""
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path / "home"))
+
+    def test_a_missing_folder_exits_two(self, tmp_path):
+        code = main(
+            ["watch", "--in", str(tmp_path / "nope"), "--template", "hubspot",
+             "--out", str(tmp_path / "out")]
+        )
+        assert code == 2
+
+    def test_once_observes_then_processes_across_processes(self, tmp_path, contacts_csv):
+        """The cron path: fresh process each run, state on disk."""
+        inbox = tmp_path / "in"
+        inbox.mkdir()
+        (inbox / "contacts.csv").write_bytes(contacts_csv.read_bytes())
+        out = tmp_path / "out"
+
+        first = main(
+            ["watch", "--in", str(inbox), "--template", "hubspot", "--out", str(out),
+             "--once", "--settle", "1"]
+        )
+        assert first == 0
+        assert not (out / "contacts").exists()
+
+        # Second invocation, same folder, a different process in reality.
+        monkey_now = {"t": None}
+        from app_files.batch import WatchFolder
+
+        folder = WatchFolder(inbox, "hubspot", out, settle_seconds=1.0)
+        first_seen = folder.state.first_seen(folder.watch_key, inbox / "contacts.csv")
+        assert first_seen is not None
+        monkey_now["t"] = first_seen[0] + 5.0
+        assert [p.name for p in folder.ready(now=monkey_now["t"])] == ["contacts.csv"]
+
+    def test_a_processed_file_is_not_reprocessed_by_a_later_invocation(
+        self, tmp_path, contacts_csv
+    ):
+        inbox = tmp_path / "in"
+        inbox.mkdir()
+        (inbox / "contacts.csv").write_bytes(contacts_csv.read_bytes())
+        out = tmp_path / "out"
+
+        from app_files.batch import WatchFolder
+
+        # Seed the settle observation, then process on a later poll.
+        first = WatchFolder(inbox, "hubspot", out, settle_seconds=1.0)
+        first.ready(now=0.0)
+        first.process_ready(now=10.0)
+
+        second = WatchFolder(inbox, "hubspot", out, settle_seconds=1.0)
+        assert second.process_ready(now=100.0) == []
+
+
 # ------------------------------------------------------------------ CLI batch
 def test_batch_cli_processes_a_folder(inbox, tmp_path, capsys):
     out = tmp_path / "outbox"

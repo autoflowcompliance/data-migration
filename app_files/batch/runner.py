@@ -10,9 +10,10 @@ feature useless.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from app_files.ingestion import available_extensions, read_any
 from app_files.lineage import LineageTracker

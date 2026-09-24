@@ -212,6 +212,27 @@ python -m app_files.cli -i app_files/samples/messy_contacts.csv -c hubspot -o ou
 Wrote deliverables to output
 ```
 
+### Watch a folder
+
+To process a file the moment it lands, rather than when someone asks:
+
+```bash
+python -m app_files.cli watch --in inbox --template hubspot --out out --settle 2
+```
+
+`--once` polls once and exits, so a cron job gets the same behaviour as the
+long-running loop. A file is only read once its size and mtime have held steady
+for `--settle` seconds — an export that arrives in several writes must not be
+read at the first write, because a truncated file passes enough checks to
+produce a plausible, wrong result. Both the settle observation and the
+already-handled record are written to `$AUTOFLOW_HOME/watch_state.json`, which
+is what makes `--once` work across processes: the first cron run observes, the
+next one processes. In-progress names (`.part`, `.tmp`, `.crdownload`, `~$…`)
+are ignored.
+
+Output is byte-identical to a batch run: the watcher is a trigger for the
+existing batch engine, not a second pipeline.
+
 ## Docker
 
 ```bash
@@ -539,6 +560,7 @@ restore_backup(backup, TenantRegistry().get("acme"))
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Add a new CRM or bank format |
 | [docs/RULES.md](docs/RULES.md) | Every rule type with a worked YAML example |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | Detect and mask personal data |
+| [docs/WATCH.md](docs/WATCH.md) | Process files the moment they land |
 
 ## Tests
 
@@ -546,7 +568,7 @@ restore_backup(backup, TenantRegistry().get("acme"))
 python -m pytest -q
 ```
 
-Expect `1487 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1524 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
@@ -554,9 +576,9 @@ role-based access control, the tamper-evident audit chain, encryption at rest,
 plugin registration for transforms, rule types, output formats and
 destinations, the durable job queue and its resource limits, tenant isolation,
 backup and verified restore, deployment manifests, cloud/SaaS licensing with
-seats and metering, trials, brand profiles, a compliance packet,
-config-schema validation, golden-file regression fixtures, and malformed-input
-error handling. It runs in about thirty seconds, so there is no reason not to
+seats and metering, trials, brand profiles, a compliance packet, the
+folder watcher and its settle window, config-schema validation, golden-file
+regression fixtures, and malformed-input error handling. It runs in about thirty seconds, so there is no reason not to
 run it before a commit.
 
 Frozen core: `app_files/cleaners/`, `mappers/`, `validators/`, `auditors/` and

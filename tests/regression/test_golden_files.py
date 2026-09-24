@@ -36,6 +36,7 @@ def test_golden_files_are_present():
         },
         "orchestration": {"jobs.json", "expected_transcript.json"},
         "compliance": {"controls.json"},
+        "watcher": {"clean_data.csv", "outcome.txt"},
         "cloud_license": {"expected_state.json"},
         "tenancy": {
             "expected_manifest.json", "render.yaml", "docker-compose.yml", "k8s.yaml",

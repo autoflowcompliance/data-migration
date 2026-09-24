@@ -1,0 +1,7 @@
+firstname,lastname,email,phone,company,jobtitle,website,address,city,state,zip,country,lifecyclestage,hs_lead_status,createdate
+John,Smith,john@email.com,+16174983000,Acme Inc,CEO,,,Boston,,,USA,lead,,2024-12-31
+Jane,Doe,jane.doe@example.com,+15128765432,Globex,CTO,,,Austin,,,USA,lead,,2024-11-05
+Émile,Müller,emile@ex-ample.fr,+33142685300,Initech,Analyst,,,Paris,,,France,lead,,2024-12-31
+Bob,Jones,bob.jones@umbrella.com,12345,Umbrella,Manager,,,Denver,,,USA,lead,,2024-03-04
+Alice,Brown,,+14159876543,Hooli,VP Sales,,,San Francisco,,,USA,lead,,2024-02-17
+Carlos,Diaz,carlos@example.com,+14157200137,Vehement Capital,Director,,,Miami,,,USA,lead,,

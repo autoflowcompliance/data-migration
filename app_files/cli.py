@@ -22,8 +22,8 @@ from app_files.reporters import render_audit_report
 
 def _read_csv(path: Path) -> pd.DataFrame:
     """Read CSV with encoding detection."""
+
     import chardet
-    import io
     
     with open(path, 'rb') as f:
         raw = f.read()
@@ -68,6 +68,70 @@ def build_batch_parser() -> argparse.ArgumentParser:
                         help="clean-data format for each file")
     parser.add_argument("--project", default="Batch run")
     return parser
+
+
+def build_watch_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m app_files.cli watch",
+        description="Process a file the moment it lands in a folder.",
+    )
+    parser.add_argument("--in", dest="input_dir", required=True, type=Path,
+                        help="folder to watch")
+    parser.add_argument("--template", required=True,
+                        help=f"target config ({', '.join(available_crms())})")
+    parser.add_argument("--out", dest="output_dir", required=True, type=Path,
+                        help="folder for per-file output")
+    parser.add_argument("--format", default="csv",
+                        choices=["csv", "excel", "json", "sql"],
+                        help="clean-data format for each file")
+    parser.add_argument("--interval", type=float, default=5.0,
+                        help="seconds between polls")
+    parser.add_argument("--settle", type=float, default=2.0,
+                        help="seconds a file's size must hold steady before it is read")
+    parser.add_argument("--once", action="store_true",
+                        help="poll once and exit, for cron")
+    parser.add_argument("--max-polls", type=int, default=None,
+                        help="stop after this many polls")
+    parser.add_argument("--project", default="Watch run")
+    return parser
+
+
+def run_watch_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli watch …``."""
+    from app_files.batch import WatchFolder
+
+    args = build_watch_parser().parse_args(argv)
+    if not args.input_dir.is_dir():
+        print(f"Input folder not found: {args.input_dir}", file=sys.stderr)
+        return 2
+
+    folder = WatchFolder(
+        args.input_dir,
+        args.template,
+        args.output_dir,
+        settle_seconds=args.settle,
+        output_format=args.format,
+        project_name=args.project,
+    )
+
+    def report(outcome) -> None:
+        if outcome.ok:
+            print(f"  ok    {outcome.file}: {outcome.item.rows_out} rows out, "
+                  f"score {outcome.item.score}%")
+        else:
+            print(f"  FAIL  {outcome.file}: {outcome.reason}", file=sys.stderr)
+
+    iterations = 1 if args.once else args.max_polls
+    try:
+        outcomes = folder.run(
+            iterations=iterations,
+            poll_interval=args.interval,
+            on_progress=report,
+        )
+    except KeyboardInterrupt:
+        print("\nStopped.", file=sys.stderr)
+        return 0
+    return 1 if any(not outcome.ok for outcome in outcomes) else 0
 
 
 def run_batch_command(argv: list[str]) -> int:
@@ -117,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "batch":
         return run_batch_command(argv[1:])
+    if argv and argv[0] == "watch":
+        return run_watch_command(argv[1:])
 
     args = build_parser().parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)

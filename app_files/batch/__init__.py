@@ -30,6 +30,14 @@ from app_files.batch.runner import (
     supported_files,
 )
 from app_files.batch.summary import COLUMNS, summary_frame, write_summary
+from app_files.batch.watcher import (
+    WatchFolder,
+    WatchOutcome,
+    is_deliverable,
+    watch,
+    watch_once,
+    watch_state_path,
+)
 
 __all__ = [
     "COLUMNS",
@@ -43,7 +51,10 @@ __all__ = [
     "RetryOutcome",
     "RetryPolicy",
     "ScheduledJob",
+    "WatchFolder",
+    "WatchOutcome",
     "parse_schedule",
+    "is_deliverable",
     "process_one",
     "record_fingerprint",
     "render_dashboard",
@@ -54,5 +65,8 @@ __all__ = [
     "summary_frame",
     "supported_files",
     "write_dashboard",
+    "watch",
+    "watch_once",
+    "watch_state_path",
     "write_summary",
 ]
