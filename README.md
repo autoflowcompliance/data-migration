@@ -239,6 +239,23 @@ are ignored.
 Output is byte-identical to a batch run: the watcher is a trigger for the
 existing batch engine, not a second pipeline.
 
+### Rehearse a migration before committing
+
+`migrate` runs the whole safety sequence on one command: profile the source,
+take a rollback copy, dry-run the pipeline, and generate a cutover runbook from
+the real config. Nothing is migrated unless you pass `--commit`.
+
+```bash
+python -m app_files.cli migrate -i app_files/samples/messy_contacts.csv -c hubspot -o output
+```
+
+That writes `pre_migration.txt` (and `.json`), `rollback/`, and `runbook.txt`,
+then stops — `clean_data.csv` is not written. Add `--commit` to run it. A
+blocking issue (an unmapped source column, or quality below the migration
+floor) exits non-zero in rehearsal, so a script cannot blithely migrate a
+source that was never checked. `--schedule "0 2 * * *"` names a recurring job
+in the runbook.
+
 ## Docker
 
 ```bash

@@ -344,6 +344,110 @@ def run_drift_command(argv: list[str]) -> int:
     return 0
 
 
+def build_migrate_parser() -> argparse.ArgumentParser:
+    """``python -m app_files.cli migrate …`` — rehearse, then run, a migration.
+
+    Layer 18 was library-only: a buyer could import it, but nothing they could
+    actually run reached it. This exposes the four safety steps on one command:
+    analyse the source, take a rollback copy, dry-run, write the runbook, then
+    migrate -- each step skipped unless asked for.
+    """
+    parser = argparse.ArgumentParser(
+        prog="app_files.cli migrate",
+        description=(
+            "Rehearse a migration before committing to it: pre-migration "
+            "analysis, a rollback copy, a dry run, and a generated runbook. "
+            "Pass --commit to actually run the migration and write output."
+        ),
+    )
+    parser.add_argument("-i", "--input", required=True, type=Path, help="source CSV")
+    parser.add_argument("-c", "--crm", required=True,
+                        help=f"target CRM or mapping config path ({', '.join(available_crms())})")
+    parser.add_argument("-o", "--outdir", type=Path, default=Path("output"))
+    parser.add_argument("--project", default="Data migration")
+    parser.add_argument("--schedule", default=None,
+                        help="cron expression to name in the runbook, if any")
+    parser.add_argument("--commit", action="store_true",
+                        help="run the migration and write output; without it, "
+                             "nothing is written and a blocking issue exits non-zero")
+    return parser
+
+
+def run_migrate_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli migrate …``.
+
+    The default is a rehearsal: analysis, rollback copy, dry run and runbook
+    are written, but the migration itself is not. ``--commit`` runs it. A
+    blocking issue found in analysis stops before anything is written unless
+    ``--commit`` is passed, and then only with the issue printed.
+    """
+    from app_files.migration import (
+        analyze_source,
+        build_rollback,
+        dry_run,
+        generate_runbook,
+        write_pre_migration_report,
+    )
+
+    args = build_migrate_parser().parse_args(argv)
+    frame = _read_csv(args.input)
+    outdir = args.outdir
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    analysis = analyze_source(frame, args.crm, source_name=args.input.name)
+    write_pre_migration_report(analysis, outdir / "pre_migration.txt")
+    print(analysis.render())
+
+    rollback = build_rollback(frame, outdir / "rollback", source_name=args.input.name)
+    print(
+        f"\nRollback copy: {rollback.path} "
+        f"({rollback.rows} rows, sha256 {rollback.checksum[:12]}…)"
+    )
+
+    rehearsal = dry_run(
+        frame, args.crm, project_name=args.project, source_filename=args.input.name
+    )
+    print("\n" + rehearsal.render())
+
+    runbook = generate_runbook(
+        args.crm, project_name=args.project, source_name=args.input.name,
+        output_path=str(outdir), schedule=args.schedule,
+    )
+    runbook.write(outdir / "runbook.txt")
+    print(f"\nRunbook written to {outdir / 'runbook.txt'}")
+
+    if not args.commit:
+        if not analysis.ready:
+            print(
+                "\nBlocking issues found. Fix them or re-run with --commit to "
+                "migrate anyway.",
+                file=sys.stderr,
+            )
+            return 1
+        print(
+            "\nRehearsal complete, nothing was migrated. Re-run with --commit "
+            "to run the migration."
+        )
+        return 0
+
+    from app_files.pipeline import run_pipeline
+
+    result = run_pipeline(
+        frame,
+        crm=args.crm,
+        project_name=args.project,
+        source_filename=args.input.name,
+    )
+    result.clean_frame.to_csv(outdir / "clean_data.csv", index=False)
+    summary = result.summary()
+    print(
+        f"\n{summary['rows_in']} rows in, {summary['rows_out']} out, "
+        f"quality score {summary['quality_score']}%"
+    )
+    print(f"Wrote deliverables to {outdir}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "batch":
@@ -354,6 +458,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_pull_command(argv[1:])
     if argv and argv[0] == "drift":
         return run_drift_command(argv[1:])
+    if argv and argv[0] == "migrate":
+        return run_migrate_command(argv[1:])
 
     args = build_parser().parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)
