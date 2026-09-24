@@ -1,0 +1,31 @@
+{
+  "alerting": true,
+  "baseline": {
+    "dimensions": {
+      "completeness": 100.0,
+      "consistency": 100.0,
+      "timeliness": 100.0,
+      "uniqueness": 100.0,
+      "validity": 100.0
+    },
+    "overall": 100.0
+  },
+  "current": {
+    "dimensions": {
+      "completeness": 50.0,
+      "consistency": 100.0,
+      "timeliness": 100.0,
+      "uniqueness": 100.0,
+      "validity": 100.0
+    },
+    "overall": 83.3
+  },
+  "drifts": [
+    {"baseline": 100.0, "current": 50.0, "delta": -50.0, "dimension": "completeness"},
+    {"baseline": 100.0, "current": 100.0, "delta": 0.0, "dimension": "uniqueness"},
+    {"baseline": 100.0, "current": 100.0, "delta": 0.0, "dimension": "validity"},
+    {"baseline": 100.0, "current": 100.0, "delta": 0.0, "dimension": "consistency"},
+    {"baseline": 100.0, "current": 100.0, "delta": 0.0, "dimension": "timeliness"}
+  ],
+  "regressed": ["completeness"]
+}

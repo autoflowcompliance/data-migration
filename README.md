@@ -160,6 +160,29 @@ to their age and future dates are penalised as likely typos. Pass an explicit
 
 The five scores render as a scorecard in the HTML QA report and in the web UI.
 
+The scorecard answers "how good is this file". It cannot answer "is this source
+getting better or worse", because nothing remembered yesterday's score — the
+trend store and baseline comparison existed in the profiling package but no run
+called them. Two flags bind them in:
+
+```bash
+# Record this run in the source's history and report the trend
+python -m app_files.cli -i inbox/contacts.csv -c hubspot -o out --record-quality
+
+# Pin this run as the source's baseline (records it too)
+python -m app_files.cli -i inbox/contacts.csv -c hubspot -o out --baseline
+
+# Exit non-zero when a dimension falls past the pinned baseline
+python -m app_files.cli -i inbox/contacts.csv -c hubspot -o out \
+    --record-quality --fail-on-regression
+```
+
+History is one row per run per source in SQLite under `AUTOFLOW_HOME`, so a
+source is remembered by filename (`contacts`) rather than by path and a copy in
+another folder continues the same history. `--fail-on-regression` is how a
+scheduled run refuses to deliver a file that has rotted since the last accepted
+one.
+
 ### Lineage — prove what changed
 
 Every transformation is recorded as one row: source row index, output row index,

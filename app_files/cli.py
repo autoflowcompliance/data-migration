@@ -51,6 +51,13 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Parse dates with day first (DD/MM/YYYY instead of MM/DD/YYYY)")
     parser.add_argument("--strict-rules", action="store_true",
                        help="Exit non-zero when a rule the config declares fails")
+    parser.add_argument("--record-quality", action="store_true",
+                       help="Record this run's quality score in the source's history "
+                            "and report the trend")
+    parser.add_argument("--baseline", action="store_true",
+                       help="Pin this run as the source's baseline (records it too)")
+    parser.add_argument("--fail-on-regression", action="store_true",
+                       help="Exit non-zero when a dimension falls past the baseline")
     return parser
 
 
@@ -733,9 +740,47 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     print(f"Wrote deliverables to {args.outdir}")
+    quality_history = None
+    if args.record_quality or args.baseline:
+        # Layer 5's trend store and baseline comparison had no caller outside
+        # the profiling package, so every run scored a source and forgot it.
+        # Recording is opt-in so a run that never asked for history writes
+        # nothing and stays byte-identical.
+        from app_files.profiling import pin_baseline, profile, record_quality
+        from app_files.profiling.binding import source_key
+
+        current_profile = profile(result.clean_frame)
+        if args.baseline:
+            point = pin_baseline(args.input.name, current_profile)
+            print(f"Baseline pinned for {source_key(args.input.name)} at {point.overall:.1f}.")
+        else:
+            quality_history = record_quality(args.input.name, current_profile)
+            counts = quality_history.summary()
+            print(
+                f"Quality history: {counts['runs_recorded']} run(s) for "
+                f"{counts['source']}, trend {counts['trend']}"
+            )
+            if quality_history.comparison is not None and quality_history.alerting:
+                comparison = quality_history.comparison
+                print(
+                    f"  regression: {', '.join(comparison.regressed_dimensions)} "
+                    f"fell past baseline ({comparison.overall_baseline} -> "
+                    f"{comparison.overall_current})"
+                )
     if args.strict_rules and failures_exceed(built, max_failures=0):
         print(
             f"--strict-rules: {built.total_rule_failures} declared rule failure(s).",
+            file=sys.stderr,
+        )
+        return 1
+    if (
+        args.fail_on_regression
+        and quality_history is not None
+        and quality_history.alerting
+    ):
+        print(
+            "--fail-on-regression: the run fell past its baseline in "
+            f"{', '.join(quality_history.comparison.regressed_dimensions)}.",
             file=sys.stderr,
         )
         return 1

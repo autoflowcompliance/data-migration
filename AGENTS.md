@@ -166,6 +166,11 @@ a name containing `&` truncates itself and swallows the reference after it.
   under it. A new state-writing layer that hardcodes a path under the repo root
   will litter the working tree and fail the portability tests in
   `tests/unit/test_market_layers.py` (`test_orders_storage_honours_autoflow_home`).
+- Layer 5's trend store and baseline comparison were the same: complete in the
+  profiling package, zero callers. `--record-quality` / `--baseline` /
+  `--fail-on-regression` bind them (`app_files/profiling/binding.py`), and
+  `BaselineComparison.regressed_dimensions` is a **property**, not a method —
+  calling it raises `TypeError: 'list' object is not callable`.
 - Layer 18 (migration safety) and Layer 14 (orchestration) were library-only.
   They now have CLI entry points: `migrate` (rehearsal by default, `--commit`
   to run) and `jobs` (submit/list/run). `jobs run` registers the built-in

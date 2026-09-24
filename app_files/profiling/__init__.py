@@ -7,6 +7,12 @@ from app_files.profiling.baseline import (
     compare_to_baseline,
     compare_to_stored_baseline,
 )
+from app_files.profiling.binding import (
+    QualityHistory,
+    pin_baseline,
+    record_quality,
+    source_key,
+)
 from app_files.profiling.dimension_anomaly import (
     MIN_SAMPLES,
     DimensionAnomaly,
@@ -45,14 +51,18 @@ __all__ = [
     "DimensionDrift",
     "DimensionRange",
     "Profile",
+    "QualityHistory",
     "QualityPoint",
     "TrendStore",
     "compare_to_baseline",
     "compare_to_stored_baseline",
     "detect_dimension_anomalies",
     "evaluable_dimensions",
+    "pin_baseline",
     "profile",
     "learn_ranges",
+    "record_quality",
+    "source_key",
     "profile_and_render",
     "render_qa_report_with_profile",
     "render_trend_html",
