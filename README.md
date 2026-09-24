@@ -562,6 +562,7 @@ restore_backup(backup, TenantRegistry().get("acme"))
 | [docs/PRIVACY.md](docs/PRIVACY.md) | Detect and mask personal data |
 | [docs/WATCH.md](docs/WATCH.md) | Process files the moment they land |
 | [docs/LARGE_FILES.md](docs/LARGE_FILES.md) | Stream a file too big for memory |
+| [docs/CONNECTORS.md](docs/CONNECTORS.md) | Read from a database, SFTP or cloud storage |
 
 ## Tests
 
@@ -569,7 +570,7 @@ restore_backup(backup, TenantRegistry().get("acme"))
 python -m pytest -q
 ```
 
-Expect `1578 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1652 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
@@ -579,6 +580,7 @@ destinations, the durable job queue and its resource limits, tenant isolation,
 backup and verified restore, deployment manifests, cloud/SaaS licensing with
 seats and metering, trials, brand profiles, a compliance packet, the
 folder watcher and its settle window, chunked ingestion for large files,
+direct database and SFTP connectors, allocation-based memory enforcement,
 config-schema validation, golden-file regression fixtures, and malformed-input
 error handling. It runs in about thirty seconds, so there is no reason not to
 run it before a commit.

@@ -143,6 +143,141 @@ class TestWatchCli:
 
 
 # ------------------------------------------------------------------ CLI batch
+class TestPullCli:
+    """`pull` fetches through a connector, then runs the one pipeline."""
+
+    @pytest.fixture
+    def sqlite_db(self, tmp_path):
+        import sqlite3
+
+        path = tmp_path / "crm.db"
+        connection = sqlite3.connect(path)
+        connection.execute(
+            "CREATE TABLE contacts (email TEXT, first_name TEXT, last_name TEXT, "
+            "company TEXT, country TEXT, amount TEXT, created TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO contacts VALUES (?,?,?,?,?,?,?)",
+            [
+                ("a@b.com", "Al", "Smith", "Acme", "GB", "100", "2024-01-01"),
+                ("c@d.com", "", "Jones", "", "US", "", ""),
+                ("e@f.com", "Eve", "Novak", "Initech", "GB", "50", "2024-02-02"),
+            ],
+        )
+        connection.commit()
+        connection.close()
+        return path
+
+    def test_pull_from_a_database_runs_the_pipeline(self, sqlite_db, tmp_path, capsys):
+        code = main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--table",
+                "contacts",
+                "-o",
+                str(tmp_path / "out"),
+            ]
+        )
+        output = capsys.readouterr().out
+        assert code == 0
+        assert "Pulled 3 rows" in output
+        assert "3 rows in, 3 out" in output
+        assert (tmp_path / "out").exists()
+
+    def test_pull_dry_run_fetches_without_running(self, sqlite_db, tmp_path, capsys):
+        code = main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--table",
+                "contacts",
+                "--dry-run",
+                "-o",
+                str(tmp_path / "out"),
+            ]
+        )
+        assert code == 0
+        assert "Pulled 3 rows" in capsys.readouterr().out
+        assert not (tmp_path / "out").exists()
+
+    def test_pull_with_a_query(self, sqlite_db, tmp_path, capsys):
+        code = main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--query",
+                "SELECT email, first_name FROM contacts WHERE country = 'GB'",
+                "-o",
+                str(tmp_path / "out"),
+            ]
+        )
+        assert code == 0
+        assert "Pulled 2 rows" in capsys.readouterr().out
+
+    def test_pull_reports_a_missing_table_without_a_traceback(
+        self, sqlite_db, tmp_path, capsys
+    ):
+        code = main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--table",
+                "no_such_table",
+                "-o",
+                str(tmp_path / "out"),
+            ]
+        )
+        captured = capsys.readouterr()
+        assert code == 2
+        assert "Could not read from database" in captured.err
+
+    def test_pull_output_matches_the_single_file_cli(self, sqlite_db, tmp_path, capsys):
+        """Same rows through `pull` and through the flat flags, same numbers."""
+        main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--table",
+                "contacts",
+                "-o",
+                str(tmp_path / "pullout"),
+            ]
+        )
+        pulled_output = capsys.readouterr().out
+
+        import csv
+
+        csv_path = tmp_path / "contacts.csv"
+        with open(csv_path, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(
+                ["email", "first_name", "last_name", "company", "country", "amount", "created"]
+            )
+            writer.writerows(
+                [
+                    ("a@b.com", "Al", "Smith", "Acme", "GB", "100", "2024-01-01"),
+                    ("c@d.com", "", "Jones", "", "US", "", ""),
+                    ("e@f.com", "Eve", "Novak", "Initech", "GB", "50", "2024-02-02"),
+                ]
+            )
+        main(["-i", str(csv_path), "-c", "hubspot", "-o", str(tmp_path / "fileout")])
+        file_output = capsys.readouterr().out
+
+        assert "3 rows in, 3 out" in pulled_output
+        assert "3 rows in, 3 out" in file_output
+
+
 def test_batch_cli_processes_a_folder(inbox, tmp_path, capsys):
     out = tmp_path / "outbox"
     exit_code = main(["batch", "--in", str(inbox), "--template", "hubspot", "--out", str(out)])

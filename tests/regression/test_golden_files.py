@@ -38,6 +38,7 @@ def test_golden_files_are_present():
         "compliance": {"controls.json"},
         "watcher": {"clean_data.csv", "outcome.txt"},
         "chunked": {"input.csv", "expected.csv"},
+        "database": {"crm.db", "expected.csv"},
         "cloud_license": {"expected_state.json"},
         "tenancy": {
             "expected_manifest.json", "render.yaml", "docker-compose.yml", "k8s.yaml",

@@ -1,0 +1,6 @@
+email,first_name,last_name,company,country,amount,created
+alice@example.com,Alice,Smith,Acme Ltd,GB,"1,200.50",2024-01-05
+bob@example.com,Bob,,Globex,US,980,2024-02-11
+carol@example.com,,,,,,
+dave@example.com,dave,O'Neil,Acme Ltd,GB,-45.25,2024-03-02
+eve@example.com,Eve,Novak,Initech,gb,"1.000,00",2024-03-09

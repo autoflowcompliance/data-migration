@@ -96,6 +96,83 @@ def build_watch_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_pull_parser() -> argparse.ArgumentParser:
+    """``python -m app_files.cli pull …`` — read from where the data lives."""
+    from app_files.distribution.connectors import available_connectors
+
+    parser = argparse.ArgumentParser(
+        prog="app_files.cli pull",
+        description="Fetch a dataset from a connector and run the pipeline on it.",
+    )
+    parser.add_argument("provider", choices=available_connectors())
+    parser.add_argument("--table", default="", help="table name (database providers)")
+    parser.add_argument("--query", default="", help="read-only SELECT (database providers)")
+    parser.add_argument("--url", default="", help="database URL")
+    parser.add_argument("--bucket", default="", help="S3 bucket")
+    parser.add_argument("--key", default="", help="S3 key")
+    parser.add_argument("--path", default="", help="remote path (SFTP/Dropbox/OneDrive)")
+    parser.add_argument("--spreadsheet-id", default="", help="Google sheet id")
+    parser.add_argument("--sheet-name", default="", help="Google sheet tab")
+    parser.add_argument("--file-id", default="", help="Google Drive file id")
+    parser.add_argument("-c", "--crm", default="hubspot")
+    parser.add_argument("-o", "--outdir", type=Path, default=Path("output"))
+    parser.add_argument(
+        "--dry-run", action="store_true", help="fetch only, do not run the pipeline"
+    )
+    return parser
+
+
+def run_pull_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli pull …``.
+
+    Fetch through the connector, then hand the resulting DataFrame to the same
+    ``run_pipeline`` every other entry point uses. The connector is a producer
+    into the existing interface, not a second pipeline.
+    """
+    from app_files.distribution.connectors import ConnectorError, get_connector
+
+    args = build_pull_parser().parse_args(argv)
+    connector_kwargs = {
+        key: value
+        for key, value in {
+            "url": args.url,
+            "bucket": args.bucket,
+            "path": args.path,
+            "spreadsheet_id": args.spreadsheet_id,
+            "sheet_name": args.sheet_name,
+            "file_id": args.file_id,
+        }.items()
+        if value
+    }
+    fetch_kwargs = {
+        key: value
+        for key, value in {"table": args.table, "query": args.query, "key": args.key}.items()
+        if value
+    }
+    try:
+        connector = get_connector(args.provider, **connector_kwargs)
+        payload = connector.fetch(**fetch_kwargs) if fetch_kwargs else connector.fetch()
+    except (ConnectorError, ValueError) as exc:
+        print(f"Could not read from {args.provider}: {exc}", file=sys.stderr)
+        return 2
+
+    frame = payload.as_frame()
+    print(f"Pulled {len(frame)} rows from {payload.location or payload.name}")
+    if args.dry_run:
+        return 0
+
+    args.outdir.mkdir(parents=True, exist_ok=True)
+    result = run_pipeline(frame, crm=args.crm)
+    summary = result.summary()
+    print(
+        f"{summary['rows_in']} rows in, {summary['rows_out']} out, "
+        f"quality score {summary['quality_score']}%, {summary['errors']} errors, "
+        f"{summary['warnings']} warnings"
+    )
+    print(f"Wrote deliverables to {args.outdir}")
+    return 0
+
+
 def run_watch_command(argv: list[str]) -> int:
     """Handle ``python -m app_files.cli watch …``."""
     from app_files.batch import WatchFolder
@@ -183,6 +260,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_batch_command(argv[1:])
     if argv and argv[0] == "watch":
         return run_watch_command(argv[1:])
+    if argv and argv[0] == "pull":
+        return run_pull_command(argv[1:])
 
     args = build_parser().parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)
