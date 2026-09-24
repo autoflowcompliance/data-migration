@@ -478,6 +478,31 @@ outcome = run_migration(frame, source_name="c.csv", template="hubspot",
 default path is unchanged. An unknown profile name **raises** rather than falling
 back — falling back would put one client's brand on another client's report.
 
+## Compliance posture
+
+`app_files.governance.compliance` answers the questions a buyer's legal team
+actually asks, from the running code rather than from a marketing page.
+
+```python
+from app_files.governance import build_packet, write_packet
+
+packet = build_packet(retention_days=365, tenants=registry.list())
+write_packet(packet, "docs/compliance.md")   # also writes compliance.json
+print(packet.ready, packet.counts)           # ready only when there are no gaps
+```
+
+- **Controls are checked against the real code.** Is the audit chain actually
+  append-only? Is encryption keyed from a secret store? A check that cannot run
+  is a **gap**, never an assumed pass — a compliance document that quietly
+  rounds up is worse than none.
+- **Retention is days and enforced by age**, so the rule is testable. An
+  unreadable timestamp is kept, not deleted: the safe direction is to retain.
+- **Residency is per tenant**, read from the tenant's metadata, because one
+  global region would misstate where a specific tenant's data sits.
+- **Exception messages never reach the packet.** Only the exception *type* is
+  recorded; the message can carry a path or a value, and this document goes to
+  a third party.
+
 ## Tenants, backup and deployment
 
 A tenant is the unit of isolation for a hosted install: its own data, config,
@@ -521,7 +546,7 @@ restore_backup(backup, TenantRegistry().get("acme"))
 python -m pytest -q
 ```
 
-Expect `1457 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1487 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
@@ -529,7 +554,7 @@ role-based access control, the tamper-evident audit chain, encryption at rest,
 plugin registration for transforms, rule types, output formats and
 destinations, the durable job queue and its resource limits, tenant isolation,
 backup and verified restore, deployment manifests, cloud/SaaS licensing with
-seats and metering, trials, brand profiles,
+seats and metering, trials, brand profiles, a compliance packet,
 config-schema validation, golden-file regression fixtures, and malformed-input
 error handling. It runs in about thirty seconds, so there is no reason not to
 run it before a commit.

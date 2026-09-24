@@ -21,6 +21,16 @@ from app_files.governance.audit_chain import (
     chain_path,
     verify_chain,
 )
+from app_files.governance.compliance import (
+    FRAMEWORKS,
+    CompliancePacket,
+    Control,
+    Residency,
+    RetentionPolicy,
+    assess_controls,
+    build_packet,
+    write_packet,
+)
 from app_files.governance.encryption import (
     Ciphertext,
     EncryptionError,
@@ -46,18 +56,25 @@ from app_files.governance.rbac import (
 )
 
 __all__ = [
+    "FRAMEWORKS",
     "ROLE_PERMISSIONS",
     "AccessDenied",
     "AuditChain",
+    "CompliancePacket",
+    "Control",
     "ChainVerification",
     "Ciphertext",
     "EncryptionError",
     "Permission",
     "Principal",
+    "Residency",
+    "RetentionPolicy",
     "Role",
     "SecretStore",
     "UserRegistry",
     "append_to_chain",
+    "assess_controls",
+    "build_packet",
     "chain_path",
     "check",
     "decrypt_bytes",
@@ -70,4 +87,5 @@ __all__ = [
     "resolve_key",
     "role_for",
     "verify_chain",
+    "write_packet",
 ]

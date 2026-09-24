@@ -35,6 +35,7 @@ def test_golden_files_are_present():
             "bank.csv", "ledger.csv", "processor.csv", "expected_result.json",
         },
         "orchestration": {"jobs.json", "expected_transcript.json"},
+        "compliance": {"controls.json"},
         "cloud_license": {"expected_state.json"},
         "tenancy": {
             "expected_manifest.json", "render.yaml", "docker-compose.yml", "k8s.yaml",
