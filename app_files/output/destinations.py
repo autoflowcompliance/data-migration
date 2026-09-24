@@ -44,6 +44,50 @@ class Destination(Protocol):
     def deliver(self, data: bytes, filename: str) -> DeliveryReceipt: ...
 
 
+#: Named destination factories, for plugins and for config-driven delivery.
+#: A factory takes the config mapping and returns a ``Destination``.
+DESTINATION_TYPES: dict[str, Callable[[dict[str, Any]], Destination]] = {}
+
+
+def register_destination(
+    name: str,
+    factory: Callable[[dict[str, Any]], Destination],
+    override: bool = False,
+) -> Callable[[dict[str, Any]], Destination]:
+    """Add a destination type. The plugin system's registration point.
+
+    A factory, not a class: a destination almost always needs configuration
+    (a URL, a bucket, credentials) before it is usable, and a factory is where
+    that configuration is validated.
+    """
+    key = str(name).strip().lower()
+    if not key:
+        raise ValueError("A destination needs a name")
+    if not callable(factory):
+        raise ValueError(f"Destination {name!r} must be a factory, got {type(factory).__name__}")
+    if key in DESTINATION_TYPES and not override:
+        raise ValueError(
+            f"Destination {name!r} already exists. Pass override=True to replace it."
+        )
+    DESTINATION_TYPES[key] = factory
+    return factory
+
+
+def build_destination(name: str, config: dict[str, Any] | None = None) -> Destination:
+    key = str(name).strip().lower()
+    try:
+        factory = DESTINATION_TYPES[key]
+    except KeyError:
+        raise ValueError(
+            f"Unknown destination {name!r}. Known: {', '.join(sorted(DESTINATION_TYPES))}"
+        ) from None
+    return factory(dict(config or {}))
+
+
+def registered_destinations() -> list[str]:
+    return sorted(DESTINATION_TYPES)
+
+
 # --------------------------------------------------------------- local file
 
 

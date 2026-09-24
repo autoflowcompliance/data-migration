@@ -23,7 +23,13 @@ from app_files.rules.schema import (
     RuleConfigError,
     load_rules,
 )
-from app_files.rules.validators import VALIDATORS, get_validator
+from app_files.rules.validators import (
+    VALIDATORS,
+    get_validator,
+    register_validator,
+    registered_options,
+    registered_rule_types,
+)
 from app_files.rules.versioning import (
     RuleVersion,
     RuleVersionError,
@@ -49,6 +55,9 @@ __all__ = [
     "SandboxStore",
     "apply_cross_field_rules",
     "get_validator",
+    "register_validator",
+    "registered_options",
+    "registered_rule_types",
     "load_cross_field_rules",
     "load_rules",
     "load_rules_for",

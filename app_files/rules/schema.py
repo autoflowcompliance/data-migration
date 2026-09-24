@@ -17,7 +17,8 @@ than silently passing every row.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from typing import Any
 
 SEVERITIES = ("error", "warning", "info")
@@ -26,6 +27,31 @@ RULE_TYPES = ("required", "range", "length", "list_of_values", "regex")
 
 class RuleConfigError(ValueError):
     """Raised when a rule is missing required parameters or is malformed."""
+
+
+def _known_rule_types() -> tuple[str, ...]:
+    """Built-in rule types plus any registered by a plugin.
+
+    Looked up at call time rather than captured at import, so a plugin that
+    registers a rule type after this module loads is still recognised.
+    """
+    try:
+        from app_files.rules.validators import registered_rule_types
+
+        extra = tuple(t for t in registered_rule_types() if t not in RULE_TYPES)
+    except Exception:  # noqa: BLE001 - a partially imported module must not break a load
+        extra = ()
+    return RULE_TYPES + extra
+
+
+def _registered_options() -> frozenset[str]:
+    """Extra YAML keys a registered rule type is allowed to carry."""
+    try:
+        from app_files.rules.validators import registered_options
+
+        return registered_options()
+    except Exception:  # noqa: BLE001
+        return frozenset()
 
 
 @dataclass
@@ -54,6 +80,8 @@ class Rule:
     pattern: str = ""
     message: str = ""
     """Optional human-readable override for the failure message."""
+    options: dict[str, Any] = dataclass_field(default_factory=dict)
+    """Parameters for a plugin-registered rule type, beyond the built-ins."""
 
     _KNOWN = frozenset(
         {
@@ -67,7 +95,7 @@ class Rule:
     def from_dict(cls, data: dict[str, Any]) -> Rule:
         if not isinstance(data, dict):
             raise RuleConfigError(f"Each rule must be a mapping, got {type(data).__name__}")
-        unknown = set(data) - cls._KNOWN
+        unknown = set(data) - cls._KNOWN - _registered_options()
         if unknown:
             raise RuleConfigError(
                 f"Rule has unknown keys: {', '.join(sorted(unknown))}. "
@@ -76,9 +104,9 @@ class Rule:
         if "type" not in data:
             raise RuleConfigError(f"Rule {data.get('name', data.get('field', '?'))!r} has no 'type'")
         rule_type = str(data["type"]).strip().lower()
-        if rule_type not in RULE_TYPES:
+        if rule_type not in _known_rule_types():
             raise RuleConfigError(
-                f"Unknown rule type {rule_type!r}. Known types: {', '.join(RULE_TYPES)}"
+                f"Unknown rule type {rule_type!r}. Known types: {', '.join(sorted(_known_rule_types()))}"
             )
         severity = str(data.get("severity", "error")).strip().lower()
         if severity not in SEVERITIES:
@@ -102,6 +130,7 @@ class Rule:
             case_sensitive=bool(data.get("case_sensitive", False)),
             pattern=str(data.get("pattern") or ""),
             message=str(data.get("message") or ""),
+            options={key: value for key, value in data.items() if key not in cls._KNOWN},
         )
         rule.validate_params()
         return rule

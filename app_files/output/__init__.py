@@ -7,14 +7,19 @@ for download buttons.
 from app_files.output import csv_writer, excel_writer, json_writer, sql_writer
 from app_files.output.csv_writer import write as write_csv
 from app_files.output.destinations import (
+    DESTINATION_TYPES,
     DeliveryReceipt,
+    Destination,
     EmailDestination,
     FileDestination,
     GoogleSheetsDestination,
     S3Destination,
     SFTPDestination,
+    build_destination,
     push,
     push_file,
+    register_destination,
+    registered_destinations,
 )
 from app_files.output.excel_writer import write as write_excel
 from app_files.output.formats import (
@@ -22,6 +27,7 @@ from app_files.output.formats import (
     Format,
     normalise_format,
     output_filename,
+    register_format,
     write_any,
 )
 from app_files.output.inmemory import Payload, to_bytes
@@ -51,8 +57,10 @@ from app_files.output.webhooks import (
 __all__ = [
     "EVENTS",
     "FORMATS",
+    "DESTINATION_TYPES",
     "DeliveryReceipt",
     "DeliveryResult",
+    "Destination",
     "EmailDestination",
     "FileDestination",
     "Format",
@@ -66,6 +74,7 @@ __all__ = [
     "Webhook",
     "WebhookDispatcher",
     "WebhookPayload",
+    "build_destination",
     "csv_writer",
     "excel_writer",
     "json_writer",
@@ -75,6 +84,9 @@ __all__ = [
     "push",
     "push_file",
     "read_manifest",
+    "register_destination",
+    "register_format",
+    "registered_destinations",
     "sign_bytes",
     "sign_directory",
     "sign_file",

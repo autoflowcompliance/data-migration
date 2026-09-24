@@ -377,6 +377,43 @@ key = SecretStore().get("default")
 sealed = encrypt_text('{"client": "acme"}', key)
 ```
 
+## Extending DataFlow
+
+A plugin is a module with a `register(registry)` function. It declares a
+transform, a rule type, an output format or a destination, and the pipeline
+picks it up without a fork.
+
+```python
+from app_files.plugins import PluginSpec, load_plugin
+
+def register(registry):
+    registry.transform("shout", lambda value: str(value).upper())
+    registry.rule_type(
+        "starts_with",
+        lambda value, rule: str(value).startswith(rule.options["prefix"]),
+        options=("prefix",),
+    )
+
+load_plugin(register, PluginSpec(name="acme", version="1.0"))
+```
+
+Every registration is additive. A plugin cannot shadow a built-in name unless
+it passes `override=True`, because a plugin that silently replaces the CSV
+writer is how an install stops producing CSV for everyone and nobody notices
+until someone opens the file. A refused claim is recorded on the registry, not
+raised, so one bad claim does not abandon the rest of the plugin.
+
+`app_files.plugins.events` carries the same idea to lifecycle points: subscribe
+a handler to `run.completed`, `job.finished`, `plugin.loaded` and others. A
+handler that raises does not fail the run — the failure comes back in the
+receipt, because a correct run must not break because an observer did.
+
+```python
+from app_files.plugins import LifecycleEvent, subscribe
+
+subscribe(LifecycleEvent.RUN_COMPLETED, lambda event, payload: audit(payload))
+```
+
 ## Documentation
 
 | Document | Covers |
@@ -392,11 +429,13 @@ sealed = encrypt_text('{"client": "acme"}', key)
 python -m pytest -q
 ```
 
-Expect `1257 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1303 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
 role-based access control, the tamper-evident audit chain, encryption at rest,
+plugin registration for transforms, rule types, output formats and
+destinations,
 config-schema validation, golden-file regression fixtures, and malformed-input
 error handling. It runs in about thirty seconds, so there is no reason not to
 run it before a commit.

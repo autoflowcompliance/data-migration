@@ -13,6 +13,7 @@ rule works on bank/ledger data that has not been cleaned yet.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -112,3 +113,47 @@ def get_validator(rule_type: str):
         raise ValueError(
             f"No validator for rule type {rule_type!r}. Known: {', '.join(VALIDATORS)}"
         ) from None
+
+
+_OPTIONS: dict[str, frozenset[str]] = {}
+
+
+def registered_options() -> frozenset[str]:
+    """Every extra YAML key any registered validator declared it understands."""
+    merged: frozenset[str] = frozenset()
+    for keys in _OPTIONS.values():
+        merged |= keys
+    return merged
+
+
+def register_validator(
+    rule_type: str,
+    validator: Callable[[Any, Rule], bool],
+    options: Iterable[str] | None = None,
+    override: bool = False,
+) -> Callable[[Any, Rule], bool]:
+    """Add a rule type. The plugin system's registration point.
+
+    ``options`` names the extra YAML keys this rule type carries. They land in
+    :attr:`~app_files.rules.schema.Rule.options`, so a custom rule can be
+    parameterised without a schema change. Declaring them also keeps the
+    schema's unknown-key guard working: a key nobody declared is still a typo.
+    """
+    key = str(rule_type).strip()
+    if not key:
+        raise ValueError("A rule type needs a name")
+    if not callable(validator):
+        raise ValueError(
+            f"Validator for {rule_type!r} must be callable, got {type(validator).__name__}"
+        )
+    if key in VALIDATORS and not override:
+        raise ValueError(
+            f"Rule type {rule_type!r} already exists. Pass override=True to replace it."
+        )
+    VALIDATORS[key] = validator
+    _OPTIONS[key] = frozenset(str(name) for name in (options or ()))
+    return validator
+
+
+def registered_rule_types() -> list[str]:
+    return sorted(VALIDATORS)
