@@ -132,6 +132,50 @@ Jaro-Winkler rates any two values sharing a long prefix as similar, so a column
 of serial-number-shaped values can legitimately collapse; the merges are
 recorded, and `max_cluster_size` is the backstop.
 
+### `notifications`
+
+An optional block that turns a run into something the outside world hears about.
+It binds Layer 8's completion webhook and Layer 15's alerting, both of which
+were complete and unreachable from a run until this block existed. Nothing fires
+unless the run is asked to notify (`--notify` on the CLI single-file and `batch`
+commands), so a run that never passes the flag reaches no network and its output
+is byte-identical to before.
+
+```yaml
+notifications:
+  alerts:                       # omit entirely for a critical alert on failure
+    - condition: quality_drop   # failure | quality_drop | sla_breach | duration_breach
+      threshold: 80             # the floor (drop) or ceiling (breach)
+      severity: warning         # info | warning | critical
+  channels:                     # where alerts go
+    - type: slack               # webhook | slack | teams
+      url_env: SLACK_WEBHOOK    # read from the environment, not the YAML
+  webhooks:                     # run.completed / run.failed payloads
+    - url_env: DATAFLOW_HOOK
+      events: [run.completed, run.failed]
+      secret_env: DATAFLOW_HOOK_SECRET   # HMAC-signs the body when set
+```
+
+| Key | Meaning |
+| --- | --- |
+| `alerts` | Alert rules. Omitting the key gives a critical alert on any failure; `alerts: []` turns alerts off. |
+| `alerts[].condition` | `failure`, `quality_drop`, `sla_breach`, or `duration_breach`. |
+| `alerts[].threshold` | The floor for `quality_drop`, the ceiling for a breach. |
+| `alerts[].severity` | `info`, `warning`, or `critical`. |
+| `channels` | Alert channels: `webhook`, `slack`, or `teams`. |
+| `webhooks` | Completion webhooks. `events` filters which of `run.completed` / `run.failed` fire. |
+| `url` / `url_env` | A channel or webhook URL, inline or from an environment variable. |
+| `secret_env` | Environment variable holding an HMAC key; the payload is signed when set. |
+
+Endpoints and their signing keys are named through `url_env` / `secret_env`
+rather than committed to the YAML. A URL with no `url` and no `url_env`, or a
+named environment variable that is not set, fails the run loudly rather than
+silently notifying nobody. Delivery itself is best-effort: a dead endpoint is
+reported in the run's output but never fails a run that produced correct data.
+The alerting evaluation is also reachable directly from Python —
+`notify_run(config, summary, run_id=…)` returns `None` when the config declares
+no block, so a caller can tell "unconfigured" from "configured and clean".
+
 ## Adding a new CRM
 
 1. Look at your source file's header row and decide the target column names.

@@ -192,6 +192,21 @@ a name containing `&` truncates itself and swallows the reference after it.
   privacy card. `clean_data.csv` is never rewritten, so a config with no
   `privacy:` block stays byte-identical to the frozen pipeline. Privacy *does*
   need binding in every new entry point — it is not applied by `run_pipeline`.
+- Layer 8's completion webhook and Layer 15's alerting were both complete and
+  both unreachable from a run, so nothing ever notified an external system.
+  `app_files/observability/binding.py` binds a config's `notifications:` block
+  and is invoked by the CLI `--notify` flag on the single-file run and on
+  `batch`. It is **not** on by default — a run that never passes `--notify`
+  reaches no network. Delivery is best-effort (a dead endpoint is reported, not
+  raised); a *malformed* block raises `NotificationConfigError` so a typo fails
+  loudly. Endpoints come from the environment via `url_env` / `secret_env`, not
+  from the committed YAML. Omitting `alerts:` gives a default critical alert on
+  failure; `alerts: []` opts out.
+- `notify_run(crm, summary, run_id=…)` returns `None` when the config declares
+  no `notifications:` block, so a caller can distinguish "unconfigured" from
+  "configured and clean". A test that injects a `dispatcher=` no longer exists;
+  pass `transport=` (the `(url, body, headers, timeout) -> status` seam the
+  webhook layer exposes) so the declared webhooks are still built from YAML.
 - `run_pipeline` does **not** execute the config's `rules:` block. It validates
   the mapped frame only. Rules are run separately by the caller with
   `run_rules_for(frame, crm)`. A config passed as `crm` whose rules never get

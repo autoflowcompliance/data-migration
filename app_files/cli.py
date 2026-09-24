@@ -58,6 +58,9 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Pin this run as the source's baseline (records it too)")
     parser.add_argument("--fail-on-regression", action="store_true",
                        help="Exit non-zero when a dimension falls past the baseline")
+    parser.add_argument("--notify", action="store_true",
+                       help="Fire the config's notifications: alerts and completion "
+                            "webhooks for this run")
     return parser
 
 
@@ -78,6 +81,9 @@ def build_batch_parser() -> argparse.ArgumentParser:
     parser.add_argument("--project", default="Batch run")
     parser.add_argument("--strict-rules", action="store_true",
                         help="Exit non-zero when a rule the config declares fails")
+    parser.add_argument("--notify", action="store_true",
+                        help="Fire the config's notifications: alerts and completion "
+                             "webhooks for each file")
     return parser
 
 
@@ -265,6 +271,39 @@ def run_batch_command(argv: list[str]) -> int:
     )
     print(f"Summary:   {Path(result.output_dir) / 'summary.csv'}")
     print(f"Dashboard: {Path(result.output_dir) / 'dashboard.html'}")
+    if args.notify:
+        # A scheduled batch is exactly the unattended case the spec wants an
+        # external system told about. One notification per file, from the same
+        # config block the single-file run reads.
+        from app_files.observability import NotificationConfigError, notify_run
+
+        missed = 0
+        for item in result.items:
+            try:
+                outcome = notify_run(
+                    args.template,
+                    {
+                        "status": "ok" if item.ok else "failed",
+                        "quality_score": item.score,
+                        "rows_in": item.rows_in,
+                        "rows_out": item.rows_out,
+                        "errors": item.errors,
+                        "warnings": item.warnings,
+                        "source": Path(item.file).stem,
+                        "run_id": Path(item.file).stem,
+                    },
+                    run_id=Path(item.file).stem,
+                    output_location=item.output_dir,
+                    error=item.error,
+                    source=Path(item.file).stem,
+                )
+            except NotificationConfigError as exc:
+                print(f"Invalid notifications configuration: {exc}", file=sys.stderr)
+                return 2
+            if outcome is not None and outcome.failed_deliveries:
+                missed += outcome.failed_deliveries
+        if missed:
+            print(f"Notifications: {missed} delivery failure(s) across the batch")
     if result.failed:
         return 1
     if args.strict_rules:
@@ -773,6 +812,42 @@ def main(argv: list[str] | None = None) -> int:
                     f"  anomaly: {anomaly.status} outside the learned range for "
                     f"{', '.join(item.dimension for item in anomaly.anomalies)}"
                 )
+    if args.notify:
+        # Layers 8's completion webhook and 15's alerting were both complete
+        # and both unreachable from a run. This fires them from the config's
+        # notifications: block; delivery is best-effort so a dead endpoint
+        # cannot fail a run that produced correct output.
+        from app_files.observability import NotificationConfigError, notify_run
+
+        run_status = "ok" if core_valid else "failed"
+        notify_summary = {
+            **summary,
+            "status": run_status,
+            "source": args.input.stem,
+            "run_id": args.input.stem,
+        }
+        try:
+            notifications = notify_run(
+                args.crm,
+                notify_summary,
+                run_id=args.input.stem,
+                output_location=str(args.outdir),
+                error=None if core_valid else f"{summary['errors']} validation error(s)",
+                source=args.input.stem,
+            )
+        except NotificationConfigError as exc:
+            print(f"Invalid notifications configuration: {exc}", file=sys.stderr)
+            return 2
+        if notifications is not None:
+            print(
+                f"Notifications: {len(notifications.alerts)} alert(s), "
+                f"{notifications.summary()['webhooks_delivered']} webhook(s) delivered"
+                + (
+                    f", {notifications.failed_deliveries} delivery failure(s)"
+                    if notifications.failed_deliveries
+                    else ""
+                )
+            )
     if args.strict_rules and failures_exceed(built, max_failures=0):
         print(
             f"--strict-rules: {built.total_rule_failures} declared rule failure(s).",

@@ -416,6 +416,39 @@ A channel that fails does not raise: a missed alert is bad, but a failed run
 because an alert could not be sent is worse. Alerts fire on failure, a quality
 score below its floor, and a run over its duration or SLA budget.
 
+### Alerts and webhooks attached to a run
+
+A config can declare a `notifications:` block, and `--notify` makes a run honour
+it. Layer 15's alerts and Layer 8's completion webhook both existed and had no
+caller from a run until this binding, so nothing was ever told a run finished or
+failed outside a Python caller. The `batch` command takes the same flag and
+notifies once per file, which is the unattended case that matters most:
+
+```bash
+python -m app_files.cli -i export.csv -c hubspot -o output --notify
+python -m app_files.cli batch --in inbox --template hubspot --out output --notify
+```
+
+```yaml
+notifications:
+  alerts:
+    - condition: quality_drop
+      threshold: 80
+      severity: warning
+  channels:
+    - type: slack
+      url_env: SLACK_WEBHOOK
+  webhooks:
+    - url_env: DATAFLOW_HOOK
+      secret_env: DATAFLOW_HOOK_SECRET
+```
+
+Endpoints and signing keys come from the environment through `url_env` /
+`secret_env`, so a URL is never committed. With no `--notify` flag the run
+reaches no network at all. A malformed block stops the run; a dead endpoint is
+reported and does not. See
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md#notifications).
+
 ## Security and governance
 
 Five roles, most to least privileged: `owner`, `admin`, `operator`, `viewer`,

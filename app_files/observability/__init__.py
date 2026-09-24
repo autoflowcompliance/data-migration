@@ -29,6 +29,13 @@ from app_files.observability.alerting import (
     evaluate_alerts,
     notify_alert,
 )
+from app_files.observability.binding import (
+    NotificationConfigError,
+    NotificationOutcome,
+    declared_alert_rules,
+    notifications_block,
+    notify_run,
+)
 from app_files.observability.health import (
     Check,
     CheckResult,
@@ -78,10 +85,15 @@ __all__ = [
     "HealthStatus",
     "Histogram",
     "MetricsRegistry",
+    "NotificationConfigError",
+    "NotificationOutcome",
     "SlackChannel",
     "TeamsChannel",
     "WebhookChannel",
     "build_alert",
+    "declared_alert_rules",
+    "notifications_block",
+    "notify_run",
     "default_registry",
     "evaluate_alerts",
     "liveness",
