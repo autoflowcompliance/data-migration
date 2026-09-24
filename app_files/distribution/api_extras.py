@@ -22,7 +22,7 @@ import json
 from typing import Any
 
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from app_files.distribution.api import (
     BadRequest,
@@ -183,6 +183,32 @@ async def schedule_endpoint(request: Request) -> JSONResponse:
     )
 
 
+async def metrics_endpoint(request: Request) -> Response:
+    """Prometheus exposition. Text, not JSON: that is what a scraper expects."""
+    from app_files.observability import render_prometheus
+
+    return Response(
+        render_prometheus(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
+async def ready_endpoint(request: Request) -> JSONResponse:
+    """Readiness: can this process serve traffic right now?"""
+    from app_files.observability import readiness
+
+    report = readiness()
+    return JSONResponse(report.as_dict(), status_code=report.http_status)
+
+
+async def live_endpoint(request: Request) -> JSONResponse:
+    """Liveness: deliberately dependency-free, so a restart loop cannot start."""
+    from app_files.observability import liveness
+
+    report = liveness()
+    return JSONResponse(report.as_dict(), status_code=report.http_status)
+
+
 def register_extra_routes(app: Any) -> Any:
     """Add the extra routes to an existing Starlette app. Idempotent."""
     from starlette.routing import Route
@@ -196,6 +222,9 @@ def register_extra_routes(app: Any) -> Any:
         Route("/lineage", lineage_endpoint, methods=["POST"]),
         Route("/audit", audit_endpoint, methods=["GET"]),
         Route("/schedule", schedule_endpoint, methods=["GET"]),
+        Route("/metrics", metrics_endpoint, methods=["GET"]),
+        Route("/ready", ready_endpoint, methods=["GET"]),
+        Route("/live", live_endpoint, methods=["GET"]),
     ]
     for route in additions:
         if route.path not in existing:

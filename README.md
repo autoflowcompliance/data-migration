@@ -305,6 +305,39 @@ store.record("acme", result)
 print(store.render_trend("acme"))        # month over month
 ```
 
+## Observability
+
+The API exposes Prometheus metrics at `GET /metrics`, a readiness probe at
+`GET /ready` and a liveness probe at `GET /live`. Readiness runs the dependency
+checks and returns 503 when a required one fails, so a platform stops routing
+without killing the process. Liveness is deliberately dependency-free: a
+liveness probe that fails when a database is down causes a restart loop that
+cannot help.
+
+Runs are recorded through `record_run`, which keeps the metric names in one
+place. A dashboard written against them should not have to change when the
+pipeline changes underneath.
+
+```python
+from app_files.observability import AlertRule, WebhookChannel, notify_alert, record_run
+
+record_run("crm", "ok", duration_seconds=3.2, quality_score=93.0, rows=1200)
+
+notify_alert(
+    {"status": "ok", "source": "crm", "quality_score": 61.0, "duration_seconds": 95.0},
+    channels=[WebhookChannel("https://hooks.example.com/dataflow")],
+    rules=[
+        AlertRule("quality_drop", threshold=80.0),
+        AlertRule("sla_breach", threshold=60.0),
+    ],
+)
+```
+
+Alert channels are Slack, Microsoft Teams, email and a generic signed webhook.
+A channel that fails does not raise: a missed alert is bad, but a failed run
+because an alert could not be sent is worse. Alerts fire on failure, a quality
+score below its floor, and a run over its duration or SLA budget.
+
 ## Documentation
 
 | Document | Covers |
@@ -320,12 +353,13 @@ print(store.render_trend("acme"))        # month over month
 python -m pytest -q
 ```
 
-Expect `1097 passed`. The suite covers value transforms, each ingestion adapter,
+Expect `1176 passed`. The suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
-multi-way reconciliation, migration safety, config-schema validation, golden-file
-regression fixtures, and malformed-input error handling. It runs in about
-twenty-eight seconds, so there is no reason not to run it before a commit.
+multi-way reconciliation, migration safety, metrics, alerting and health checks,
+config-schema validation, golden-file regression fixtures, and malformed-input
+error handling. It runs in about twenty-nine seconds, so there is no reason not
+to run it before a commit.
 
 Frozen core: `app_files/cleaners/`, `mappers/`, `validators/`, `auditors/` and
 `reporters/` are treated as stable. New capability goes in sibling packages that
