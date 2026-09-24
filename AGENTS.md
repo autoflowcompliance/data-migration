@@ -166,6 +166,12 @@ a name containing `&` truncates itself and swallows the reference after it.
   under it. A new state-writing layer that hardcodes a path under the repo root
   will litter the working tree and fail the portability tests in
   `tests/unit/test_market_layers.py` (`test_orders_storage_honours_autoflow_home`).
+- Layer 18 (migration safety) and Layer 14 (orchestration) were library-only.
+  They now have CLI entry points: `migrate` (rehearsal by default, `--commit`
+  to run) and `jobs` (submit/list/run). `jobs run` registers the built-in
+  `batch` handler and **restores the global HANDLERS registry afterwards** --
+  leaving it registered changes what other callers' own registrations mean and
+  broke the orchestration integration tests.
 - A config's `dedupe:` block **is** bound in unattended runs too
   (`app_files/dedupe/binding.apply_configured_dedupe`): `deduped_data.csv` and
   `duplicates_removed.csv` are written beside the pipeline's own output, which

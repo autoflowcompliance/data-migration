@@ -466,6 +466,20 @@ stay alive. State is a JSONL log under `AUTOFLOW_HOME` — append per submission
 and per state change, never rewritten in place, so a crash leaves the old state
 or the new state and never a torn one.
 
+Operators drive it with one command. `jobs submit` queues a batch folder,
+`jobs list` shows the queue, and `jobs run` drains it:
+
+```bash
+python -m app_files.cli jobs submit --input-dir inbox --template hubspot --out out
+python -m app_files.cli jobs submit --input-dir inbox --template hubspot --out out2 \
+    --priority high --depends-on <job-id>
+python -m app_files.cli jobs run --workers 3 --threads
+```
+
+A job that fails exits non-zero, so a scheduled drain surfaces the failure. The
+built-in `batch` handler is registered by `jobs run`, not on import, so
+importing the queue never mutates the global handler registry.
+
 ```python
 from app_files.orchestration import JobQueue, JobSpec, Priority, run_workers, register_handler
 

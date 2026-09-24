@@ -448,6 +448,133 @@ def run_migrate_command(argv: list[str]) -> int:
     return 0
 
 
+def _batch_job_handler(payload: dict) -> dict:
+    """Run one batch folder from a job payload. Registered by ``jobs run``."""
+    from app_files.batch import run_batch
+
+    result = run_batch(
+        input_dir=payload["input_dir"],
+        template=payload["template"],
+        output_dir=payload["output_dir"],
+        output_format=payload.get("output_format", "csv"),
+        project_name=payload.get("project_name", "Queued batch run"),
+    )
+    return result.as_dict()
+
+
+def build_jobs_parser() -> argparse.ArgumentParser:
+    """``python -m app_files.cli jobs …`` — the durable queue an operator drives.
+
+    Layer 14 was library-only. This exposes submit / list / run, and registers
+    the built-in ``batch`` handler so a submitted job actually does something
+    without the operator writing Python.
+    """
+    parser = argparse.ArgumentParser(
+        prog="app_files.cli jobs",
+        description=(
+            "Submit work to the durable job queue, inspect it, and drain it with "
+            "workers. The queue lives under AUTOFLOW_HOME, so a crash loses "
+            "neither a submission nor a state change."
+        ),
+    )
+    sub = parser.add_subparsers(dest="action", required=True)
+
+    submit = sub.add_parser("submit", help="add a job to the queue")
+    submit.add_argument("--kind", default="batch",
+                        help="job kind; only 'batch' has a built-in handler")
+    submit.add_argument("--input-dir", type=Path, help="folder for a batch job")
+    submit.add_argument("--template", help="config name for a batch job")
+    submit.add_argument("--out", dest="output_dir", type=Path, help="output folder")
+    submit.add_argument("--format", default="csv", help="output format for a batch job")
+    submit.add_argument("--priority", choices=["low", "normal", "high"], default="normal")
+    submit.add_argument("--depends-on", action="append", default=[],
+                        help="a job id that must succeed first; repeatable")
+    submit.add_argument("--max-attempts", type=int, default=1)
+
+    sub.add_parser("list", help="show queued and finished jobs")
+
+    run = sub.add_parser("run", help="drain the queue with workers")
+    run.add_argument("--workers", type=int, default=1, help="number of workers")
+    run.add_argument("--max-jobs", type=int, default=None,
+                     help="stop after this many jobs in total")
+    run.add_argument("--threads", action="store_true",
+                     help="run the workers concurrently rather than in turn")
+    return parser
+
+
+def run_jobs_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli jobs …``."""
+    from app_files.orchestration import JobQueue, JobSpec, Priority, run_workers
+    from app_files.orchestration.workers import register_handler
+
+    args = build_jobs_parser().parse_args(argv)
+    queue = JobQueue()
+
+    if args.action == "submit":
+        if args.kind == "batch":
+            missing = [
+                name for name, value in
+                (("--input-dir", args.input_dir), ("--template", args.template),
+                 ("--out", args.output_dir))
+                if value is None
+            ]
+            if missing:
+                print(
+                    f"A batch job needs {', '.join(missing)}.",
+                    file=sys.stderr,
+                )
+                return 2
+            payload = {
+                "input_dir": str(args.input_dir),
+                "template": args.template,
+                "output_dir": str(args.output_dir),
+                "output_format": args.format,
+            }
+        else:
+            print(f"No built-in handler for kind {args.kind!r}.", file=sys.stderr)
+            return 2
+        priority = {
+            "low": Priority.LOW, "normal": Priority.NORMAL, "high": Priority.HIGH,
+        }[args.priority]
+        job = queue.submit(
+            JobSpec(
+                kind=args.kind,
+                payload=payload,
+                priority=priority,
+                max_attempts=args.max_attempts,
+                depends_on=list(args.depends_on),
+            )
+        )
+        print(f"Submitted job {job.id} ({args.kind}, {args.priority} priority).")
+        return 0
+
+    if args.action == "list":
+        print(queue.render())
+        return 0
+
+    # ``run``: the built-in handler is registered here rather than on import, so
+    # importing the queue never mutates the global registry on a caller. The
+    # registry is restored afterwards, because leaving ``batch`` behind would
+    # change what other callers' own registrations mean.
+    from app_files.orchestration.workers import HANDLERS
+
+    snapshot = dict(HANDLERS)
+    register_handler("batch", _batch_job_handler, override=True)
+    try:
+        reports = run_workers(
+            queue, count=args.workers, max_jobs=args.max_jobs, threads=args.threads
+        )
+    finally:
+        HANDLERS.clear()
+        HANDLERS.update(snapshot)
+    total_done = sum(report.succeeded for report in reports)
+    total_failed = sum(report.failed for report in reports)
+    for report in reports:
+        print(f"worker {report.worker}: {report.succeeded} ok, {report.failed} failed")
+    print(f"Jobs: {total_done} succeeded, {total_failed} failed")
+    return 1 if total_failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "batch":
@@ -460,6 +587,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_drift_command(argv[1:])
     if argv and argv[0] == "migrate":
         return run_migrate_command(argv[1:])
+    if argv and argv[0] == "jobs":
+        return run_jobs_command(argv[1:])
 
     args = build_parser().parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)
