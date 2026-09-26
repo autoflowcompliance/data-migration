@@ -1,0 +1,25 @@
+{
+  "blocked_columns": [],
+  "drift": {
+    "added": [
+      "Loyalty Tier"
+    ],
+    "changes": [
+      {
+        "after_type": "string",
+        "before_type": null,
+        "column": "Loyalty Tier",
+        "kind": "added"
+      }
+    ],
+    "has_drift": true,
+    "removed": [],
+    "retyped": []
+  },
+  "proceed": true,
+  "reasons": [
+    "added column 'Loyalty Tier' is unmapped; it will be ignored"
+  ],
+  "source": "contacts",
+  "verdict": "warn"
+}

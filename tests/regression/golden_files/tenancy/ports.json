@@ -1,0 +1,5 @@
+{
+  "compose": "10000 against $PORT",
+  "k8s_containerPort": 10000,
+  "render_sets_port": false
+}

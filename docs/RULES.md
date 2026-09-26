@@ -160,3 +160,124 @@ for issue in result.issues:
 ```
 
 `run_rules_for` accepts a config name (`"hubspot"`) or a path to a YAML file.
+
+## Rules in an unattended run
+
+A config's `rules:` and `cross_field:` blocks run automatically in every entry
+point — the CLI, the batch engine and the web UI — not only when you call
+`run_rules_for` yourself. The failures land in the same issue list the core validator fills, so
+they appear in `issues.csv`, in the QA report and in the quality score:
+
+```bash
+python -m app_files.cli -i contacts.csv -c hubspot -o out/
+# 7 rows in, 6 out, quality score 66.7%, 1 errors, 2 warnings
+# Rules: 2 of 2 run, 1 failure(s)
+```
+
+The printed counts cover both kinds of rule, and `--strict-rules` triggers on a
+cross-field failure exactly as it does on a single-field one.
+
+A rule failure is **advisory by default** — it is reported, not enforced, so a
+run whose core validation passes still exits 0. Add `--strict-rules` to make a
+declared failure fail the run (exit 1); it works for both the single-file and
+`batch` commands:
+
+```bash
+python -m app_files.cli batch --in inbox/ --template hubspot --out out/ --strict-rules
+```
+
+The batch `summary.csv` gains two columns, `rules_run` and `rule_failures`, one
+row per file.
+
+In Python, `run_configured` returns the pipeline result with the config's rules
+already applied, and `apply_configured_rules` does the same on top of a result
+you ran yourself (pass the same `project_name` and `source_filename` so the
+re-rendered report keeps its header):
+
+```python
+from app_files.rules.binding import run_configured, failures_exceed
+
+built = run_configured(source_frame, "hubspot", project_name="Acme")
+print(built.rule_result.rules_run, built.rule_result.total_failures)
+print(failures_exceed(built))   # True when anything declared failed
+```
+
+A config with no `rules:` block behaves exactly as the plain pipeline did — same
+clean data, same report, byte for byte.
+
+## Cross-field rules
+
+Single-field rules judge one value. Some rules span columns: `close_date` must
+not precede `open_date`; `total` must equal `subtotal + tax`. Declare those under
+a top-level `cross_field:` list:
+
+```yaml
+cross_field:
+  - name: close_after_open
+    type: date_order
+    fields: [open_date, close_date]
+    severity: error
+
+  - name: total_matches_parts
+    type: sum_equals
+    fields: [total, subtotal, tax]
+    tolerance: 0.01
+
+  - name: discount_below_total
+    type: compare
+    fields: [discount, total]
+    operator: "<"
+```
+
+| Type | Fields | Meaning |
+| --- | --- | --- |
+| `date_order` | `[earlier, later]` | `earlier` must be on or before `later`. |
+| `sum_equals` | `[total, part, ...]` | `total` must equal the sum of the parts, within `tolerance`. |
+| `compare` | `[left, right]` | The declared `operator` must hold. |
+
+`compare` requires an `operator` of `<`, `<=`, `==`, `!=`, `>` or `>=`.
+`sum_equals` needs a total plus at least two parts. A `message` overrides the
+generated failure text, and `date_format` pins date parsing when a column is
+ambiguous.
+
+A cross-field rule is evaluated row by row and reports one `Issue` per failing
+row, under the check name `cross_field:<rule name>`. Those issues are the same
+type the single-field rules produce, so they appear in the issues CSV and the QA
+report.
+
+Rules are written against the **source** headers the buyer sees (`Open Date`),
+but they run against the **mapped** frame (`open_date`). Both `rules:` and
+`cross_field:` columns are translated the same way, so write them in source
+terms — the engine resolves them, and a rule whose columns resolve to nothing is
+reported as unmatched rather than silently passing.
+
+Two things a rule will not do:
+
+- A rule whose columns are not in the frame is reported in `skipped_rules`
+  rather than raising or silently passing.
+- A row with a blank in any referenced column is skipped. Empty values belong to
+  the completeness check; failing them here would count one problem twice.
+
+## Rule versioning and sandbox
+
+Rule sets are versioned under `AUTOFLOW_HOME/rules`, one JSON file per set. No
+rule set reaches production without a sandbox run first:
+
+```python
+from app_files.rules import SandboxStore
+
+store = SandboxStore()
+version = store.save_version("crm_rules", cross_field=rules, note="stricter close date")
+
+# Run the candidate against recent files. This never promotes.
+outcome = store.sandbox_run("crm_rules", version.version, [recent_frame])
+print(outcome.failures, outcome.failures_by_rule)
+
+store.promote("crm_rules", version.version)      # needs the sandbox run above
+store.rollback_to("crm_rules", 1)                # restores v1 as a new version
+```
+
+Versions are append-only. Promoting a new version marks the previous one
+`superseded`; rolling back writes the earlier rules as a new version rather than
+deleting the version it replaced. `store.history("crm_rules")` lists every
+version with its status, timestamp and sandbox runs.

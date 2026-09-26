@@ -1,0 +1,15 @@
+{
+  "profiling": {
+    "statistics": {
+      "enabled": true,
+      "top_values": 5
+    },
+    "patterns": {
+      "enabled": true
+    },
+    "outliers": {
+      "enabled": true,
+      "method": "iqr"
+    }
+  }
+}

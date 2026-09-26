@@ -19,6 +19,11 @@ app_files/
 ├── profiling/                # LAYER 4 — 5-dimension quality scores
 ├── lineage/                  # LAYER 5 — row-level transformation log
 ├── output/                   # LAYER 6 — csv/excel/json/sql writers
+├── privacy/                  # PII detection + masking (off by default)
+│   ├── config.py             # YAML-block config; per-column strategies
+│   ├── detect.py             # Luhn / mod-97 / SSN-validated detectors
+│   ├── mask.py               # redact | hash | tokenize | partial
+│   └── report.py             # appends a card to the frozen QA report
 ├── interface/web/main.py     # LAYER 7 — the web UI entry (NiceGUI)
 │   ├── routes/               # one module per page; import registers the route
 │   ├── theme.py              # LAYER 7 — design tokens + stylesheet
@@ -30,16 +35,34 @@ app_files/
 The core reporter's HTML is **not** modified to add the scorecard.
 `profiling/report.render_qa_report_with_profile` injects it into the rendered
 HTML afterwards. Verify the base report is unpolluted with
-`'Quality scorecard' not in run_pipeline(...).qa_report_html`.
+`'Quality scorecard' not in run_pipeline(...).qa_report_html`. The privacy layer
+follows the same rule — `privacy/report.inject_pii_report` appends, so
+`'Privacy scan' not in run_pipeline(...).qa_report_html` also holds.
+
+`privacy/` is off unless a `privacy:` block enables it, and it never edits the
+frame it is given. Detectors are checksum-validated, not pattern-only: a 16-digit
+order id that fails Luhn is not a card. When nothing is kind-scoped, a re-scan of
+`mask_frame`'s output must report zero detections — that is the property the unit,
+integration and golden tests defend. A field rule with `kinds:` deliberately
+leaves the other kinds in that column alone, so a scoped config's re-scan is
+*expected* to still find them; that is a choice, not a leak. `tokenize` needs a
+key and raises `PrivacyKeyError` without one rather than silently becoming
+irreversible.
 
 ## Commands
 
 ```bash
-python -m pytest -q                 # full suite, 536 tests, ~12s
-python -m pytest app_files/tests/   # the original 25 pre-existing tests
+python -m pytest -q                 # full suite, 2180 tests, ~69s
+python -m pytest app_files/tests/   # the original 27 pre-existing tests
+python -m pytest tests/regression/  # golden files — never regenerate to go green
 python main.py                      # DataFlow (NiceGUI) — port 8080
 python build_desktop.py --check     # packaged desktop target
 ```
+
+The suite needs the optional readers installed or it reports failures that look
+like regressions: `pip install -r app_files/requirements-dev.txt` (this pulls
+`xlrd`/`xlwt`, `pdfplumber`, `reportlab`, `boto3` and `pytest-asyncio`). Without
+`pytest-asyncio` the suite does not even collect.
 
 One UI ships. There is no second entry point and no `DATAREADY_UI` setting —
 `main.py`, the container and the desktop launcher all reach
@@ -133,6 +156,21 @@ a name containing `&` truncates itself and swallows the reference after it.
 
 ## API notes that are easy to get wrong
 
+- The extra API routes live in `app_files/distribution/api_extras.py`, not
+  `app_files/api_extras.py`. `register_extra_routes(app)` appends to the
+  Starlette app and is idempotent; `distribution/api.py` keeps only the original
+  five endpoints so those stay byte-identical. `_read_upload`, `_form_value`,
+  and `_frame_from_bytes` are imported from `api.py` — reuse them rather than
+  re-parsing the multipart body.
+- Form fields arrive as **strings**, so a numeric SLA floor posted as
+  `sla_completeness=0.5` is the text `"0.5"` and a strict parser rejects it as
+  "not a number". `quality_endpoint` coerces with `_as_number` before building
+  the SLA; any new endpoint taking a number from a form needs the same.
+- `quality check` exit codes: `0` met the SLA and did not regress, `1` breached
+  the SLA **or** regressed under `block`/`quarantine`, `2` the config was
+  unreadable or the block malformed. `action` softens a regression only — a
+  declared SLA floor is a hard gate and exits `1` even under `alert`.
+
 - `run_pipeline(source, crm=..., lineage_tracker=LineageTracker())` — lineage
   is opt-in via a tracker instance, not a `track_lineage=` flag.
 - `run_reconciliation` takes **raw CSV bytes plus four explicit column names**
@@ -144,6 +182,57 @@ a name containing `&` truncates itself and swallows the reference after it.
   under it. A new state-writing layer that hardcodes a path under the repo root
   will litter the working tree and fail the portability tests in
   `tests/unit/test_market_layers.py` (`test_orders_storage_honours_autoflow_home`).
+- Layer 5's trend store and baseline comparison were the same: complete in the
+  profiling package, zero callers. `--record-quality` / `--baseline` /
+  `--fail-on-regression` bind them (`app_files/profiling/binding.py`), and
+  `BaselineComparison.regressed_dimensions` is a **property**, not a method —
+  calling it raises `TypeError: 'list' object is not callable`.
+- Layer 18 (migration safety) and Layer 14 (orchestration) were library-only.
+  They now have CLI entry points: `migrate` (rehearsal by default, `--commit`
+  to run) and `jobs` (submit/list/run). `jobs run` registers the built-in
+  `batch` handler and **restores the global HANDLERS registry afterwards** --
+  leaving it registered changes what other callers' own registrations mean and
+  broke the orchestration integration tests.
+- A config's `dedupe:` block **is** bound in unattended runs too
+  (`app_files/dedupe/binding.apply_configured_dedupe`): `deduped_data.csv` and
+  `duplicates_removed.csv` are written beside the pipeline's own output, which
+  is never rewritten. Same additive contract as privacy and normalization.
+- A config's `normalization:` block **is** bound in unattended runs (CLI and
+  batch) too: `app_files/normalization/binding.apply_configured_normalization`
+  writes `normalized_data.csv` and `currency_conversions.csv` beside the
+  pipeline's own output. Same additive contract as privacy — `clean_data.csv`
+  is never rewritten.
+- A config's `privacy:` block **is** bound in unattended runs (CLI and batch):
+  `app_files/privacy/binding.apply_configured_privacy` masks the frame the
+  pipeline produced and the entry points write `masked_data.csv` plus the
+  privacy card. `clean_data.csv` is never rewritten, so a config with no
+  `privacy:` block stays byte-identical to the frozen pipeline. Privacy *does*
+  need binding in every new entry point — it is not applied by `run_pipeline`.
+- The rules → privacy → normalization → dedupe sequence is **one helper**
+  (`app_files/config_bindings.apply_configured_bindings`), not an open-coded
+  block per entry point. The CLI and batch each used to spell it out and
+  `migrate` spelled out none of them, so a committed migration wrote raw PII
+  for a config that declared masking and its rehearsal reported
+  `Duplicates removed: 0` for a config whose dedupe removes rows. Any new run
+  path calls the helper; the three paths are pinned byte-identical by
+  `tests/unit/test_config_bindings.py` and `test_migrate_command.py`.
+  `persist_rules=False` is for a rehearsal: it applies the rules to report them
+  without writing the accepted YAML to the state home.
+- Layer 8's completion webhook and Layer 15's alerting were both complete and
+  both unreachable from a run, so nothing ever notified an external system.
+  `app_files/observability/binding.py` binds a config's `notifications:` block
+  and is invoked by the CLI `--notify` flag on the single-file run and on
+  `batch`. It is **not** on by default — a run that never passes `--notify`
+  reaches no network. Delivery is best-effort (a dead endpoint is reported, not
+  raised); a *malformed* block raises `NotificationConfigError` so a typo fails
+  loudly. Endpoints come from the environment via `url_env` / `secret_env`, not
+  from the committed YAML. Omitting `alerts:` gives a default critical alert on
+  failure; `alerts: []` opts out.
+- `notify_run(crm, summary, run_id=…)` returns `None` when the config declares
+  no `notifications:` block, so a caller can distinguish "unconfigured" from
+  "configured and clean". A test that injects a `dispatcher=` no longer exists;
+  pass `transport=` (the `(url, body, headers, timeout) -> status` seam the
+  webhook layer exposes) so the declared webhooks are still built from YAML.
 - `run_pipeline` does **not** execute the config's `rules:` block. It validates
   the mapped frame only. Rules are run separately by the caller with
   `run_rules_for(frame, crm)`. A config passed as `crm` whose rules never get
@@ -164,6 +253,14 @@ a name containing `&` truncates itself and swallows the reference after it.
   DataFrame. It returns a dict; the counts are under `result["summary"]`.
   To reconcile a PDF, ingest it with `read_any` and call
   `reconcile_transactions` on the frame.
+- Match logic is YAML (`matching:` in the config), bound by
+  `services/bank_reconciliation/binding.load_match_strategy`. It returns `None`
+  when a config declares no block, and `run_reconciliation(strategy=None)` then
+  runs the frozen matcher — so a config without the block is byte-identical to
+  before. A strategy names a **column per side**, so bank and ledger can use
+  different source column names; `reconcile_transactions_with_strategy` is the
+  entry point. The reconciler is otherwise frozen: `reconcile_transactions` was
+  not edited, the strategy path is a sibling.
 - `read_any` needs `filename=` when given bytes, since the extension selects
   the adapter.
 - Blank values fail only a `required` rule. `range` / `length` /
@@ -190,6 +287,31 @@ and `docs/RULES.md`.
 One verified change at a time. Add a single new isolated feature, confirm it
 against the full suite and the goldens, then stop. Bundling several unverified
 features is how this project previously went sideways.
+
+## Profiling column detail — two traps worth remembering
+
+Both were caught only by the real-file step (a 12,000-row export), not by the
+unit tests, which is exactly why that step exists.
+
+- **Isolation forest contamination is a fraction, not a count.** The score
+  threshold is the `contamination` quantile, so the method flags *that share* of
+  the column **by construction** — it will always "find" outliers even in pure
+  noise. At the common 0.05 default, a 12,000-row column produced 600 flags and
+  read as noise. The default here is `0.01`; a caller wanting the tail rather
+  than the rare should use `iqr` or `zscore`. `tests/unit/test_profiling_outliers.py`
+  pins the ceiling so it cannot silently drift back.
+- **A per-point Python tree walk is 200x too slow.** The first implementation
+  descended each point through each tree in interpreted code: 77s for one
+  12,000-row column. Building the tree once as numpy arrays and descending all
+  points level by level (`_build_tree` + `_tree_depths`) is 0.54s for the whole
+  binding. Keep it vectorised.
+
+`profiling:` is off by default and purely additive — the `profiler` claim in the
+plugin registry, the `POST /profile/columns` route, `SDK.profile_columns()` and
+the `profile columns` CLI all read the same block, and a config without it
+produces byte-identical output. The `profiling/` additions are new sibling
+modules; `profiler.py`, `dimensions.py`, `report.py`, `dimension_anomaly.py` and
+`binding.py` stay untouched.
 
 ## The web interface is on NiceGUI 3.x
 

@@ -1,0 +1,34 @@
+{
+  "jobs": [
+    {
+      "key": "a",
+      "kind": "ok",
+      "priority": "low"
+    },
+    {
+      "key": "b",
+      "kind": "ok",
+      "priority": "high"
+    },
+    {
+      "depends_on": [
+        "a"
+      ],
+      "key": "c",
+      "kind": "ok",
+      "priority": "normal"
+    },
+    {
+      "key": "d",
+      "kind": "fail_once",
+      "max_attempts": 2,
+      "priority": "normal"
+    },
+    {
+      "key": "e",
+      "kind": "always_fail",
+      "max_attempts": 2,
+      "priority": "normal"
+    }
+  ]
+}

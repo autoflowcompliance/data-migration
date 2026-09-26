@@ -6,9 +6,9 @@ Lives in its own module so both the package ``__init__`` and
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 import pandas as pd
 
@@ -43,6 +43,33 @@ _ALIASES = {
     "sql": "sql",
     "insert": "sql",
 }
+
+
+def register_format(
+    name: str,
+    extension: str,
+    writer: Callable[..., Path],
+    override: bool = False,
+) -> Format:
+    """Add an output format. The plugin system's registration point.
+
+    Refuses to shadow a built-in writer unless ``override`` is set: a plugin
+    that silently replaces the CSV writer is how a working install stops
+    producing CSV.
+    """
+    key = str(name).strip().lower()
+    if not key:
+        raise ValueError("An output format needs a name")
+    if not extension.startswith("."):
+        raise ValueError(f"Extension for {name!r} must start with a dot, got {extension!r}")
+    if key in FORMATS and not override:
+        raise ValueError(
+            f"Output format {name!r} already exists. Pass override=True to replace it."
+        )
+    fmt = Format(key, extension, writer)
+    FORMATS[key] = fmt
+    _ALIASES[key] = key
+    return fmt
 
 
 def normalise_format(name: str) -> str:

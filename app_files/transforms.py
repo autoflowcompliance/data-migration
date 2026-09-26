@@ -1,5 +1,6 @@
 """Value level transforms shared by the cleaner, the mapper and the validator."""
 from __future__ import annotations
+
 import math
 import re
 import unicodedata
@@ -7,6 +8,7 @@ from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
+
 import pandas as pd
 import phonenumbers
 from dateutil import parser as date_parser
@@ -221,3 +223,31 @@ def get_transform(name: str) -> Callable[[Any], Any]:
         raise ValueError(
             f"Unknown transform '{name}'. Available: {', '.join(sorted(TRANSFORMS))}"
         ) from None
+
+
+def register_transform(
+    name: str,
+    function: Callable[[Any], Any],
+    override: bool = False,
+) -> Callable[[Any], Any]:
+    """Add a value transform. The plugin system's registration point.
+
+    A callable is required because a mapping entry that is not callable fails
+    later, inside a run, with an error that names the value rather than the
+    transform that produced it.
+    """
+    key = str(name).strip()
+    if not key:
+        raise ValueError("A transform needs a name")
+    if not callable(function):
+        raise ValueError(f"Transform {name!r} must be callable, got {type(function).__name__}")
+    if key in TRANSFORMS and not override:
+        raise ValueError(
+            f"Transform {name!r} already exists. Pass override=True to replace it."
+        )
+    TRANSFORMS[key] = function
+    return function
+
+
+def registered_transforms() -> list[str]:
+    return sorted(TRANSFORMS)

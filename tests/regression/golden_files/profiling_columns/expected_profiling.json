@@ -1,0 +1,87 @@
+{
+  "statistics": {
+    "order_id": {
+      "kind": "text",
+      "count": 12,
+      "missing": 0,
+      "distinct": 12,
+      "minimum": null,
+      "maximum": null,
+      "mean": null,
+      "median": null,
+      "iqr": null
+    },
+    "customer_email": {
+      "kind": "text",
+      "count": 12,
+      "missing": 0,
+      "distinct": 12,
+      "minimum": null,
+      "maximum": null,
+      "mean": null,
+      "median": null,
+      "iqr": null
+    },
+    "amount": {
+      "kind": "numeric",
+      "count": 12,
+      "missing": 0,
+      "distinct": 12,
+      "minimum": 10.0,
+      "maximum": 99999.0,
+      "mean": 8388.25,
+      "median": 65.0,
+      "iqr": 55.0
+    },
+    "currency": {
+      "kind": "categorical",
+      "count": 12,
+      "missing": 0,
+      "distinct": 1,
+      "minimum": null,
+      "maximum": null,
+      "mean": null,
+      "median": null,
+      "iqr": null
+    },
+    "placed_on": {
+      "kind": "text",
+      "count": 12,
+      "missing": 0,
+      "distinct": 12,
+      "minimum": null,
+      "maximum": null,
+      "mean": null,
+      "median": null,
+      "iqr": null
+    },
+    "status": {
+      "kind": "categorical",
+      "count": 12,
+      "missing": 0,
+      "distinct": 2,
+      "minimum": null,
+      "maximum": null,
+      "mean": null,
+      "median": null,
+      "iqr": null
+    }
+  },
+  "patterns": {
+    "order_id": "text",
+    "customer_email": "email",
+    "amount": "decimal",
+    "currency": "text",
+    "placed_on": "date",
+    "status": "text"
+  },
+  "outliers": {
+    "amount": {
+      "method": "iqr",
+      "count": 1,
+      "values": [
+        99999.0
+      ]
+    }
+  }
+}

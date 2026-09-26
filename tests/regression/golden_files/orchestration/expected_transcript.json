@@ -1,0 +1,39 @@
+{
+  "final": {
+    "a": "succeeded",
+    "b": "succeeded",
+    "c": "succeeded",
+    "d": "succeeded",
+    "e": "failed"
+  },
+  "order": [
+    {
+      "job": "b",
+      "state": "succeeded"
+    },
+    {
+      "job": "d",
+      "state": "queued"
+    },
+    {
+      "job": "d",
+      "state": "succeeded"
+    },
+    {
+      "job": "e",
+      "state": "queued"
+    },
+    {
+      "job": "e",
+      "state": "failed"
+    },
+    {
+      "job": "a",
+      "state": "succeeded"
+    },
+    {
+      "job": "c",
+      "state": "succeeded"
+    }
+  ]
+}

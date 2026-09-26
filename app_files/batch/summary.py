@@ -16,6 +16,12 @@ COLUMNS = [
     "score",
     "errors",
     "warnings",
+    "rule_failures",
+    "rules_run",
+    "privacy_masked",
+    "addresses_normalised",
+    "amounts_converted",
+    "duplicates_removed",
     "error",
     "output_dir",
 ]

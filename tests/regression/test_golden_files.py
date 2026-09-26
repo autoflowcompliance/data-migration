@@ -14,10 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 from app_files.ingestion import read_any
 from app_files.pipeline import run_pipeline
+from app_files.privacy import PrivacyConfig, detect_frame, mask_frame
 from app_files.services.bank_reconciliation.reconciler import run_reconciliation
 
 GOLDEN = Path(__file__).resolve().parent / "golden_files"
@@ -29,6 +29,23 @@ def test_golden_files_are_present():
         "contacts": {"input.csv", "expected_output.csv"},
         "bank_statement": {"input.csv", "expected_bank_only.csv"},
         "ledger": {"input.csv", "expected_ledger_only.csv"},
+        "pii": {"input.csv", "expected_masked.csv"},
+        "cross_field": {"input.csv", "rules.yaml", "expected_failures.json"},
+        "reconciliation_3way": {
+            "bank.csv", "ledger.csv", "processor.csv", "expected_result.json",
+        },
+        "match_strategy": {
+            "statement.csv", "ledger.csv", "config.yaml", "expected_matched.csv",
+        },
+        "orchestration": {"jobs.json", "expected_transcript.json"},
+        "compliance": {"controls.json"},
+        "watcher": {"clean_data.csv", "outcome.txt"},
+        "chunked": {"input.csv", "expected.csv"},
+        "database": {"crm.db", "expected.csv"},
+        "cloud_license": {"expected_state.json"},
+        "tenancy": {
+            "expected_manifest.json", "render.yaml", "docker-compose.yml", "k8s.yaml",
+        },
     }.items():
         folder = GOLDEN / name
         assert folder.is_dir(), f"missing golden folder: {name}"
@@ -111,3 +128,125 @@ def test_reconciliation_totals_are_stable():
         "missing_from_books": 1,
         "recorded_but_never_cleared": 1,
     }
+
+
+def test_pii_masking_golden_output_is_unchanged():
+    """Known PII in, known redaction out. If this breaks, the change is guilty
+    until proven innocent — do not regenerate the expected file."""
+    folder = GOLDEN / "pii"
+    source = pd.read_csv(folder / "input.csv", dtype=str, keep_default_na=False)
+    produced = mask_frame(source, PrivacyConfig(enabled=True)).frame
+    expected = pd.read_csv(folder / "expected_masked.csv", dtype=str, keep_default_na=False)
+
+    assert list(produced.columns) == list(expected.columns)
+    assert produced.fillna("").astype(str).to_dict("records") == expected.fillna("").astype(str).to_dict("records")
+
+
+def test_pii_golden_input_is_fully_masked():
+    """The point of the fixture: no sensitive value survives the pass."""
+    folder = GOLDEN / "pii"
+    source = pd.read_csv(folder / "input.csv", dtype=str, keep_default_na=False)
+    config = PrivacyConfig(enabled=True)
+    found = detect_frame(source, config)
+    assert found.total == 9, "fixture should carry 9 planted PII values"
+
+    rescan = detect_frame(mask_frame(source, config).frame, config)
+    assert rescan.total == 0, "masked golden output must scan clean"
+
+
+def test_cross_field_golden_failures_are_unchanged():
+    """Known rows in, known cross-field failures out.
+
+    The fixture pins two things at once: a rule with a custom message, and a
+    severity that is not the default. Adding cross-field rules to the codebase
+    must not quietly change which rows fail.
+    """
+    import json
+
+    import yaml
+
+    from app_files.rules import load_cross_field_rules, run_cross_field_rules
+
+    folder = GOLDEN / "cross_field"
+    source = read_any(folder / "input.csv")
+    result = run_pipeline(source, crm="hubspot", run_structural_check=False)
+    rules = load_cross_field_rules(yaml.safe_load((folder / "rules.yaml").read_text()))
+    outcome = run_cross_field_rules(result.clean_frame, rules)
+
+    produced = {
+        "rules_run": outcome.rules_run,
+        "total_failures": outcome.total_failures,
+        "failures_by_rule": outcome.failures_by_rule,
+        "skipped_rules": outcome.skipped_rules,
+        "issues": [
+            {
+                "row": issue.row,
+                "field": issue.field,
+                "check": issue.check,
+                "severity": issue.severity,
+                "message": issue.message,
+            }
+            for issue in outcome.issues
+        ],
+    }
+    expected = json.loads((folder / "expected_failures.json").read_text())
+    assert produced == expected
+
+
+def test_cross_field_golden_fixture_scans_for_skipped_rules():
+    """A golden run that silently skipped a rule would make the fixture a lie."""
+    import yaml
+
+    from app_files.rules import load_cross_field_rules
+
+    folder = GOLDEN / "cross_field"
+    rules = load_cross_field_rules(yaml.safe_load((folder / "rules.yaml").read_text()))
+    assert rules, "the cross-field fixture must carry rules"
+    assert all(rule.fields for rule in rules)
+
+
+def test_match_strategy_golden_output_is_unchanged():
+    """A config's ``matching:`` block produces a known match set.
+
+    The statement and ledger agree on no amount and on no date, so the frozen
+    matcher matches nothing. The reference strategy matches the two pairs whose
+    references agree. This golden pins that a YAML strategy actually changes the
+    outcome, and that the amount/date columns it does not use are left blank.
+    """
+    from app_files.services.bank_reconciliation.binding import load_match_strategy
+    from app_files.services.bank_reconciliation.reconciler import run_reconciliation
+
+    folder = GOLDEN / "match_strategy"
+    strategy = load_match_strategy(folder / "config.yaml")
+    assert strategy is not None and strategy.name == "reference_only"
+
+    result = run_reconciliation(
+        (folder / "statement.csv").read_bytes(),
+        (folder / "ledger.csv").read_bytes(),
+        bank_date_col="Date",
+        bank_amount_col="Amount",
+        ledger_date_col="Date",
+        ledger_amount_col="Amount",
+        strategy=strategy,
+    )
+    produced = pd.DataFrame(result["matches"])
+    # Round-trip through CSV the same way the CLI writes it, so the ``None``
+    # amount a reference-only strategy leaves behind lands as a blank cell.
+    produced_csv = produced.to_csv(index=False)
+    assert produced_csv == (folder / "expected_matched.csv").read_text()
+
+
+def test_match_strategy_golden_fixture_beats_the_frozen_default():
+    """If the default already matched, the fixture would prove nothing."""
+    from app_files.services.bank_reconciliation.reconciler import run_reconciliation
+
+    folder = GOLDEN / "match_strategy"
+    frozen = run_reconciliation(
+        (folder / "statement.csv").read_bytes(),
+        (folder / "ledger.csv").read_bytes(),
+        bank_date_col="Date",
+        bank_amount_col="Amount",
+        ledger_date_col="Date",
+        ledger_amount_col="Amount",
+    )
+    assert frozen["matches"] == [], "the fixture must differ under the default matcher"

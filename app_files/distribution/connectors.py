@@ -29,7 +29,7 @@ import io
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 DEFAULT_TIMEOUT = 60
 
@@ -547,6 +547,218 @@ class OneDriveConnector(Connector):
         )
 
 
+# --------------------------------------------------------------------- SFTP
+class SFTPConnector(Connector):
+    """Read a file from an SFTP server.
+
+    Uses ``paramiko`` when present. The client is injectable, so the request
+    construction — connect, ``open``, read, close — is exercised by tests
+    against a fake client even without a server, and the only part a test
+    cannot reach is the remote host's own behaviour.
+
+    Credentials: ``SFTP_HOST``, ``SFTP_USERNAME``, and either
+    ``SFTP_PASSWORD`` or ``SFTP_KEY`` (a path to a private key). A key is
+    preferred; a password in the environment is the fallback.
+    """
+
+    provider = "sftp"
+
+    def __init__(
+        self,
+        host: str | None = None,
+        username: str | None = None,
+        path: str = "",
+        port: int = 22,
+        client: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.host = host or self.env("SFTP_HOST") or ""
+        self.username = username or self.env("SFTP_USERNAME") or ""
+        self.path = path
+        self.port = int(port)
+        self._client = client
+
+    def credential_vars(self) -> list[str]:
+        return ["SFTP_HOST", "SFTP_USERNAME", "SFTP_PASSWORD"]
+
+    def _connection(self) -> Any:
+        if self._client is not None:
+            return self._client
+        try:
+            import paramiko
+        except ImportError as exc:
+            raise ConnectorError(
+                "SFTP needs the paramiko library. Install it with: pip install paramiko"
+            ) from exc
+        if not self.host:
+            raise MissingCredentials(self.provider, "SFTP_HOST", "server address")
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        key_path = self.env("SFTP_KEY")
+        connect_kwargs: dict[str, Any] = {
+            "hostname": self.host,
+            "port": self.port,
+            "username": self.username or None,
+            "timeout": DEFAULT_TIMEOUT,
+        }
+        if key_path:
+            connect_kwargs["key_filename"] = key_path
+        else:
+            password = self.env("SFTP_PASSWORD")
+            if not password:
+                raise MissingCredentials(
+                    self.provider, "SFTP_PASSWORD", "or set SFTP_KEY to a key file"
+                )
+            connect_kwargs["password"] = password
+        client.connect(**connect_kwargs)
+        self._client = client
+        return client
+
+    def list_files(self, remote_dir: str = ".", limit: int = 500) -> ConnectorListing:
+        connection = self._connection()
+        sftp = connection.open_sftp()
+        entries = []
+        try:
+            for entry in sftp.listdir_attr(remote_dir):
+                name = getattr(entry, "filename", str(entry))
+                if name in (".", ".."):
+                    continue
+                entries.append(
+                    {
+                        "name": f"{remote_dir.rstrip('/')}/{name}",
+                        "size": str(getattr(entry, "st_size", "")),
+                        "modified": str(getattr(entry, "st_mtime", "")),
+                    }
+                )
+        finally:
+            sftp.close()
+        return ConnectorListing(provider=self.provider, files=entries[:limit])
+
+    def fetch(self, path: str | None = None) -> ConnectorFile:
+        target = path or self.path
+        if not target:
+            raise ConnectorError("SFTP needs a remote path.")
+        connection = self._connection()
+        sftp = connection.open_sftp()
+        try:
+            with sftp.open(target, "rb") as handle:
+                data = handle.read()
+        except Exception as exc:  # noqa: BLE001 - paramiko raises many types
+            raise ConnectorError(
+                f"Could not read {target} from {self.host}: {type(exc).__name__}: {exc}"
+            ) from exc
+        finally:
+            sftp.close()
+        return ConnectorFile(
+            name=os.path.basename(target) or "sftp_file",
+            data=data if isinstance(data, bytes) else bytes(data),
+            provider=self.provider,
+            location=f"sftp://{self.host}/{target.lstrip('/')}",
+        )
+
+
+# ----------------------------------------------------------------- database
+class DatabaseConnector(Connector):
+    """Read a table, or run a read-only query, from a SQL database.
+
+    The URL is the only required input; a table name or a SELECT turns it into
+    a DataFrame that the rest of the pipeline cannot tell from a file upload.
+    SQLite is the standard library, so this path is fully exercised in the
+    suite; the other dialects share the same code and differ only in the driver
+    module, which :mod:`app_files.ingestion.database` resolves.
+
+    Registered under several names (``database``, ``postgresql``, ``mysql``,
+    ``mssql``, ``sqlite``) so a URL can pick its own alias. All share
+    ``provider = "database"``: the dialect is a property of the URL, and
+    reporting four different providers for one code path would be a lie about
+    what is implemented.
+    """
+
+    provider = "database"
+
+    def __init__(
+        self,
+        url: str = "",
+        table: str = "",
+        query: str = "",
+        columns: list[str] | None = None,
+        where: str = "",
+        limit: int | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.url = url or self.env("DATABASE_URL") or ""
+        self.table = table
+        self.query = query
+        self.columns = columns
+        self.where = where
+        self.limit = limit
+
+    def credential_vars(self) -> list[str]:
+        return ["DATABASE_URL"]
+
+    @property
+    def dialect(self) -> str:
+        from app_files.ingestion.database import parse_url
+
+        try:
+            return parse_url(self.url).dialect if self.url else "unknown"
+        except Exception:  # noqa: BLE001 - report, do not raise, in a status call
+            return "unknown"
+
+    def list_files(self, limit: int = 200) -> ConnectorListing:
+        from app_files.ingestion.database import list_tables, parse_url
+
+        if not self.url:
+            raise ConnectorError("Database connector needs a url.")
+        tables = list_tables(parse_url(self.url), environ=self.environ)
+        return ConnectorListing(
+            provider=self.provider,
+            files=[{"name": name, "size": "", "modified": ""} for name in tables[:limit]],
+        )
+
+    def fetch(self, table: str | None = None, query: str | None = None) -> ConnectorFile:
+        from app_files.ingestion.database import (
+            DatabaseError,
+            execute_query,
+            parse_url,
+            read_table,
+        )
+
+        if not self.url:
+            raise ConnectorError("Database connector needs a url.")
+        try:
+            target = parse_url(self.url)
+            statement = query or self.query
+            if statement:
+                frame = execute_query(target, statement, environ=self.environ)
+                label = "query"
+            else:
+                name = table or self.table
+                if not name:
+                    raise ConnectorError("Database connector needs a table or a query.")
+                frame = read_table(
+                    target,
+                    name,
+                    columns=self.columns,
+                    where=self.where,
+                    limit=self.limit,
+                    environ=self.environ,
+                )
+                label = name
+        except DatabaseError as exc:
+            # The connector's boundary is ConnectorError, matching every other
+            # provider, so a caller catches one type rather than three.
+            raise ConnectorError(f"Database read failed: {exc}") from exc
+        return ConnectorFile(
+            name=f"{label}.csv",
+            data=frame.to_csv(index=False).encode("utf-8"),
+            provider=self.provider,
+            location=f"{target.display()}#{label}",
+        )
+
+
 # ------------------------------------------------------------------ registry
 CONNECTORS: dict[str, type[Connector]] = {
     "s3": S3Connector,
@@ -554,6 +766,12 @@ CONNECTORS: dict[str, type[Connector]] = {
     "google_drive": GoogleDriveConnector,
     "dropbox": DropboxConnector,
     "onedrive": OneDriveConnector,
+    "sftp": SFTPConnector,
+    "database": DatabaseConnector,
+    "postgresql": DatabaseConnector,
+    "mysql": DatabaseConnector,
+    "mssql": DatabaseConnector,
+    "sqlite": DatabaseConnector,
 }
 
 PROVIDER_LABELS = {
@@ -562,6 +780,12 @@ PROVIDER_LABELS = {
     "google_drive": "Google Drive",
     "dropbox": "Dropbox",
     "onedrive": "OneDrive / SharePoint",
+    "sftp": "SFTP server",
+    "database": "SQL database (any dialect)",
+    "postgresql": "PostgreSQL",
+    "mysql": "MySQL / MariaDB",
+    "mssql": "SQL Server",
+    "sqlite": "SQLite",
 }
 
 
@@ -579,24 +803,50 @@ def get_connector(provider: str, **kwargs: Any) -> Connector:
 
 
 def credential_report(environ: dict[str, str] | None = None) -> list[dict[str, Any]]:
-    """Readiness of every connector, for the UI to show instead of failing late."""
-    report = []
+    """Readiness of every connector, for the UI to show instead of failing late.
+
+    Keyed by the registered alias, labelled distinctly, but *deduplicated by
+    provider*: the database connector is registered as ``database`` plus one
+    alias per dialect, and reporting it five times would make the UI show five
+    identical rows for one implementation.
+    """
+    report: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for name in available_connectors():
         try:
             connector = CONNECTORS[name](environ=environ)
             status = connector.check_credentials()
+            provider = connector.provider
         except Exception as exc:  # noqa: BLE001
             status = {"provider": name, "ready": False, "missing": [], "error": str(exc)}
-        status["label"] = PROVIDER_LABELS.get(name, name)
+            provider = name
+        if provider in seen:
+            continue
+        seen.add(provider)
+        status["provider"] = provider
+        status["aliases"] = sorted(
+            alias for alias, cls in CONNECTORS.items() if cls.provider == provider
+        )
+        status["label"] = PROVIDER_LABELS.get(name, provider)
         report.append(status)
-    return report
+    return sorted(report, key=lambda entry: entry["provider"])
 
 
 def pull(provider: str, **kwargs: Any) -> ConnectorFile:
     """Fetch from a provider in one call: ``pull('s3', bucket='b', key='k.csv')``."""
     fetch_kwargs = {
         key: kwargs.pop(key)
-        for key in ("key", "file_id", "file_name", "path", "item_path", "spreadsheet_id", "sheet_name")
+        for key in (
+            "key",
+            "file_id",
+            "file_name",
+            "path",
+            "item_path",
+            "spreadsheet_id",
+            "sheet_name",
+            "table",
+            "query",
+        )
         if key in kwargs
     }
     connector = get_connector(provider, **kwargs)

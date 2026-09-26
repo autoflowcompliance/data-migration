@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: dataflow
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    envVars:
+      - key: AUTOFLOW_HOME
+        value: /app/run_config
+      - key: DATAREADY_HOME
+        value: /app/run_config
+    healthCheckPath: /health

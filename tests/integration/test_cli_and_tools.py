@@ -22,7 +22,262 @@ def inbox(tmp_path, contacts_csv, bank_csv) -> Path:
     return folder
 
 
+# ------------------------------------------------------- cloud licence tool
+class TestCloudLicenseTool:
+    """The operator's tool: trials, seats and metering, none of it offline."""
+
+    @pytest.fixture(autouse=True)
+    def _home(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path))
+
+    def _run(self, capsys, *argv):
+        from tools.cloud_license import main as cloud_main
+
+        code = cloud_main(list(argv))
+        return code, capsys.readouterr()
+
+    def test_issue_trial_reports_the_expiry(self, capsys):
+        code, out = self._run(capsys, "issue-trial", "new@acme.com", "--days", "14")
+        assert code == 0
+        assert json.loads(out.out)["plan"] == "trial"
+
+    def test_status_reports_offline_before_anything_is_issued(self, capsys):
+        code, out = self._run(capsys, "status")
+        assert code == 0
+        assert json.loads(out.out) == {"mode": "offline", "cloud": False}
+
+    def test_activate_then_add_a_seat(self, capsys):
+        code, _ = self._run(
+            capsys, "activate", "acme@example.com",
+            "--issued", "2026-01-01T00:00:00", "--seats", "2",
+        )
+        assert code == 0
+        code, out = self._run(capsys, "add-seat", "alice")
+        assert code == 0
+        assert json.loads(out.out)["name"] == "alice"
+
+    def test_exceeding_the_seats_exits_non_zero_with_a_message(self, capsys):
+        self._run(
+            capsys, "activate", "acme@example.com",
+            "--issued", "2026-01-01T00:00:00", "--seats", "1",
+        )
+        self._run(capsys, "add-seat", "alice")
+        code, out = self._run(capsys, "add-seat", "bob")
+        assert code == 2
+        assert "All 1 seat" in out.err
+
+    def test_usage_reports_metered_runs(self, capsys):
+        self._run(
+            capsys, "activate", "acme@example.com",
+            "--issued", "2026-01-01T00:00:00", "--seats", "1",
+        )
+        code, out = self._run(capsys, "usage")
+        assert code == 0
+        assert json.loads(out.out)["runs"] == 0
+
+    def test_converting_a_non_trial_exits_non_zero(self, capsys):
+        self._run(
+            capsys, "activate", "acme@example.com",
+            "--issued", "2026-01-01T00:00:00",
+        )
+        code, out = self._run(capsys, "convert")
+        assert code == 2
+        assert "not a trial" in out.err
+
+
+# ------------------------------------------------------- watch CLI
+class TestWatchCli:
+    @pytest.fixture(autouse=True)
+    def _isolated_home(self, tmp_path, monkeypatch):
+        """State is on disk by design, so it must not leak between tests."""
+        monkeypatch.setenv("AUTOFLOW_HOME", str(tmp_path / "home"))
+
+    def test_a_missing_folder_exits_two(self, tmp_path):
+        code = main(
+            ["watch", "--in", str(tmp_path / "nope"), "--template", "hubspot",
+             "--out", str(tmp_path / "out")]
+        )
+        assert code == 2
+
+    def test_once_observes_then_processes_across_processes(self, tmp_path, contacts_csv):
+        """The cron path: fresh process each run, state on disk."""
+        inbox = tmp_path / "in"
+        inbox.mkdir()
+        (inbox / "contacts.csv").write_bytes(contacts_csv.read_bytes())
+        out = tmp_path / "out"
+
+        first = main(
+            ["watch", "--in", str(inbox), "--template", "hubspot", "--out", str(out),
+             "--once", "--settle", "1"]
+        )
+        assert first == 0
+        assert not (out / "contacts").exists()
+
+        # Second invocation, same folder, a different process in reality.
+        monkey_now = {"t": None}
+        from app_files.batch import WatchFolder
+
+        folder = WatchFolder(inbox, "hubspot", out, settle_seconds=1.0)
+        first_seen = folder.state.first_seen(folder.watch_key, inbox / "contacts.csv")
+        assert first_seen is not None
+        monkey_now["t"] = first_seen[0] + 5.0
+        assert [p.name for p in folder.ready(now=monkey_now["t"])] == ["contacts.csv"]
+
+    def test_a_processed_file_is_not_reprocessed_by_a_later_invocation(
+        self, tmp_path, contacts_csv
+    ):
+        inbox = tmp_path / "in"
+        inbox.mkdir()
+        (inbox / "contacts.csv").write_bytes(contacts_csv.read_bytes())
+        out = tmp_path / "out"
+
+        from app_files.batch import WatchFolder
+
+        # Seed the settle observation, then process on a later poll.
+        first = WatchFolder(inbox, "hubspot", out, settle_seconds=1.0)
+        first.ready(now=0.0)
+        first.process_ready(now=10.0)
+
+        second = WatchFolder(inbox, "hubspot", out, settle_seconds=1.0)
+        assert second.process_ready(now=100.0) == []
+
+
 # ------------------------------------------------------------------ CLI batch
+class TestPullCli:
+    """`pull` fetches through a connector, then runs the one pipeline."""
+
+    @pytest.fixture
+    def sqlite_db(self, tmp_path):
+        import sqlite3
+
+        path = tmp_path / "crm.db"
+        connection = sqlite3.connect(path)
+        connection.execute(
+            "CREATE TABLE contacts (email TEXT, first_name TEXT, last_name TEXT, "
+            "company TEXT, country TEXT, amount TEXT, created TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO contacts VALUES (?,?,?,?,?,?,?)",
+            [
+                ("a@b.com", "Al", "Smith", "Acme", "GB", "100", "2024-01-01"),
+                ("c@d.com", "", "Jones", "", "US", "", ""),
+                ("e@f.com", "Eve", "Novak", "Initech", "GB", "50", "2024-02-02"),
+            ],
+        )
+        connection.commit()
+        connection.close()
+        return path
+
+    def test_pull_from_a_database_runs_the_pipeline(self, sqlite_db, tmp_path, capsys):
+        code = main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--table",
+                "contacts",
+                "-o",
+                str(tmp_path / "out"),
+            ]
+        )
+        output = capsys.readouterr().out
+        assert code == 0
+        assert "Pulled 3 rows" in output
+        assert "3 rows in, 3 out" in output
+        assert (tmp_path / "out").exists()
+
+    def test_pull_dry_run_fetches_without_running(self, sqlite_db, tmp_path, capsys):
+        code = main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--table",
+                "contacts",
+                "--dry-run",
+                "-o",
+                str(tmp_path / "out"),
+            ]
+        )
+        assert code == 0
+        assert "Pulled 3 rows" in capsys.readouterr().out
+        assert not (tmp_path / "out").exists()
+
+    def test_pull_with_a_query(self, sqlite_db, tmp_path, capsys):
+        code = main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--query",
+                "SELECT email, first_name FROM contacts WHERE country = 'GB'",
+                "-o",
+                str(tmp_path / "out"),
+            ]
+        )
+        assert code == 0
+        assert "Pulled 2 rows" in capsys.readouterr().out
+
+    def test_pull_reports_a_missing_table_without_a_traceback(
+        self, sqlite_db, tmp_path, capsys
+    ):
+        code = main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--table",
+                "no_such_table",
+                "-o",
+                str(tmp_path / "out"),
+            ]
+        )
+        captured = capsys.readouterr()
+        assert code == 2
+        assert "Could not read from database" in captured.err
+
+    def test_pull_output_matches_the_single_file_cli(self, sqlite_db, tmp_path, capsys):
+        """Same rows through `pull` and through the flat flags, same numbers."""
+        main(
+            [
+                "pull",
+                "database",
+                "--url",
+                f"sqlite:///{sqlite_db}",
+                "--table",
+                "contacts",
+                "-o",
+                str(tmp_path / "pullout"),
+            ]
+        )
+        pulled_output = capsys.readouterr().out
+
+        import csv
+
+        csv_path = tmp_path / "contacts.csv"
+        with open(csv_path, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(
+                ["email", "first_name", "last_name", "company", "country", "amount", "created"]
+            )
+            writer.writerows(
+                [
+                    ("a@b.com", "Al", "Smith", "Acme", "GB", "100", "2024-01-01"),
+                    ("c@d.com", "", "Jones", "", "US", "", ""),
+                    ("e@f.com", "Eve", "Novak", "Initech", "GB", "50", "2024-02-02"),
+                ]
+            )
+        main(["-i", str(csv_path), "-c", "hubspot", "-o", str(tmp_path / "fileout")])
+        file_output = capsys.readouterr().out
+
+        assert "3 rows in, 3 out" in pulled_output
+        assert "3 rows in, 3 out" in file_output
+
+
 def test_batch_cli_processes_a_folder(inbox, tmp_path, capsys):
     out = tmp_path / "outbox"
     exit_code = main(["batch", "--in", str(inbox), "--template", "hubspot", "--out", str(out)])

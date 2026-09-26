@@ -1,0 +1,35 @@
+{
+  "good": {
+    "overall": 100.0,
+    "scores": {
+      "completeness": 100.0,
+      "uniqueness": 100.0,
+      "validity": 100.0,
+      "consistency": 100.0,
+      "timeliness": 100.0
+    },
+    "sla_passed": true,
+    "breaches": [],
+    "skipped": []
+  },
+  "degraded": {
+    "overall": 83.3,
+    "scores": {
+      "completeness": 50.0,
+      "uniqueness": 100.0,
+      "validity": 100.0,
+      "consistency": 100.0,
+      "timeliness": 100.0
+    },
+    "sla_passed": false,
+    "breaches": [
+      {
+        "dimension": "completeness",
+        "required": 0.98,
+        "actual": 0.5,
+        "shortfall": 0.48
+      }
+    ],
+    "skipped": []
+  }
+}

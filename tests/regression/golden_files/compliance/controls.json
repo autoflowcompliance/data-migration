@@ -1,0 +1,79 @@
+{
+  "controls": [
+    {
+      "control_id": "A.1",
+      "framework": "GDPR",
+      "status": "met",
+      "title": "Records of processing"
+    },
+    {
+      "control_id": "A.2",
+      "framework": "GDPR",
+      "status": "met",
+      "title": "Data minimisation and masking"
+    },
+    {
+      "control_id": "A.3",
+      "framework": "GDPR",
+      "status": "met",
+      "title": "Storage limitation"
+    },
+    {
+      "control_id": "A.4",
+      "framework": "GDPR",
+      "status": "met",
+      "title": "Integrity and confidentiality"
+    },
+    {
+      "control_id": "B.1",
+      "framework": "CCPA",
+      "status": "met",
+      "title": "Access controls"
+    },
+    {
+      "control_id": "B.2",
+      "framework": "CCPA",
+      "status": "met",
+      "title": "Consumer deletion"
+    },
+    {
+      "control_id": "B.3",
+      "framework": "CCPA",
+      "status": "met",
+      "title": "Encryption of personal information"
+    },
+    {
+      "control_id": "C.1",
+      "framework": "SOC 2",
+      "status": "met",
+      "title": "Change and access logging"
+    },
+    {
+      "control_id": "C.2",
+      "framework": "SOC 2",
+      "status": "met",
+      "title": "Encryption at rest and in transit"
+    },
+    {
+      "control_id": "C.3",
+      "framework": "SOC 2",
+      "status": "partial",
+      "title": "Confidentiality of secrets"
+    }
+  ],
+  "counts": {
+    "gap": 0,
+    "met": 9,
+    "partial": 1
+  },
+  "ready": true,
+  "retention": {
+    "applies_to": [
+      "runs",
+      "outputs",
+      "audit",
+      "backups"
+    ],
+    "days": 365
+  }
+}

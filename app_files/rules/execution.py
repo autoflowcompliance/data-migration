@@ -21,9 +21,10 @@ it.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import pandas as pd
 
@@ -31,6 +32,7 @@ from app_files.pipeline import PipelineResult, run_pipeline
 from app_files.profiling import Profile, profile
 from app_files.profiling.report import render_qa_report_with_profile
 from app_files.reporters import render_qa_report
+from app_files.rules.cross_field import CrossFieldRule, run_cross_field_rules
 from app_files.rules.engine import RuleResult, run_rules
 from app_files.rules.schema import Rule
 from app_files.validators import frictionless_summary
@@ -48,13 +50,32 @@ class BuiltRuleRun:
     rules_yaml: str
     qa_report_html: str
     profile_result: Profile
+    cross_field_rules: list[CrossFieldRule] = dataclasses.field(default_factory=list)
+    cross_field_result: Any = None
+    unmatched_cross_field: list[str] = dataclasses.field(default_factory=list)
+
+    @property
+    def total_rules_run(self) -> int:
+        """Single-field and cross-field rules that actually executed."""
+        return self.rule_result.rules_run + getattr(self.cross_field_result, "rules_run", 0)
+
+    @property
+    def total_rule_failures(self) -> int:
+        """Single-field and cross-field failures, the number a caller reports."""
+        return self.rule_result.total_failures + len(
+            getattr(self.cross_field_result, "issues", []) or []
+        )
 
     def summary(self) -> dict[str, Any]:
         """Pipeline summary plus the rule outcome, for the UI's metric row."""
+        cross = self.cross_field_result
         return {
             **self.result.summary(),
             **self.rule_result.summary(),
             "unmatched_rules": len(self.unmatched_rules),
+            "cross_field_run": getattr(cross, "rules_run", 0),
+            "cross_field_failures": len(getattr(cross, "issues", []) or []),
+            "unmatched_cross_field": len(self.unmatched_cross_field),
         }
 
     def issues_frame(self) -> pd.DataFrame:
@@ -128,6 +149,34 @@ def resolve_rules(
     return resolved, unmatched
 
 
+def resolve_cross_field_rules(
+    result: PipelineResult, rules: Iterable[CrossFieldRule]
+) -> tuple[list[CrossFieldRule], list[str]]:
+    """Re-point each cross-field rule's columns at their mapped names.
+
+    Mirrors :func:`resolve_rules` for multi-column rules: a rule is written
+    against the source headers the buyer sees (``Open Date``), but the engine
+    reads the mapped frame (``open_date``). A rule with a column in neither
+    frame is reported as unmatched rather than running against nothing.
+    """
+    mapping = field_map(result)
+    mapped_columns = {str(c) for c in result.clean_frame.columns}
+    resolved: list[CrossFieldRule] = []
+    unmatched: list[str] = []
+    for rule in rules:
+        targets: list[str] = []
+        for field in rule.fields:
+            target = mapping.get(field) or mapping.get(field.lower())
+            if target is None or target not in mapped_columns:
+                break
+            targets.append(target)
+        else:
+            resolved.append(dataclasses.replace(rule, fields=targets))
+            continue
+        unmatched.append(rule.name)
+    return resolved, unmatched
+
+
 def apply_rules(
     result: PipelineResult, rules: Iterable[Rule]
 ) -> tuple[RuleResult, list[str]]:
@@ -188,21 +237,39 @@ def run_with_rules(
     project_name: str = "Data migration",
     source_filename: str = "upload.csv",
     run_structural_check: bool = True,
+    result: PipelineResult | None = None,
+    cross_field_rules: Iterable[CrossFieldRule] = (),
+    persist_rules: bool = True,
 ) -> BuiltRuleRun:
     """Clean, map, validate, then apply ``rules`` and re-render the report.
 
     ``crm`` still selects the mapping config — the buyer's rules are additive on
     top of it, not a replacement for it.
+
+    Pass ``result`` when the caller has already run the pipeline with options
+    this function does not take (a cleaning config, say). The supplied result is
+    used as-is instead of running the pipeline again, so those options survive.
+
+    ``persist_rules=False`` reports the rules without writing the accepted YAML
+    to ``rules_path``, so a caller that must write nothing (a dry run) can still
+    show what the rules would do.
     """
     rules = list(rules)
-    result = run_pipeline(
-        source,
-        crm=crm,
-        project_name=project_name,
-        source_filename=source_filename,
-        run_structural_check=run_structural_check,
-    )
+    if result is None:
+        result = run_pipeline(
+            source,
+            crm=crm,
+            project_name=project_name,
+            source_filename=source_filename,
+            run_structural_check=run_structural_check,
+        )
     outcome, unmatched = apply_rules(result, rules)
+    cross_resolved, cross_unmatched = resolve_cross_field_rules(
+        result, cross_field_rules
+    )
+    cross_outcome = run_cross_field_rules(result.clean_frame, cross_resolved)
+    if cross_outcome.issues:
+        result.validation.issues.extend(cross_outcome.issues)
     profile_result = profile(result.clean_frame)
     structural = (
         structural_check(result.clean_frame) if run_structural_check else None
@@ -212,7 +279,7 @@ def run_with_rules(
     from app_files.rules.builder import rules_to_yaml
 
     yaml_text = rules_to_yaml([_rule_to_dict(rule) for rule in rules])
-    written = write_rules_file(yaml_text, rules_path)
+    written = Path(rules_path) if not persist_rules else write_rules_file(yaml_text, rules_path)
 
     return BuiltRuleRun(
         result=result,
@@ -223,6 +290,9 @@ def run_with_rules(
         rules_yaml=yaml_text,
         qa_report_html=html,
         profile_result=profile_result,
+        cross_field_rules=cross_resolved,
+        cross_field_result=cross_outcome,
+        unmatched_cross_field=cross_unmatched,
     )
 
 

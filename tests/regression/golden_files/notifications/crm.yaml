@@ -1,0 +1,11 @@
+crm: Contacts
+notifications:
+  alerts:
+    - condition: quality_drop
+      threshold: 90
+      severity: critical
+  channels:
+    - type: webhook
+      url: http://hook
+  webhooks:
+    - url: http://hook

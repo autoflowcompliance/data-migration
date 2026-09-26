@@ -9,7 +9,6 @@ and wizard tests relocate ``AUTOFLOW_HOME`` to a temporary directory.
 from __future__ import annotations
 
 import io
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -143,14 +142,21 @@ class _Response:
         return self._payload
 
 
-def test_five_connectors_are_registered():
-    assert set(available_connectors()) == {
+def test_the_original_five_connectors_are_registered():
+    assert {
         "s3",
         "google_sheets",
         "google_drive",
         "dropbox",
         "onedrive",
-    }
+    } <= set(available_connectors())
+
+
+def test_the_source_connectors_added_by_the_spec_are_registered():
+    """SFTP and direct database reads, per the extended architecture."""
+    assert {"sftp", "database", "postgresql", "mysql", "mssql", "sqlite"} <= set(
+        available_connectors()
+    )
 
 
 def test_dropbox_fetch_builds_authenticated_request():
@@ -219,8 +225,17 @@ def test_missing_credentials_are_named():
 
 
 def test_credential_report_covers_every_provider():
+    """One report row per *provider*, not per registered alias.
+
+    The database connector registers one alias per dialect; five rows for one
+    implementation would make the UI show five identical entries.
+    """
     report = credential_report(environ={})
-    assert len(report) == 5
+    providers = [entry["provider"] for entry in report]
+    assert len(providers) == len(set(providers))
+    assert {"s3", "google_sheets", "dropbox", "onedrive", "sftp", "database"} <= set(
+        providers
+    )
     assert all(entry["ready"] is False for entry in report)
 
 
@@ -332,7 +347,10 @@ def test_pricing_tiers_and_payment_status(home, monkeypatch):
 def test_shareable_report_is_self_contained(samples_dir):
     import re
 
-    from app_files.collaboration.shareable_report import Provenance, render_shareable_report
+    from app_files.collaboration.shareable_report import (
+        Provenance,
+        render_shareable_report,
+    )
     from app_files.ingestion import read_any
     from app_files.pipeline import run_pipeline
 
@@ -357,7 +375,6 @@ def test_shareable_report_is_self_contained(samples_dir):
 
 
 def test_contract_passes_compliant_and_flags_violations():
-    import pandas as pd
 
     from app_files.collaboration.contracts import check_contract, load_contract
 
@@ -405,7 +422,6 @@ def test_comparison_report_counts_and_highlights(samples_dir):
 
 # ------------------------------------------------------------ intelligence D2-D4
 def test_anomaly_detection_flags_a_spike(home):
-    import pandas as pd
 
     from app_files.intelligence.anomaly import clear_baselines, detect
 
@@ -426,7 +442,6 @@ def test_anomaly_detection_flags_a_spike(home):
 
 
 def test_suggestions_are_derived_from_the_frame():
-    import pandas as pd
 
     from app_files.intelligence.suggestions import suggestion_texts
 
@@ -444,7 +459,6 @@ def test_suggestions_are_derived_from_the_frame():
 
 
 def test_natural_language_query_filters_invalid_rows():
-    import pandas as pd
 
     from app_files.intelligence.nl_query import query
 

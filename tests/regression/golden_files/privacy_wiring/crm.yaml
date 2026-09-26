@@ -1,0 +1,20 @@
+crm: Contacts
+version: "1.0"
+fields:
+  - name: firstname
+    aliases: ["First Name"]
+  - name: lastname
+    aliases: ["Last Name"]
+  - name: email
+    aliases: ["Email Address"]
+  - name: phone
+    aliases: ["Phone 1"]
+  - name: notes
+    aliases: ["Notes"]
+privacy:
+  default_strategy: redact
+  fields:
+    - column: email
+      strategy: hash
+    - column: phone
+      strategy: partial

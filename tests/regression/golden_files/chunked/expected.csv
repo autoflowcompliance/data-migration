@@ -1,0 +1,11 @@
+id,name,city,note,amount
+1,Ana Ruiz,München,plain,12.50
+2,Bo Li,Leeds,"He said ""hello, world""",0.00
+3,,,,
+4,Céline Dion,Montréal,"accented, and quoted",99.99
+5,Dan O'Neil,Dublin,apostrophe's fine,7.25
+6,Eve  Adams,NYC,padded,-3.10
+7,Fumiko Sato,Osaka,日本語のメモ,1000.00
+8,Gil,,"trailing comma,",5.5
+9,Hana Nováková,Praha,ř/ž/ů,42
+10,Ian,Glasgow,,0

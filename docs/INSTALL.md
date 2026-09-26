@@ -64,5 +64,7 @@ report). Add a licence through `DATAREADY_HOME` for the full tool.
 python -m pytest -q
 ```
 
-Expect `465 passed`. The suite covers the frozen core plus every new layer, and
-runs in a few seconds — there is no reason not to run it before a commit.
+Expect the whole suite to pass — around 1,970 tests in about seventy seconds.
+Five database tests run only when a PostgreSQL server is reachable; without one
+they report as skipped, not failed. The suite covers the frozen core plus every
+new layer.

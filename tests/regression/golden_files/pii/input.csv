@@ -1,0 +1,4 @@
+full_name,email,phone,card,ssn,note
+John Smith,john.smith@example.com,"(617) 498-3000",4111111111111111,078-05-1120,call john.smith@example.com
+Jane Doe,jane.doe@example.com,512.876.5432,4012888888881881,219-09-9999,ok
+Blank Row,,,,

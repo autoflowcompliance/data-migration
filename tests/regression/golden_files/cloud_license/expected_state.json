@@ -1,0 +1,16 @@
+{
+  "account": "acme@example.com",
+  "plan": "team",
+  "rows": 1500,
+  "runs": 2,
+  "seat_names": [
+    "alice",
+    "bob"
+  ],
+  "seats": 2,
+  "seats_active": [
+    true,
+    true
+  ],
+  "trial": null
+}

@@ -9,10 +9,9 @@ output" achievable.
 
 from __future__ import annotations
 
-import io
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import BinaryIO
 
 import pandas as pd
 

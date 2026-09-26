@@ -1,0 +1,3 @@
+row,field,check,severity,message
+3,phone,validity,warning,Invalid phone format: 'not-a-phone'
+3,phone,rule:phone_e164_format,warning,Phone is not in E.164 form (e.g. +15551234567)

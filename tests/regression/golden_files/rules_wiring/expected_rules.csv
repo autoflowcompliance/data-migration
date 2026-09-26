@@ -1,0 +1,3 @@
+rule,field,type,severity,failures,ran
+lastname_required,lastname,required,error,0,yes
+phone_e164_format,phone,regex,warning,1,yes
