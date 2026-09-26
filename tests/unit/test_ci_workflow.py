@@ -50,3 +50,13 @@ def test_the_workflow_declares_read_only_permissions():
     body = _workflow()
     assert "permissions:" in body
     assert "contents: read" in body
+
+
+def test_the_workflow_runs_the_live_database_test_against_a_real_server():
+    """The SQLite connector tests need no server, so they cannot catch a broken
+    PostgreSQL path. The job starts a real server and points the live test at
+    it; without this the test silently skips and the path stays unproven."""
+    body = _workflow()
+    assert "postgres:16-alpine" in body, "no real PostgreSQL server is started"
+    assert "test_postgres_live.py" in body, "the live test is never run"
+    assert "DATAREADY_TEST_POSTGRES_URL" in body, "the live test is not pointed at the server"

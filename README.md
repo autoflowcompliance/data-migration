@@ -714,7 +714,8 @@ restore_backup(backup, TenantRegistry().get("acme"))
 | [docs/LARGE_FILES.md](docs/LARGE_FILES.md) | Stream a file too big for memory |
 | [docs/CONNECTORS.md](docs/CONNECTORS.md) | Read from a database, SFTP or cloud storage |
 | [docs/DRIFT.md](docs/DRIFT.md) | Stop a run when a source's schema changes |
-| [docs/SWEEP.md](docs/SWEEP.md) | The acceptance run: clean install, full suite, one real file |
+| [docs/SWEEP.md](docs/SWEEP.md) | The acceptance run: clean install, full suite, one real file, measured scale |
+| [CHANGELOG.md](CHANGELOG.md) | What each extended layer adds, and every fix |
 
 ## Tests
 
@@ -722,7 +723,10 @@ restore_backup(backup, TenantRegistry().get("acme"))
 python -m pytest -q
 ```
 
-Expect `1677 passed`. The suite covers value transforms, each ingestion adapter,
+Expect the whole suite to pass — around 1,970 tests in about seventy seconds.
+Five database tests run only when a PostgreSQL server is reachable (see
+`docs/CONNECTORS.md`); without one they report as skipped, not failed. The
+suite covers value transforms, each ingestion adapter,
 each rule type, each profiling dimension, the lineage tracker, all four output
 writers, PII detection and masking, cross-field rules and rule versioning,
 multi-way reconciliation, migration safety, metrics, alerting and health checks,
@@ -735,7 +739,7 @@ folder watcher and its settle window, chunked ingestion for large files,
 direct database and SFTP connectors, allocation-based memory enforcement,
 the schema drift gate,
 config-schema validation, golden-file regression fixtures, and malformed-input
-error handling. It runs in about thirty seconds, so there is no reason not to
+error handling. It runs in about seventy seconds, so there is no reason not to
 run it before a commit.
 
 Frozen core: `app_files/cleaners/`, `mappers/`, `validators/`, `auditors/` and

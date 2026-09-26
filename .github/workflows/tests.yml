@@ -53,6 +53,35 @@ jobs:
           AUTOFLOW_HOME: ${{ runner.temp }}/autoflow
         run: python -m pytest -q
 
+      # The database connector's SQLite tests always run, but SQLite needs no
+      # server, no driver and no password, so they cannot catch a broken
+      # PostgreSQL path. A real server on 3.10 turns the skip into a run.
+      - name: Start PostgreSQL
+        if: matrix.python-version == '3.10'
+        run: |
+          docker run -d --name pgtest \
+            -e POSTGRES_PASSWORD=testpw \
+            -e POSTGRES_USER=testuser \
+            -e POSTGRES_DB=testdb \
+            -p 55432:5432 postgres:16-alpine
+          for i in $(seq 1 30); do
+            if docker exec pgtest pg_isready -U testuser -d testdb >/dev/null 2>&1; then
+              echo "postgres ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "postgres did not become ready"; exit 1
+
+      - name: Run the live database tests
+        if: matrix.python-version == '3.10'
+        env:
+          AUTOFLOW_HOME: ${{ runner.temp }}/autoflow
+          PGTEST_PW: testpw
+          DATAREADY_TEST_POSTGRES_URL: postgresql://testuser@127.0.0.1:55432/testdb?password_env=PGTEST_PW
+        run: |
+          pip install psycopg2-binary
+          python -m pytest tests/integration/test_postgres_live.py -q -rs
+
   # A single required check that a branch protection rule can point at, so
   # adding a matrix entry later does not silently leave a stale required check.
   tests-passed:

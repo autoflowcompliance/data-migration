@@ -88,13 +88,16 @@ def seeded():
     """Create the table on the real server and hand back its URL."""
     import psycopg2
 
+    from app_files.ingestion.database import parse_url
+
     url = _url()
+    target = parse_url(url)
     connection = psycopg2.connect(
-        host="127.0.0.1",
-        port=55432,
-        user="testuser",
+        host=target.host,
+        port=target.port,
+        user=target.username,
         password=os.environ.get("PGTEST_PW", DEFAULT_PASSWORD),
-        dbname="testdb",
+        dbname=target.database,
     )
     connection.autocommit = True
     with connection.cursor() as cursor:

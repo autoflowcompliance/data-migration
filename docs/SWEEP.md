@@ -55,3 +55,41 @@ and reports the block in `pre_migration.txt` (`Ready to migrate: no`).
 would do, but it does not persist the accepted rule YAML to the state home.
 `persist_rules=False` is the flag that keeps it honest; a test asserts the
 state home stays empty after a rehearsal.
+
+## Scale
+
+The acceptance run above uses a 6-row sample, which proves the pipeline is
+wired but says nothing about a real export. Measured on a generated
+500,000-row, 64 MB contacts file with every declared block on
+(`everything_on.yaml`):
+
+| Stage | Time | Notes |
+| --- | --- | --- |
+| Read | 0.9s | |
+| `run_pipeline` (clean, map, profile) | 75.6s | |
+| Declared blocks | 453.9s | the bulk of the run |
+| **Total** | **530.4s** | 943 rows/s, peak RSS 1,421 MB |
+
+The declared blocks break down as:
+
+| Block | Time | Peak RSS |
+| --- | --- | --- |
+| Rules (4 rules) | 246.8s | 720 MB |
+| Privacy (detect + mask) | 172.7s | 981 MB |
+| Normalization | 14.2s | 981 MB |
+| Dedupe | 19.9s | 981 MB |
+
+Rule validation dominates. `run_rules` walks every value in Python and calls a
+validator per value, so its cost is rows x rules — four rules over half a
+million rows is two million Python calls. Privacy is next, because detection
+runs seven patterns over every cell. Normalization and dedupe are cheap by
+comparison.
+
+This is a characteristic of the frozen validator interface, not a defect: the
+core pipeline is untouched and a config that declares no blocks pays none of
+it. A file large enough for the rules pass to matter should either run the
+blocks on a filtered frame or accept the linear cost. `docs/LARGE_FILES.md`
+covers the streaming path for files that do not fit in memory; the declared
+blocks operate on a materialised frame, so chunked ingestion and the blocks are
+separate paths, not a combined one.
+
