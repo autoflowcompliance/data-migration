@@ -8,7 +8,7 @@ as a gap, not as met.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -28,20 +28,20 @@ from app_files.governance import compliance as module
 class TestRetention:
     def test_a_fresh_record_is_kept(self):
         policy = RetentionPolicy(days=30)
-        assert policy.decision("2026-09-01T00:00:00", at=datetime(2026, 9, 10, tzinfo=UTC)) == "keep"
+        assert policy.decision("2026-09-01T00:00:00", at=datetime(2026, 9, 10, tzinfo=timezone.utc)) == "keep"
 
     def test_a_record_past_the_window_is_deleted(self):
         policy = RetentionPolicy(days=30)
-        assert policy.decision("2026-01-01T00:00:00", at=datetime(2026, 9, 10, tzinfo=UTC)) == "delete"
+        assert policy.decision("2026-01-01T00:00:00", at=datetime(2026, 9, 10, tzinfo=timezone.utc)) == "delete"
 
     def test_the_boundary_itself_is_not_yet_expired(self):
         """Exactly N days old is still inside a window of N days."""
-        now = datetime(2026, 9, 10, tzinfo=UTC)
+        now = datetime(2026, 9, 10, tzinfo=timezone.utc)
         created = (now - timedelta(days=30)).isoformat()
         assert RetentionPolicy(days=30).is_expired(created, at=now) is False
 
     def test_zero_days_expires_anything_from_the_past(self):
-        now = datetime(2026, 9, 10, tzinfo=UTC)
+        now = datetime(2026, 9, 10, tzinfo=timezone.utc)
         assert RetentionPolicy(days=0).is_expired(
             "2026-09-09T00:00:00", at=now
         ) is True
