@@ -607,6 +607,103 @@ def run_quality_check_command(argv: list[str]) -> int:
     return 0
 
 
+def build_profile_columns_parser() -> argparse.ArgumentParser:
+    """``python -m app_files.cli profile columns …`` — describe a file's columns."""
+    parser = argparse.ArgumentParser(
+        prog="app_files.cli profile columns",
+        description=(
+            "Report column-level statistics, inferred patterns and outliers for "
+            "a file. The profiling: block in the config decides which sections "
+            "run; --outlier-method overrides the block's method."
+        ),
+    )
+    parser.add_argument("input", type=Path, help="the file to profile")
+    parser.add_argument("-c", "--config", required=True, type=Path,
+                        help="config holding the profiling: block")
+    parser.add_argument("--outlier-method", default=None,
+                        choices=["iqr", "zscore", "isolation_forest"],
+                        help="override the block's outlier method")
+    parser.add_argument("-o", "--outdir", type=Path, default=None,
+                        help="write profiling_report.json here")
+    return parser
+
+
+def run_profile_columns_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli profile columns …``.
+
+    Exit codes: ``0`` a report was produced, ``2`` the config or input could
+    not be read, or the ``profiling:`` block was malformed. There is no ``1``:
+    profiling describes data, it does not judge it — the quality command is
+    what gates a run.
+    """
+    args = build_profile_columns_parser().parse_args(argv)
+
+    if not args.config.exists():
+        print(f"No config at {args.config}", file=sys.stderr)
+        return 2
+    if not args.input.exists():
+        print(f"No input file at {args.input}", file=sys.stderr)
+        return 2
+
+    from app_files.core import ConfigError
+    from app_files.ingestion import read_any
+    from app_files.profiling.profiling_block import bind_profiling
+
+    try:
+        declared = _read_config(args.config)
+    except Exception as exc:  # noqa: BLE001 - an unreadable config is reported
+        print(f"Could not read {args.config}: {exc}", file=sys.stderr)
+        return 2
+
+    if not declared.get("profiling"):
+        print(
+            f"No profiling: block declared in {args.config}; nothing to report.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if args.outlier_method:
+        declared = dict(declared)
+        block = dict(declared["profiling"])
+        outliers = dict(block.get("outliers") or {})
+        outliers["method"] = args.outlier_method
+        block["outliers"] = outliers
+        declared["profiling"] = block
+
+    frame = read_any(args.input)
+
+    try:
+        binding = bind_profiling(frame, declared)
+    except ConfigError as exc:
+        print(f"Invalid profiling block: {exc}", file=sys.stderr)
+        return 2
+
+    summary = binding.summary()
+
+    for stats in binding.statistics:
+        print(
+            f"{stats.name}: {stats.kind}, {stats.count} present, "
+            f"{stats.missing} missing, {stats.distinct} distinct"
+        )
+    for name, result in binding.outliers.items():
+        print(
+            f"Outliers in {name} ({result.method}): {result.count} "
+            f"{result.values if result.count else ''}".rstrip()
+        )
+
+    if args.outdir is not None:
+        import json
+
+        args.outdir.mkdir(parents=True, exist_ok=True)
+        target = args.outdir / "profiling_report.json"
+        target.write_text(
+            json.dumps(summary, indent=2, default=str), encoding="utf-8"
+        )
+        print(f"Wrote profiling report to {target}")
+
+    return 0
+
+
 def _read_config(path: Path) -> dict[str, Any]:
     """Read a config file into a mapping, or raise if it is not one."""
     import yaml
@@ -989,6 +1086,16 @@ def main(argv: list[str] | None = None) -> int:
         if len(argv) > 1 and argv[1] == "check":
             return run_quality_check_command(argv[2:])
         return run_quality_command(argv[1:])
+    if argv and argv[0] == "profile":
+        # ``profile columns`` describes a file's columns; there is no bare
+        # ``profile`` subcommand, so anything else is a usage error.
+        if len(argv) > 1 and argv[1] == "columns":
+            return run_profile_columns_command(argv[2:])
+        print(
+            "usage: python -m app_files.cli profile columns <file> -c <config>",
+            file=sys.stderr,
+        )
+        return 2
     if argv and argv[0] == "migrate":
         return run_migrate_command(argv[1:])
     if argv and argv[0] == "jobs":

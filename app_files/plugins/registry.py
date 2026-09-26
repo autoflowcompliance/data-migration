@@ -101,6 +101,16 @@ class PluginRegistry:
 
         self._claim("destination", name, lambda: register_destination(name, factory, override))
 
+    def profiler(
+        self,
+        name: str,
+        function: Callable[[Any], Any],
+        override: bool = False,
+    ) -> None:
+        from app_files.profiling.registry import register_profiler
+
+        self._claim("profiler", name, lambda: register_profiler(name, function, override))
+
     def _claim(self, kind: str, name: str, action: Callable[[], Any]) -> None:
         try:
             action()

@@ -34,6 +34,7 @@ class ConfiguredBindings:
     dedupe: Any | None
     qa_report_html: str
     quality: Any | None = None
+    profiling: Any | None = None
 
     @property
     def declared_rules(self) -> int:
@@ -54,6 +55,8 @@ class ConfiguredBindings:
             result["dedupe"] = self.dedupe.summary()
         if self.quality is not None:
             result["quality"] = self.quality.summary()
+        if self.profiling is not None:
+            result["profiling"] = self.profiling.summary()
         return result
 
 
@@ -102,7 +105,23 @@ def apply_configured_bindings(
         dedupe=apply_configured_dedupe(result.clean_frame, crm),
         qa_report_html=qa_html,
         quality=_configured_quality(result.clean_frame, crm),
+        profiling=_configured_profiling(result.clean_frame, crm),
     )
+
+
+def _configured_profiling(frame: pd.DataFrame, crm: str | Path) -> Any | None:
+    """Resolve a config's ``profiling:`` block against the frame, or ``None``.
+
+    Same contract as ``_configured_quality``: read the block from the one
+    config file, run only if it is declared, and return ``None`` so an unbound
+    config writes no artifact.
+    """
+    from app_files.profiling.profiling_block import bind_profiling
+
+    declared = _declared_blocks(crm)
+    if "profiling" not in declared:
+        return None
+    return bind_profiling(frame, declared)
 
 
 def _configured_quality(frame: pd.DataFrame, crm: str | Path) -> Any | None:
@@ -176,6 +195,13 @@ def write_bound_deliverables(
         written["quality_report"] = _write_text(
             outdir / "quality_report.json",
             json.dumps(bindings.quality.summary(), indent=2, default=str),
+        )
+    if bindings.profiling is not None:
+        import json
+
+        written["profiling_report"] = _write_text(
+            outdir / "profiling_report.json",
+            json.dumps(bindings.profiling.summary(), indent=2, default=str),
         )
     return written
 

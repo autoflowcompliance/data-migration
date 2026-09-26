@@ -216,6 +216,54 @@ python -m app_files.cli quality contacts.csv -o reports
 `-o` writes `<source>_quality_trend.html` — the same table that shows the
 direction (`improving`, `stable`, `declining`) and every recorded score.
 
+### Profiling — column detail
+
+The five scores answer "how good is this file". A second, opt-in report answers
+"what is in it": per-column statistics, the shape of each column, and the values
+that do not fit it. Declare a `profiling:` block in the config to turn it on.
+
+```yaml
+profiling:
+  statistics:
+    enabled: true
+    top_values: 5
+  patterns:
+    enabled: true
+  outliers:
+    enabled: true
+    method: iqr          # iqr | zscore | isolation_forest
+    k: 1.5
+```
+
+```bash
+python -m app_files.cli profile columns inbox/contacts.csv --config hubspot.yaml
+```
+
+Statistics are count, distinct, missing, and — for a numeric column — min, max,
+mean, median, quartiles and IQR. Patterns infer a regex plus a label a human
+recognises (`email`, `date`, `uuid`, `currency`), and report coverage: the share
+of values the pattern actually matches, so a column of mixed content says so
+rather than over-claiming.
+
+Outliers come from one of three methods. IQR uses Tukey fences; z-score uses a
+standard-deviation cut; the isolation forest needs no threshold at all and is
+implemented over numpy rather than scikit-learn, so it adds no dependency to
+`requirements.txt`. The isolation forest flags a fixed *share* of the column —
+`contamination`, 1% by default — because that is how its threshold is defined.
+A caller who wants the tail rather than the rare should use `iqr` or `zscore`.
+
+Everything here is off by default and additive: a config with no `profiling:`
+block produces no report and byte-identical output to a run made before the
+block existed. The same sections are reachable as `POST /profile/columns` and
+`SDK.profile_columns()`, and a custom profiler registers through the existing
+plugin registry:
+
+```python
+from app_files.plugins.registry import load_plugin
+
+load_plugin(lambda registry: registry.profiler("my_profiler", my_function))
+```
+
 ### Quality SLA and the action a regression takes
 
 The scorecard says how good a file is; the history says whether it is getting

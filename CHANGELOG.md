@@ -26,6 +26,13 @@ this work produces byte-identical output.
   floor per dimension, plus the action a regression against the pinned baseline
   should take (`alert`, `block`, `quarantine`). Reachable as
   `quality check`, `POST /quality` and `SDK.quality()`.
+- **Profiling — column detail.** Column-level statistics (count, distinct,
+  missing, quartiles, IQR, length range), regex pattern inference with a
+  human-readable label (`email`, `date`, `uuid`, `currency`), and outlier
+  detection by IQR fence, z-score, or a self-contained isolation forest. A
+  `profiling:` config block turns the sections on, off by default. Reachable as
+  `profile columns`, `POST /profile/columns` and `SDK.profile_columns()`, and
+  registered through the existing plugin registry as the `profiler` kind.
 - **Lineage.** Interactive lineage graph, blast-radius analysis, OpenLineage
   export.
 - **Reconciliation.** N-way reconciliation with configurable match logic and

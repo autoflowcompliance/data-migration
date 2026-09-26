@@ -150,6 +150,41 @@ class DataFlowClient:
             form["regression_action"] = action
         return self._upload("/quality", data, filename, form)
 
+    def profile_columns(
+        self,
+        data: bytes,
+        filename: str = "upload.csv",
+        *,
+        statistics: bool = False,
+        patterns: bool = False,
+        outliers: bool = False,
+        outlier_method: str | None = None,
+        outlier_k: float | None = None,
+        outlier_contamination: float | None = None,
+        outlier_columns: list[str] | None = None,
+    ) -> Response:
+        """Describe an upload column by column.
+
+        Each section is opt-in, matching the ``profiling:`` config block, so
+        the cost of a wide frame is only paid when it is asked for.
+        """
+        form: dict[str, str] = {}
+        if statistics:
+            form["statistics"] = "true"
+        if patterns:
+            form["patterns"] = "true"
+        if outliers:
+            form["outliers"] = "true"
+        if outlier_method is not None:
+            form["outlier_method"] = outlier_method
+        if outlier_k is not None:
+            form["outlier_k"] = str(outlier_k)
+        if outlier_contamination is not None:
+            form["outlier_contamination"] = str(outlier_contamination)
+        if outlier_columns:
+            form["outlier_columns"] = ",".join(outlier_columns)
+        return self._upload("/profile/columns", data, filename, form)
+
     def audit(self, limit: int = 100) -> Response:
         return self.session.get(f"/audit?limit={limit}")
 

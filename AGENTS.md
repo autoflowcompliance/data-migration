@@ -52,8 +52,9 @@ irreversible.
 ## Commands
 
 ```bash
-python -m pytest -q                 # full suite, 1969 tests at HEAD, ~69s
+python -m pytest -q                 # full suite, 2180 tests, ~69s
 python -m pytest app_files/tests/   # the original 27 pre-existing tests
+python -m pytest tests/regression/  # golden files — never regenerate to go green
 python main.py                      # DataFlow (NiceGUI) — port 8080
 python build_desktop.py --check     # packaged desktop target
 ```
@@ -286,6 +287,31 @@ and `docs/RULES.md`.
 One verified change at a time. Add a single new isolated feature, confirm it
 against the full suite and the goldens, then stop. Bundling several unverified
 features is how this project previously went sideways.
+
+## Profiling column detail — two traps worth remembering
+
+Both were caught only by the real-file step (a 12,000-row export), not by the
+unit tests, which is exactly why that step exists.
+
+- **Isolation forest contamination is a fraction, not a count.** The score
+  threshold is the `contamination` quantile, so the method flags *that share* of
+  the column **by construction** — it will always "find" outliers even in pure
+  noise. At the common 0.05 default, a 12,000-row column produced 600 flags and
+  read as noise. The default here is `0.01`; a caller wanting the tail rather
+  than the rare should use `iqr` or `zscore`. `tests/unit/test_profiling_outliers.py`
+  pins the ceiling so it cannot silently drift back.
+- **A per-point Python tree walk is 200x too slow.** The first implementation
+  descended each point through each tree in interpreted code: 77s for one
+  12,000-row column. Building the tree once as numpy arrays and descending all
+  points level by level (`_build_tree` + `_tree_depths`) is 0.54s for the whole
+  binding. Keep it vectorised.
+
+`profiling:` is off by default and purely additive — the `profiler` claim in the
+plugin registry, the `POST /profile/columns` route, `SDK.profile_columns()` and
+the `profile columns` CLI all read the same block, and a config without it
+produces byte-identical output. The `profiling/` additions are new sibling
+modules; `profiler.py`, `dimensions.py`, `report.py`, `dimension_anomaly.py` and
+`binding.py` stay untouched.
 
 ## The web interface is on NiceGUI 3.x
 

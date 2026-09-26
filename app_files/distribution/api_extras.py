@@ -391,6 +391,62 @@ async def quality_endpoint(request: Request) -> JSONResponse:
     )
 
 
+async def profile_columns_endpoint(request: Request) -> JSONResponse:
+    """Describe an uploaded file column by column.
+
+    ``/profile`` answers "how good is this file"; this answers "what is in
+    it". The sections are opt-in through the form, matching the config block,
+    so a caller who asks for nothing gets the empty shape rather than a
+    surprise cost.
+    """
+    form = await request.form()
+    data, filename = await _read_upload(request)
+    frame = _frame_from_bytes(data, filename)
+
+    from app_files.core import ConfigError
+    from app_files.profiling.profiling_block import bind_profiling
+
+    def _flag(name: str) -> bool:
+        value = _form_value(form, name, None)
+        if value is None:
+            return False
+        return str(value).strip().lower() in {"true", "1", "yes", "on"}
+
+    block: dict[str, Any] = {}
+    if _flag("statistics"):
+        block["statistics"] = {"enabled": True}
+    if _flag("patterns"):
+        block["patterns"] = {"enabled": True}
+    if _flag("outliers"):
+        outliers: dict[str, Any] = {"enabled": True}
+        method = _form_value(form, "outlier_method", None)
+        if method is not None:
+            outliers["method"] = method
+        k = _form_value(form, "outlier_k", None)
+        if k is not None:
+            outliers["k"] = _as_number(k)
+        contamination = _form_value(form, "outlier_contamination", None)
+        if contamination is not None:
+            outliers["contamination"] = _as_number(contamination)
+        columns = _form_value(form, "outlier_columns", None)
+        if columns:
+            outliers["columns"] = [c.strip() for c in str(columns).split(",") if c.strip()]
+        block["outliers"] = outliers
+
+    try:
+        binding = bind_profiling(frame, {"profiling": block})
+    except ConfigError as exc:
+        raise BadRequest(str(exc)) from exc
+
+    if binding is None:
+        return JSONResponse(
+            {"status": "ok", "statistics": {}, "patterns": {}, "outliers": {}}
+        )
+    payload = binding.summary()
+    payload["status"] = "ok"
+    return JSONResponse(payload)
+
+
 def register_extra_routes(app: Any) -> Any:
     """Add the extra routes to an existing Starlette app. Idempotent."""
     from starlette.routing import Route
@@ -401,6 +457,7 @@ def register_extra_routes(app: Any) -> Any:
     additions = [
         Route("/map", map_endpoint, methods=["POST"]),
         Route("/quality", quality_endpoint, methods=["POST"]),
+        Route("/profile/columns", profile_columns_endpoint, methods=["POST"]),
         Route("/mask", mask_endpoint, methods=["POST"]),
         Route("/lineage", lineage_endpoint, methods=["POST"]),
         Route("/audit", audit_endpoint, methods=["GET"]),

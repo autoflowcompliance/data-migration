@@ -1,0 +1,13 @@
+order_id,customer_email,amount,currency,placed_on,status
+AB-1001,ada@example.com,10.00,USD,2024-01-01,paid
+AB-1002,grace@example.com,20.00,USD,2024-01-02,paid
+AB-1003,alan@example.com,30.00,USD,2024-01-03,pending
+AB-1004,edsger@example.com,40.00,USD,2024-01-04,paid
+AB-1005,barbara@example.com,50.00,USD,2024-01-05,paid
+AB-1006,don@example.com,60.00,USD,2024-01-06,paid
+AB-1007,leslie@example.com,70.00,USD,2024-01-07,paid
+AB-1008,john@example.com,80.00,USD,2024-01-08,paid
+AB-1009,tony@example.com,90.00,USD,2024-01-09,paid
+AB-1010,alant@example.com,100.00,USD,2024-01-10,paid
+AB-1011,ada2@example.com,110.00,USD,2024-01-11,paid
+AB-1012,grace2@example.com,99999.00,USD,2024-01-12,paid
