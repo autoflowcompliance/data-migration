@@ -16,6 +16,34 @@ state left behind by development.
 
 Total from a cold copy: about 100 seconds, against a ten-minute budget.
 
+## Continuous integration
+
+`.github/workflows/tests.yml` runs the same command this document does, from
+`requirements.txt`, on 3.10 (what `python:3.10-slim` ships) and 3.12.
+
+Verified green on run
+[36217388719](https://github.com/autoflowcompliance/data-migration/actions/runs/36217388719):
+`test (3.10)` success, `test (3.12)` success, `tests-passed` success, with
+
+```
+1969 passed, 5 skipped, 1 warning in 57.34s
+postgres ready
+5 passed in 0.07s
+```
+
+The five skipped tests are the PostgreSQL ones. On 3.10 the job starts a real
+`postgres:16-alpine` container and points them at it, so they run rather than
+skip; on any machine without a server they skip rather than fail.
+
+The first run of this workflow failed, and that is worth recording. It was
+green on 3.12 and red on 3.10 because `tests/unit/test_compliance.py` imported
+`datetime.UTC`, which exists only from 3.11 — on the deployed interpreter the
+module raised `ImportError` at import time. Development happens on 3.13, where
+the import works, so the suite was green on the machine that wrote it. A guard
+in `tests/unit/test_deployment.py` now fails on any name newer than the 3.10
+floor, on whichever interpreter the suite runs.
+
+
 ## One config, everything on
 
 `app_files/configs/everything_on.yaml` declares every extension block, so one
