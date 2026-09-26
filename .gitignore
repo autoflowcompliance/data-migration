@@ -13,6 +13,9 @@ lineage_report.csv
 # Generated deliverables (write_deliverables defaults to ./output). Anchored so
 # it never matches the app_files/output/ source package.
 /output/
+# The same deliverables written to a shorter -o. `out/` is not the default, but
+# it is the obvious shorthand and a run that uses it must not litter the tree.
+/out/
 
 # PyInstaller desktop build output
 /build/
