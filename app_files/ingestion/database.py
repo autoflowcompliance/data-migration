@@ -206,6 +206,25 @@ def connect(target: DatabaseTarget, environ: dict[str, str] | None = None):
     except ImportError as exc:
         raise MissingDriver(target.dialect, module_name, target.driver_package) from exc
 
+    try:
+        return _open_connection(module, module_name, target, password)
+    except (DatabaseError, MissingDriver):
+        raise
+    except Exception as exc:  # noqa: BLE001 - driver error types are many
+        # A refused connection is the common case here: wrong password, no
+        # server, no route. Letting the driver's own exception escape means a
+        # caller catching DatabaseError — as read_table and execute_query
+        # document — sees an unhandled type and a 500 instead of a plain
+        # message. Report it as the error this module promises.
+        raise DatabaseError(
+            f"Connecting to {target.display()} failed: "
+            f"{_without_secrets(str(exc), password)}"
+        ) from exc
+
+
+def _open_connection(module, module_name: str, target: DatabaseTarget, password: str):
+    """The dialect-specific connect call. Split out so ``connect`` can wrap
+    every driver's failure in one place."""
     if module_name == "psycopg2":
         return module.connect(
             host=target.host,
@@ -241,6 +260,14 @@ def connect(target: DatabaseTarget, environ: dict[str, str] | None = None):
         return module.connect(database=target.database or ":memory:")
 
     raise DatabaseError(f"No connect recipe for driver {module_name!r}.")
+
+
+def _without_secrets(message: str, password: str) -> str:
+    """Some drivers echo the DSN they were handed. The password must not reach
+    a log line or an HTTP error body, so scrub it before the message travels."""
+    if password and password in message:
+        return message.replace(password, "***")
+    return message
 
 
 def _stringify_value(value: Any) -> str:

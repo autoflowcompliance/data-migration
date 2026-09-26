@@ -297,6 +297,68 @@ class TestDialectCoverage:
         assert _quote_identifier("t", "postgresql") == '"t"'
         assert _quote_identifier("public.t", "postgresql") == '"public"."t"'
 
+    def test_a_refused_connection_is_a_database_error(self, monkeypatch):
+        """A driver's own exception must not escape ``connect``.
+
+        A wrong password or an unreachable server is the most common failure a
+        buyer hits, and every caller documents ``DatabaseError`` as the type to
+        catch. When the driver's error propagated instead, that catch missed and
+        a client mistake surfaced as a 500. Reproduced with a fake driver rather
+        than a real server, so it runs everywhere.
+        """
+        import sys
+        import types
+
+        from app_files.ingestion import database
+
+        class Refused(Exception):
+            pass
+
+        def refuse(**kwargs):
+            raise Refused("connection to server failed: FATAL: password authentication failed")
+
+        fake = types.ModuleType("psycopg2")
+        fake.connect = refuse
+        monkeypatch.setitem(sys.modules, "psycopg2", fake)
+
+        target = database.parse_url("postgresql://u@h/db")
+        with pytest.raises(DatabaseError, match="Connecting to postgresql://u@h"):
+            database.connect(target)
+
+    def test_a_refused_connection_does_not_leak_the_password(self, monkeypatch):
+        """Some drivers echo the DSN. The password must be scrubbed before the
+        message can reach a log line or an error response."""
+        import sys
+        import types
+
+        from app_files.ingestion import database
+
+        def refuse(**kwargs):
+            raise RuntimeError(f"could not connect using dsn with password={kwargs.get('password')}")
+
+        fake = types.ModuleType("psycopg2")
+        fake.connect = refuse
+        monkeypatch.setitem(sys.modules, "psycopg2", fake)
+
+        target = database.parse_url("postgresql://u@h/db?password_env=PGPASSWORD")
+        with pytest.raises(DatabaseError) as caught:
+            database.connect(target, environ={"PGPASSWORD": "hunter2-secret"})
+
+        assert "hunter2-secret" not in str(caught.value)
+        assert "***" in str(caught.value)
+
+    def test_a_missing_driver_is_not_masked_as_a_connection_failure(self, monkeypatch):
+        """MissingDriver is the actionable error; wrapping it in the generic
+        one would bury the install instruction."""
+        import sys
+
+        from app_files.ingestion import database
+
+        monkeypatch.setitem(sys.modules, "psycopg2", None)
+        target = database.parse_url("postgresql://u@h/db")
+        with pytest.raises(MissingDriver):
+            database.connect(target)
+
 
 class TestConnectorIntegration:
     def test_the_database_connector_pulls_a_table_as_a_file(self, db_path):
