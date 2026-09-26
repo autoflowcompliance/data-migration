@@ -1,0 +1,6 @@
+First Name,Last Name,Email Address,Phone 1,Company,Address,Amount,Created Date
+John,Smith,john.smith@example.com,(617) 498-3000,Acme,"123 north maple ave., springfield, il 62704","€1,000.00",2026-01-15
+Jon,Smith,jon.smith@example.com,617.498.3001,Acme,"123 N Maple Ave, Springfield, IL 62704","€980.00",2026-01-16
+Jane,Doe,jane.doe@example.com,512.876.5432,Beta,"456 S Oak St, Springfield, IL 62704","£500.00",2026-02-01
+Janet,Doe,janet.doe@example.com,+1 512 876 5433,Beta,"456 south oak street, springfield, il 62704","£510.00",2026-02-02
+Zoe,Adams,not-an-email,,Gamma,"789 west pine blvd, springfield, il 62704","$250.00",2026-03-01

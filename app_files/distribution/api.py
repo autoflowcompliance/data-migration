@@ -268,6 +268,30 @@ def create_app() -> Starlette:
 app = create_app()
 
 
+def build_app(*, include_extras: bool = True) -> Starlette:
+    """Build the ASGI app.
+
+    ``include_extras`` registers the routes the extra layers expose (``/map``,
+    ``/mask``, ``/lineage``, ``/audit``, ``/schedule``, ``/metrics``, the
+    probes, and the admin reads). It defaults to on so the documented API is
+    the one the server actually serves; tests that assert the original five
+    endpoints pass ``include_extras=False`` and see the app unchanged.
+    """
+    app = create_app()
+    if include_extras:
+        from app_files.distribution import api_extras
+        from app_files.distribution.api_extras import register_extra_routes
+
+        register_extra_routes(app)
+        # ``python -m app_files.distribution.api`` runs this file as ``__main__``,
+        # so ``api_extras`` imports a *second* copy of this module and a second
+        # ``BadRequest`` class. The handler registered above then misses it and
+        # a client error degrades to a 500. Alias the extras' classes onto the
+        # same responses so module identity cannot change the status code.
+        app.exception_handlers[api_extras.BadRequest] = _bad_request
+    return app
+
+
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - server shim
     import argparse
 
@@ -276,8 +300,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - server shi
     parser = argparse.ArgumentParser(description="Run the AutoFlow REST API.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8600)
+    parser.add_argument(
+        "--core-only",
+        action="store_true",
+        help="serve only the original five endpoints, without the extras",
+    )
     args = parser.parse_args(argv)
-    uvicorn.run(create_app(), host=args.host, port=args.port)
+    uvicorn.run(build_app(include_extras=not args.core_only), host=args.host, port=args.port)
     return 0
 
 

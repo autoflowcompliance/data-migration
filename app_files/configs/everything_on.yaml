@@ -1,0 +1,83 @@
+crm: Everything On
+version: "1.0"
+fields:
+  - name: firstname
+    aliases: ["First Name", "Given Name"]
+  - name: lastname
+    required: true
+    aliases: ["Last Name", "Surname"]
+  - name: email
+    required: true
+    transform: email_lowercase
+    aliases: ["Email Address", "E-mail"]
+  - name: phone
+    transform: phone_e164
+    aliases: ["Phone 1", "Phone Number", "Mobile"]
+  - name: company
+    aliases: ["Company", "Company Name", "Organisation"]
+  - name: address
+    aliases: ["Address", "Street", "Street Address"]
+  - name: amount
+    aliases: ["Amount", "Total"]
+  - name: createdate
+    transform: date_iso
+    aliases: ["Created Date", "Date Created", "Created At"]
+
+rules:
+  - name: lastname_required
+    field: lastname
+    type: required
+    severity: error
+  - name: email_present
+    field: email
+    type: required
+    severity: error
+  - name: email_shape
+    field: email
+    type: regex
+    pattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    severity: warning
+    message: "Email is not a plausible address"
+
+cross_field:
+  - name: firstname_before_lastname
+    type: compare
+    fields: [firstname, lastname]
+    operator: "<"
+    severity: warning
+    message: "First name should sort before last name"
+
+privacy:
+  default_strategy: redact
+  fields:
+    - column: email
+      strategy: hash
+    - column: phone
+      strategy: partial
+
+dedupe:
+  rules:
+    - columns: [firstname, lastname]
+      threshold: 0.85
+      metric: jaro_winkler
+
+normalization:
+  addresses:
+    - column: address
+  currency:
+    target: USD
+    columns: [amount]
+    rates:
+      - {base: EUR, quote: USD, rate: 1.08, as_of: 2026-01-15}
+      - {base: GBP, quote: USD, rate: 1.27, as_of: 2026-01-15}
+
+notifications:
+  alerts:
+    - condition: quality_drop
+      threshold: 95
+      severity: warning
+  channels:
+    - type: webhook
+      url: http://127.0.0.1:8791/hook
+  webhooks:
+    - url: http://127.0.0.1:8791/hook
