@@ -192,6 +192,16 @@ a name containing `&` truncates itself and swallows the reference after it.
   privacy card. `clean_data.csv` is never rewritten, so a config with no
   `privacy:` block stays byte-identical to the frozen pipeline. Privacy *does*
   need binding in every new entry point — it is not applied by `run_pipeline`.
+- The rules → privacy → normalization → dedupe sequence is **one helper**
+  (`app_files/config_bindings.apply_configured_bindings`), not an open-coded
+  block per entry point. The CLI and batch each used to spell it out and
+  `migrate` spelled out none of them, so a committed migration wrote raw PII
+  for a config that declared masking and its rehearsal reported
+  `Duplicates removed: 0` for a config whose dedupe removes rows. Any new run
+  path calls the helper; the three paths are pinned byte-identical by
+  `tests/unit/test_config_bindings.py` and `test_migrate_command.py`.
+  `persist_rules=False` is for a rehearsal: it applies the rules to report them
+  without writing the accepted YAML to the state home.
 - Layer 8's completion webhook and Layer 15's alerting were both complete and
   both unreachable from a run, so nothing ever notified an external system.
   `app_files/observability/binding.py` binds a config's `notifications:` block

@@ -327,6 +327,15 @@ floor) exits non-zero in rehearsal, so a script cannot blithely migrate a
 source that was never checked. `--schedule "0 2 * * *"` names a recurring job
 in the runbook.
 
+The rehearsal reports every block the config declares — `rules:`, `privacy:`,
+`normalization:`, `dedupe:` — under "Config-declared steps the committed run
+also applies", because those blocks run on top of the pipeline rather than
+inside it. `--commit` applies them and writes their deliverables
+(`masked_data.csv`, `deduped_data.csv`, `normalized_data.csv`, `issues.csv`),
+so a migration from a config that declares masking never writes raw PII. A
+rehearsal applies the rules to report what they would catch but does not
+persist the accepted ruleset, so it stays a rehearsal.
+
 ## Docker
 
 ```bash
@@ -705,6 +714,7 @@ restore_backup(backup, TenantRegistry().get("acme"))
 | [docs/LARGE_FILES.md](docs/LARGE_FILES.md) | Stream a file too big for memory |
 | [docs/CONNECTORS.md](docs/CONNECTORS.md) | Read from a database, SFTP or cloud storage |
 | [docs/DRIFT.md](docs/DRIFT.md) | Stop a run when a source's schema changes |
+| [docs/SWEEP.md](docs/SWEEP.md) | The acceptance run: clean install, full suite, one real file |
 
 ## Tests
 
