@@ -129,13 +129,11 @@ class NormalizationOutcome:
         }
 
 
-def apply_normalization(
-    frame: pd.DataFrame, block: dict[str, Any], config_dir: Path
-) -> NormalizationOutcome:
-    """Normalise ``frame`` per a resolved ``normalization:`` block.
+def _validate_normalization_block(block: dict[str, Any], config_dir: Path) -> None:
+    """Raise ``NormalizationConfigError`` on a malformed block.
 
-    ``config_dir`` anchors a relative ``rate_file`` so the config and its rates
-    travel together.
+    Split from the transforms so a caller can report a config error before it
+    has a frame to normalise.
     """
     if not isinstance(block, dict):
         raise NormalizationConfigError(
@@ -148,8 +146,6 @@ def apply_normalization(
             f"Allowed: enabled, addresses, currency, rates, rate_file"
         )
 
-    outcome = NormalizationOutcome(frame=frame.copy())
-
     raw_addresses = block.get("addresses", []) or []
     if not isinstance(raw_addresses, list):
         raise NormalizationConfigError("'addresses' must be a list of column names")
@@ -157,22 +153,55 @@ def apply_normalization(
         column = entry.get("column") if isinstance(entry, dict) else entry
         if not column:
             raise NormalizationConfigError("Each address entry needs a 'column'")
-        result = normalise_addresses(outcome.frame, str(column))
-        outcome.frame = result.frame
-        outcome.address_results[str(column)] = result
 
     currency = block.get("currency")
     if currency is not None:
         if not isinstance(currency, dict):
             raise NormalizationConfigError("'currency' must be a mapping")
-        target = currency.get("target")
-        if not target:
+        if not currency.get("target"):
             raise NormalizationConfigError("currency needs a 'target'")
         columns = currency.get("columns")
         if columns is None:
             columns = [currency["column"]] if currency.get("column") else []
         if not isinstance(columns, list) or not columns:
             raise NormalizationConfigError("currency needs 'column' or 'columns'")
+        _rate_table(currency, config_dir)
+
+
+def validate_normalization_block(crm: str | Path) -> None:
+    """Validate a config's ``normalization:`` block without needing a frame."""
+    block = normalization_block(crm)
+    if block is None or block.get("enabled") is False:
+        return
+    path = _config_path(crm)
+    config_dir = path.parent if path is not None else Path.cwd()
+    _validate_normalization_block(block, config_dir)
+
+
+def apply_normalization(
+    frame: pd.DataFrame, block: dict[str, Any], config_dir: Path
+) -> NormalizationOutcome:
+    """Normalise ``frame`` per a resolved ``normalization:`` block.
+
+    ``config_dir`` anchors a relative ``rate_file`` so the config and its rates
+    travel together.
+    """
+    _validate_normalization_block(block, config_dir)
+
+    outcome = NormalizationOutcome(frame=frame.copy())
+
+    for entry in block.get("addresses", []) or []:
+        column = entry.get("column") if isinstance(entry, dict) else entry
+        result = normalise_addresses(outcome.frame, str(column))
+        outcome.frame = result.frame
+        outcome.address_results[str(column)] = result
+
+    currency = block.get("currency")
+    if currency is not None:
+        target = currency.get("target")
+        columns = currency.get("columns")
+        if columns is None:
+            columns = [currency["column"]] if currency.get("column") else []
         rates = _rate_table(currency, config_dir)
         source_currency = currency.get("source_currency")
         for column in columns:
@@ -210,4 +239,5 @@ __all__ = [
     "apply_configured_normalization",
     "apply_normalization",
     "normalization_block",
+    "validate_normalization_block",
 ]

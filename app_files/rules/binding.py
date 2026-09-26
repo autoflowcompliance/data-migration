@@ -112,6 +112,7 @@ def apply_configured_rules(
     source_filename: str = "upload.csv",
     rules_path: str | Path | None = None,
     run_structural_check: bool = True,
+    persist_rules: bool = True,
 ) -> BuiltRuleRun:
     """Apply ``crm``'s declared rules on top of an already-run pipeline result.
 
@@ -125,6 +126,10 @@ def apply_configured_rules(
     run with. Applying rules re-renders the QA report, and the reporter takes
     those as arguments — passing the defaults here would quietly replace the
     run's real header with a placeholder.
+
+    ``persist_rules=False`` skips writing the accepted rule YAML to the state
+    home. A rehearsal reads the rules to report what a committed run would do;
+    it must not leave the accepted ruleset behind, or it is not a rehearsal.
     """
     rules = _declared_rules(crm)
     cross_field_rules = _declared_cross_field_rules(crm)
@@ -149,6 +154,7 @@ def apply_configured_rules(
         run_structural_check=run_structural_check,
         result=result,
         cross_field_rules=cross_field_rules,
+        persist_rules=persist_rules,
     )
 
 

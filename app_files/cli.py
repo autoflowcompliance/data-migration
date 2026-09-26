@@ -8,6 +8,7 @@ whole folder.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import pandas as pd
 from app_files.auditors import audit_import
 from app_files.cleaners import load_cleaning_config
 from app_files.mappers import available_crms
+from app_files.mappers.schema import CONFIG_DIR
 from app_files.pipeline import run_pipeline
 from app_files.reporters import render_audit_report
 
@@ -30,7 +32,14 @@ def _read_csv(path: Path) -> pd.DataFrame:
         result = chardet.detect(raw)
         encoding = result['encoding'] or 'utf-8'
     
-    return pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding)
+    try:
+        return pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding)
+    except pd.errors.EmptyDataError as exc:
+        # pandas' own message ("No columns to parse from file") does not say
+        # which file, and an empty upload is the most common first mistake.
+        raise ValueError(
+            f"{path} is empty — it has no header row, so there is nothing to map."
+        ) from exc
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,6 +70,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--notify", action="store_true",
                        help="Fire the config's notifications: alerts and completion "
                             "webhooks for this run")
+    parser.add_argument("--lineage", action="store_true",
+                       help="Record row-level lineage and write lineage_report.csv, "
+                            "lineage_report.html and lineage_openlineage.json")
+    parser.add_argument("--diff", action="store_true",
+                       help="Write diff_report.html — what changed, value by value")
+    parser.add_argument("--profile-report", action="store_true",
+                       help="Inject the five-dimension quality scorecard into the "
+                            "QA report and write profile.json")
     return parser
 
 
@@ -146,10 +163,10 @@ def run_pull_command(argv: list[str]) -> int:
     ``run_pipeline`` every other entry point uses. The connector is a producer
     into the existing interface, not a second pipeline.
     """
-    from app_files.distribution.connectors import ConnectorError, get_connector
+    from app_files.distribution.connectors import CONNECTORS, ConnectorError, get_connector
 
     args = build_pull_parser().parse_args(argv)
-    connector_kwargs = {
+    supplied = {
         key: value
         for key, value in {
             "url": args.url,
@@ -161,6 +178,22 @@ def run_pull_command(argv: list[str]) -> int:
         }.items()
         if value
     }
+    # Every option is offered for every provider, so an option that does not
+    # apply (``--path`` on a database) used to reach the constructor and raise
+    # TypeError. Pass only what the chosen connector accepts, and say what was
+    # ignored rather than silently dropping a value the user typed.
+    from inspect import signature
+
+    connector_class = CONNECTORS[args.provider]
+    accepted = set(signature(connector_class.__init__).parameters) - {"self"}
+    connector_kwargs = {k: v for k, v in supplied.items() if k in accepted}
+    ignored = sorted(set(supplied) - accepted)
+    if ignored:
+        print(
+            f"Note: {args.provider} does not use "
+            f"{', '.join('--' + k.replace('_', '-') for k in ignored)}; ignoring.",
+            file=sys.stderr,
+        )
     fetch_kwargs = {
         key: value
         for key, value in {"table": args.table, "query": args.query, "key": args.key}.items()
@@ -186,7 +219,13 @@ def run_pull_command(argv: list[str]) -> int:
         f"quality score {summary['quality_score']}%, {summary['errors']} errors, "
         f"{summary['warnings']} warnings"
     )
-    print(f"Wrote deliverables to {args.outdir}")
+    # A pulled dataset is a run like any other: it used to print "Wrote
+    # deliverables" while writing none, so a scheduled pull produced an empty
+    # output folder and no complaint.
+    from app_files.pipeline import write_deliverables
+
+    written = write_deliverables(result, args.outdir, include_lineage=False)
+    print(f"Wrote {len(written)} deliverables to {args.outdir}")
     return 0
 
 
@@ -641,6 +680,10 @@ def run_migrate_command(argv: list[str]) -> int:
         )
         return 0
 
+    from app_files.config_bindings import (
+        apply_configured_bindings,
+        write_bound_deliverables,
+    )
     from app_files.pipeline import run_pipeline
 
     result = run_pipeline(
@@ -649,12 +692,38 @@ def run_migrate_command(argv: list[str]) -> int:
         project_name=args.project,
         source_filename=args.input.name,
     )
+    # The config's declared blocks apply on a committed migration exactly as
+    # they do on the flat CLI and in batch. Skipping them wrote raw PII for a
+    # config whose ``privacy:`` block says mask it, and omitted the declared
+    # dedupe and normalization deliverables.
+    from app_files.dedupe.engine import DedupeConfigError
+    from app_files.normalization.binding import NormalizationConfigError
+    from app_files.privacy.config import PrivacyConfigError
+
+    try:
+        bindings = apply_configured_bindings(
+            result, args.crm, project_name=args.project, source_filename=args.input.name
+        )
+    except (PrivacyConfigError, NormalizationConfigError, DedupeConfigError) as exc:
+        # Fail closed on a malformed block: a typo in ``privacy:`` must not let
+        # unmasked PII through while the command reports success.
+        print(f"Invalid configuration block: {exc}", file=sys.stderr)
+        return 2
     result.clean_frame.to_csv(outdir / "clean_data.csv", index=False)
+    write_bound_deliverables(bindings, outdir)
+    if bindings.declared_rules:
+        result.validation.issues_frame().to_csv(outdir / "issues.csv", index=False)
     summary = result.summary()
     print(
         f"\n{summary['rows_in']} rows in, {summary['rows_out']} out, "
         f"quality score {summary['quality_score']}%"
     )
+    if bindings.privacy is not None:
+        counts = bindings.privacy.summary()
+        print(
+            f"Privacy: {counts['detected']} value(s) detected, "
+            f"{counts['masked']} masked in {', '.join(counts['columns']) or 'no columns'}"
+        )
     print(f"Wrote deliverables to {outdir}")
     return 0
 
@@ -808,6 +877,63 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)
 
+    # A config that cannot be parsed, or that declares no fields at all, used to
+    # reach the pipeline as an empty mapping: every source column dropped and a
+    # cheerful "quality score 100.0%". That is the worst possible failure for a
+    # migration tool, so both are caught here and reported plainly. This lives
+    # at the CLI boundary because the frozen mapper's loader is shared with the
+    # web UI, which surfaces the same problems through its own error path.
+    config_path = Path(args.crm)
+    if not config_path.exists():
+        config_path = CONFIG_DIR / f"{str(args.crm).strip().lower()}.yaml"
+    if not config_path.exists():
+        print(
+            f"No mapping config for {args.crm!r}. Known CRMs: "
+            f"{', '.join(available_crms())}",
+            file=sys.stderr,
+        )
+        return 2
+    import yaml
+
+    try:
+        declared = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        print(f"Invalid mapping config {config_path}: {exc}", file=sys.stderr)
+        return 2
+    if not isinstance(declared, dict):
+        print(
+            f"Invalid mapping config {config_path}: expected a YAML mapping, "
+            f"found {type(declared).__name__}",
+            file=sys.stderr,
+        )
+        return 2
+    # Validate each declared block before the fields guard below, so a config
+    # that is wrong in two ways reports the more specific one. The bindings
+    # raise their own config error, which is the message a buyer needs.
+    from app_files.dedupe.binding import declared_dedupe_rules
+    from app_files.dedupe.engine import DedupeConfigError
+    from app_files.normalization.binding import (
+        NormalizationConfigError,
+        validate_normalization_block,
+    )
+
+    try:
+        declared_dedupe_rules(config_path)
+    except DedupeConfigError as exc:
+        print(f"Invalid dedupe configuration: {exc}", file=sys.stderr)
+        return 2
+    try:
+        validate_normalization_block(config_path)
+    except NormalizationConfigError as exc:
+        print(f"Invalid normalization configuration: {exc}", file=sys.stderr)
+        return 2
+    if not declared.get("fields"):
+        print(
+            f"Invalid mapping config {config_path}: it declares no 'fields', so "
+            "every source column would be dropped. Add at least one field.",
+            file=sys.stderr,
+        )
+        return 2
     # Load cleaning config and apply date_first preference
     cleaning_config = load_cleaning_config(args.cleaning_config)
     if args.date_dayfirst:
@@ -815,6 +941,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from app_files.dedupe.binding import apply_configured_dedupe
     from app_files.dedupe.engine import DedupeConfigError
+    from app_files.lineage import LineageTracker
     from app_files.normalization.binding import (
         NormalizationConfigError,
         apply_configured_normalization,
@@ -824,12 +951,19 @@ def main(argv: list[str] | None = None) -> int:
     from app_files.privacy.report import inject_pii_report
     from app_files.rules.binding import apply_configured_rules, failures_exceed
 
+    try:
+        source_frame = _read_csv(args.input)
+    except (ValueError, pd.errors.ParserError) as exc:
+        print(f"Cannot read {args.input}: {exc}", file=sys.stderr)
+        return 2
+
     result = run_pipeline(
-        source=_read_csv(args.input),
+        source=source_frame,
         crm=args.crm,
         cleaning_config=cleaning_config,
         project_name=args.project,
         source_filename=args.input.name,
+        lineage_tracker=LineageTracker() if args.lineage else None,
     )
     # Layer 4's config rules used to run only in the web UI, so an unattended
     # run's issues.csv and score omitted them entirely. Apply them here on top
@@ -892,7 +1026,61 @@ def main(argv: list[str] | None = None) -> int:
         merges = dedupe.merges_frame()
         if not merges.empty:
             merges.to_csv(args.outdir / "duplicates_removed.csv", index=False)
+    # Layer 5's scorecard and Layer 6's two views were reachable only from the
+    # web UI, so a scheduled run produced no scorecard and no lineage. Both are
+    # opt-in: a run that does not ask for them writes exactly what it wrote
+    # before, which keeps every prior golden file byte-identical.
+    if args.profile_report:
+        from app_files.profiling import profile
+        from app_files.profiling.report import render_qa_report_with_profile
+
+        profile_result = profile(result.clean_frame)
+        qa_html = render_qa_report_with_profile(qa_html, result.clean_frame, profile_result)
+        profile_dict = profile_result.as_dict()
+        (args.outdir / "profile.json").write_text(
+            json.dumps(profile_dict, indent=2), encoding="utf-8"
+        )
+        dimensions = {
+            k: v
+            for k, v in profile_dict.items()
+            if k in {"completeness", "uniqueness", "validity", "consistency", "timeliness"}
+        }
+        print(
+            f"Profile: overall {profile_dict['overall']:.1f} "
+            f"({', '.join(f'{k} {v:.0f}' for k, v in dimensions.items())})"
+        )
     (args.outdir / "qa_report.html").write_text(qa_html, encoding="utf-8")
+    if args.lineage:
+        from app_files.collaboration.comparison import (
+            build_comparison,
+            render_comparison_html,
+        )
+        from app_files.lineage import (
+            render_lineage_html,
+            to_openlineage,
+            write_lineage_report,
+            write_openlineage,
+        )
+
+        tracker = result.lineage
+        write_lineage_report(tracker, args.outdir / "lineage_report.csv")
+        (args.outdir / "lineage_report.html").write_text(
+            render_lineage_html(tracker), encoding="utf-8"
+        )
+        write_openlineage(
+            to_openlineage(tracker), args.outdir / "lineage_openlineage.json"
+        )
+        if args.diff:
+            try:
+                (args.outdir / "diff_report.html").write_text(
+                    render_comparison_html(
+                        build_comparison(_read_csv(args.input), tracker, result.clean_frame),
+                        title=f"What changed — {args.input.stem}",
+                    ),
+                    encoding="utf-8",
+                )
+            except Exception as exc:  # noqa: BLE001 - a missing diff must not fail the run
+                print(f"Diff report unavailable: {exc}", file=sys.stderr)
 
     summary = result.summary()
     print(

@@ -239,6 +239,7 @@ def run_with_rules(
     run_structural_check: bool = True,
     result: PipelineResult | None = None,
     cross_field_rules: Iterable[CrossFieldRule] = (),
+    persist_rules: bool = True,
 ) -> BuiltRuleRun:
     """Clean, map, validate, then apply ``rules`` and re-render the report.
 
@@ -248,6 +249,10 @@ def run_with_rules(
     Pass ``result`` when the caller has already run the pipeline with options
     this function does not take (a cleaning config, say). The supplied result is
     used as-is instead of running the pipeline again, so those options survive.
+
+    ``persist_rules=False`` reports the rules without writing the accepted YAML
+    to ``rules_path``, so a caller that must write nothing (a dry run) can still
+    show what the rules would do.
     """
     rules = list(rules)
     if result is None:
@@ -274,7 +279,7 @@ def run_with_rules(
     from app_files.rules.builder import rules_to_yaml
 
     yaml_text = rules_to_yaml([_rule_to_dict(rule) for rule in rules])
-    written = write_rules_file(yaml_text, rules_path)
+    written = Path(rules_path) if not persist_rules else write_rules_file(yaml_text, rules_path)
 
     return BuiltRuleRun(
         result=result,

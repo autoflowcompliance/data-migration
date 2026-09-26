@@ -321,7 +321,14 @@ def _restore_dtype(series: pd.Series, dtype: str) -> pd.Series:
 
 @dataclass
 class DryRunReport:
-    """What a real run would produce, without producing it."""
+    """What a real run would produce, without producing it.
+
+    The config-declared counts are separate from the pipeline's own, because
+    the flat CLI and the batch engine apply a config's ``rules:``, ``privacy:``,
+    ``normalization:`` and ``dedupe:`` blocks *after* the pipeline. A rehearsal
+    that reported only the pipeline would understate what the committed run
+    delivers — and would not mention that a ``privacy:`` block masks the output.
+    """
 
     would_rename: dict[str, str]
     rows_in: int
@@ -331,6 +338,13 @@ class DryRunReport:
     quality_score: float | None
     columns_out: list[str]
     written: bool = False
+    declared_blocks: list[str] = field(default_factory=list)
+    rule_failures: int = 0
+    rules_declared: int = 0
+    pii_masked: int = 0
+    addresses_normalised: int = 0
+    amounts_converted: int = 0
+    duplicates_merged: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -342,6 +356,13 @@ class DryRunReport:
             "quality_score": self.quality_score,
             "columns_out": list(self.columns_out),
             "written": self.written,
+            "declared_blocks": list(self.declared_blocks),
+            "rule_failures": self.rule_failures,
+            "rules_declared": self.rules_declared,
+            "pii_masked": self.pii_masked,
+            "addresses_normalised": self.addresses_normalised,
+            "amounts_converted": self.amounts_converted,
+            "duplicates_merged": self.duplicates_merged,
         }
 
     def render(self) -> str:
@@ -360,8 +381,36 @@ class DryRunReport:
             lines.append("  (none)")
         for source, target in sorted(self.would_rename.items()):
             lines.append(f"  {source} -> {target}")
+        if self.declared_blocks:
+            lines += ["", "Config-declared steps the committed run also applies:"]
+            for block in self.declared_blocks:
+                lines.append(f"  {block}")
         lines += ["", "No files were written."]
         return "\n".join(lines)
+
+
+def _declared_block_steps(bindings: Any) -> list[str]:
+    """One human line per config-declared block, for the rehearsal report."""
+    steps: list[str] = []
+    if bindings.declared_rules:
+        steps.append(
+            f"rules: {bindings.built.total_rules_run} of "
+            f"{bindings.declared_rules} run, {bindings.built.total_rule_failures} failure(s)"
+        )
+    if bindings.privacy is not None:
+        steps.append(
+            f"privacy: {bindings.privacy.total_masked} value(s) masked "
+            f"({', '.join(bindings.privacy.columns_masked) or 'no columns'})"
+        )
+    if bindings.normalization is not None:
+        counts = bindings.normalization.summary()
+        steps.append(
+            f"normalization: {counts['addresses_normalised']} address(es) canonicalised, "
+            f"{counts['amounts_converted']} amount(s) converted"
+        )
+    if bindings.dedupe is not None:
+        steps.append(f"dedupe: {bindings.dedupe.duplicates_removed} near-duplicate row(s) removed")
+    return steps
 
 
 def dry_run(
@@ -370,7 +419,13 @@ def dry_run(
     project_name: str = "Data migration",
     source_filename: str = "upload.csv",
 ) -> DryRunReport:
-    """Run the real pipeline in memory and report the outcome. Writes nothing."""
+    """Run the real pipeline in memory and report the outcome. Writes nothing.
+
+    Applies the config's declared blocks too, so the rehearsal reflects the
+    committed run: without this a rehearsal reported ``Duplicates removed: 0``
+    for a config whose dedupe block removes rows, and said nothing about the
+    PII a ``privacy:`` block would mask.
+    """
     result: PipelineResult = run_pipeline(
         frame,
         crm=crm,
@@ -379,6 +434,18 @@ def dry_run(
         run_structural_check=False,
     )
     summary = result.summary()
+    from app_files.config_bindings import apply_configured_bindings
+
+    bindings = apply_configured_bindings(
+        result,
+        crm,
+        project_name=project_name,
+        source_filename=source_filename,
+        persist_rules=False,
+    )
+    normalization_counts = (
+        bindings.normalization.summary() if bindings.normalization is not None else {}
+    )
     return DryRunReport(
         would_rename=_rename_map(result),
         rows_in=int(summary.get("rows_in", len(frame))),
@@ -388,6 +455,13 @@ def dry_run(
         quality_score=_quality_score(result),
         columns_out=[str(column) for column in result.mapping.frame.columns],
         written=False,
+        declared_blocks=_declared_block_steps(bindings),
+        rule_failures=int(bindings.built.total_rule_failures),
+        rules_declared=bindings.declared_rules,
+        pii_masked=int(bindings.privacy.total_masked) if bindings.privacy is not None else 0,
+        addresses_normalised=int(normalization_counts.get("addresses_normalised", 0)),
+        amounts_converted=int(normalization_counts.get("amounts_converted", 0)),
+        duplicates_merged=int(bindings.dedupe.duplicates_removed) if bindings.dedupe is not None else 0,
     )
 
 
