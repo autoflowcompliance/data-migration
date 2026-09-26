@@ -8,6 +8,7 @@ second implementation of anything.
     POST /map        suggest a mapping for an uploaded file
     POST /mask       detect and mask PII in an uploaded file
     POST /lineage    return the lineage events for a run
+    POST /quality    judge an uploaded file against a quality SLA
     GET  /audit      read the immutable audit log
     POST /schedule   compute the next fire times for a cron expression
 
@@ -310,6 +311,86 @@ async def backup_endpoint(request: Request) -> JSONResponse:
     raise BadRequest(f"Unknown action {action!r}. Use create or verify.")
 
 
+def _as_number(value: Any) -> Any:
+    """Turn a form value into a number, leaving anything else untouched.
+
+    Form fields arrive as strings, so ``sla_completeness=0.5`` is the text
+    ``"0.5"``. Without this the SLA would refuse every floor a caller sent and
+    report a type error instead of a verdict. A value that is not numeric is
+    passed through so the SLA raises the specific complaint (ambiguous, out of
+    range) rather than a generic one.
+    """
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    try:
+        text = str(value).strip()
+        if text.lower() in {"true", "false"}:
+            return value
+        number = float(text)
+    except (TypeError, ValueError):
+        return value
+    return int(number) if number.is_integer() and "." not in text else number
+
+
+async def quality_endpoint(request: Request) -> JSONResponse:
+    """Judge an uploaded file against a quality SLA.
+
+    The five scores are the existing Layer 5 ``profile``; the floors come from
+    the request so a caller can check a file without a config file on disk. An
+    upload with no floors declared has nothing to enforce and passes, which is
+    the same answer the CLI gives for a config with no ``quality:`` block.
+    """
+    form = await request.form()
+    data, filename = await _read_upload(request)
+    frame = _frame_from_bytes(data, filename)
+
+    from app_files.core import ConfigError
+    from app_files.profiling import profile
+    from app_files.quality import Action, QualitySLA, evaluate_sla
+
+    block: dict[str, Any] = {}
+    floors = {
+        name: _form_value(form, f"sla_{name}", None)
+        for name in ("completeness", "uniqueness", "validity", "consistency", "timeliness")
+    }
+    declared = {
+        name: _as_number(value) for name, value in floors.items() if value is not None
+    }
+    if declared:
+        block["sla"] = declared
+
+    action = _form_value(form, "regression_action", None)
+    threshold = _form_value(form, "regression_threshold", None)
+    regression: dict[str, Any] = {}
+    if action is not None:
+        regression["action"] = action
+    if threshold is not None:
+        regression["threshold"] = _as_number(threshold)
+    if regression:
+        block["regression"] = regression
+
+    try:
+        sla = QualitySLA.from_block(block.get("sla") or {})
+        resolved_action = Action.parse(regression.get("action", Action.default().value))
+    except ConfigError as exc:
+        raise BadRequest(str(exc)) from exc
+
+    result = profile(frame)
+    verdict = evaluate_sla(result, sla)
+    return JSONResponse(
+        {
+            "status": "ok",
+            "passed": verdict.passed,
+            "scores": {name: round(float(value), 1) for name, value in result.scores.items()},
+            "overall": round(float(result.overall), 1),
+            "sla_declared": sla.as_dict(),
+            "breaches": verdict.summary()["breaches"],
+            "skipped": verdict.skipped,
+            "action": resolved_action.value,
+        }
+    )
+
+
 def register_extra_routes(app: Any) -> Any:
     """Add the extra routes to an existing Starlette app. Idempotent."""
     from starlette.routing import Route
@@ -319,6 +400,7 @@ def register_extra_routes(app: Any) -> Any:
     }
     additions = [
         Route("/map", map_endpoint, methods=["POST"]),
+        Route("/quality", quality_endpoint, methods=["POST"]),
         Route("/mask", mask_endpoint, methods=["POST"]),
         Route("/lineage", lineage_endpoint, methods=["POST"]),
         Route("/audit", audit_endpoint, methods=["GET"]),

@@ -68,6 +68,16 @@ fields:
     aliases: ["Phone"]
 """
 
+# Module 10's block, appended to a config that already declares the others.
+QUALITY = """
+quality:
+  sla:
+    completeness: 0.98
+  regression:
+    threshold: 5
+    action: block
+"""
+
 
 @pytest.fixture(autouse=True)
 def state_home(tmp_path, monkeypatch):
@@ -117,6 +127,34 @@ class TestApplyBindings:
         result = run_pipeline(_frame(), crm=str(config))
         bindings = apply_configured_bindings(result, str(config))
         assert "PII" in bindings.qa_report_html or "privacy" in bindings.qa_report_html.lower()
+
+    def test_a_config_without_a_quality_block_resolves_it_to_none(self, tmp_path):
+        result = run_pipeline(_frame(), crm=str(_config(tmp_path, BARE)))
+        bindings = apply_configured_bindings(result, str(tmp_path / "crm.yaml"))
+        assert bindings.quality is None
+
+    def test_a_declared_quality_block_is_resolved_and_judged(self, tmp_path):
+        config = _config(tmp_path, ALL_ON + QUALITY)
+        result = run_pipeline(_frame(), crm=str(config))
+        bindings = apply_configured_bindings(result, str(config))
+        assert bindings.quality is not None
+        assert bindings.quality.sla.completeness == 0.98
+        # The SOURCE fixture is complete, so the floor is met.
+        assert bindings.quality.verdict.passed is True
+
+    def test_the_quality_summary_is_part_of_the_bindings_summary(self, tmp_path):
+        config = _config(tmp_path, ALL_ON + QUALITY)
+        result = run_pipeline(_frame(), crm=str(config))
+        bindings = apply_configured_bindings(result, str(config))
+        assert "quality" in bindings.summary()
+
+    def test_a_quality_block_does_not_change_the_pipeline_frame(self, tmp_path):
+        # Module 10 reads the frame; it must never rewrite it.
+        config = _config(tmp_path, ALL_ON + QUALITY)
+        result = run_pipeline(_frame(), crm=str(config))
+        before = result.clean_frame.copy()
+        apply_configured_bindings(result, str(config))
+        pd.testing.assert_frame_equal(result.clean_frame, before)
 
 
 class TestWriteBoundDeliverables:

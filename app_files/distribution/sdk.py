@@ -133,6 +133,23 @@ class DataFlowClient:
     ) -> Response:
         return self._upload("/lineage", data, filename, {"crm": crm})
 
+    def quality(
+        self,
+        data: bytes,
+        filename: str = "upload.csv",
+        sla: dict[str, float] | None = None,
+        action: str | None = None,
+    ) -> Response:
+        """Judge an upload against a quality SLA.
+
+        ``sla`` maps a dimension name to its floor; ``action`` is the
+        regression action (``alert``, ``block``, ``quarantine``).
+        """
+        form = {f"sla_{name}": str(value) for name, value in (sla or {}).items()}
+        if action is not None:
+            form["regression_action"] = action
+        return self._upload("/quality", data, filename, form)
+
     def audit(self, limit: int = 100) -> Response:
         return self.session.get(f"/audit?limit={limit}")
 

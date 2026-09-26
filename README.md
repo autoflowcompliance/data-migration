@@ -216,6 +216,61 @@ python -m app_files.cli quality contacts.csv -o reports
 `-o` writes `<source>_quality_trend.html` — the same table that shows the
 direction (`improving`, `stable`, `declining`) and every recorded score.
 
+### Quality SLA and the action a regression takes
+
+The scorecard says how good a file is; the history says whether it is getting
+worse. Neither *acts*. A `quality:` block in the config makes the score a gate:
+a floor per dimension that a run must meet, and a decision for what a
+regression against the baseline should do.
+
+```yaml
+quality:
+  sla:
+    completeness: 0.98      # a fraction, or a whole percentage (98)
+    validity: 0.95
+  regression:
+    threshold: 5            # percentage points of drop before it counts
+    action: alert           # alert | block | quarantine
+```
+
+`alert` reports and lets the run through; `block` stops it before output is
+written; `quarantine` stops it and marks the output as held for review. `alert`
+is the default because it is the only one that cannot lose data. A dimension
+the file has nothing to evaluate — timeliness on a file with no dates — is
+skipped rather than failed, so a file is never punished for its shape.
+
+Check a file from the shell:
+
+```bash
+python -m app_files.cli quality check inbox/contacts.csv --config hubspot.yaml
+```
+
+The exit code is the point: `0` met the SLA and did not regress, `1` breached
+it or regressed under `block`/`quarantine`, `2` the config could not be read.
+A cron job can therefore tell "the data is bad" from "the config is wrong".
+`action` softens a *regression*, not the SLA — a declared floor is a hard gate,
+so a file under its floor exits `1` even under `alert`. `--baseline` pins this
+run as the source's baseline; `--record` adds it to the history. Neither is
+implied — the check itself is read-only, so a gate never moves the baseline it
+is measuring against. A source with no baseline cannot regress, so a first run
+is never blocked for want of history.
+
+Over the API, the same check takes the floors as form fields:
+
+```bash
+curl -F file=@contacts.csv -F sla_completeness=0.98 -F regression_action=block \
+    http://localhost:8080/quality
+```
+
+or from the Python SDK:
+
+```python
+client.quality(csv_bytes, sla={"completeness": 0.98}, action="block")
+```
+
+A config with no `quality:` block changes nothing: no SLA, no extra file, no
+different exit code.
+
 ### Lineage — prove what changed
 
 Every transformation is recorded as one row: source row index, output row index,

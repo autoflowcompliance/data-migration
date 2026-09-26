@@ -1,0 +1,18 @@
+crm: Quality SLA golden
+version: "1.0"
+fields:
+  - name: email
+    source: Email Address
+  - name: first_name
+    source: First Name
+  - name: last_name
+    source: Last Name
+  - name: company
+    source: Company
+quality:
+  sla:
+    completeness: 0.98
+    uniqueness: 0.99
+  regression:
+    threshold: 5
+    action: block

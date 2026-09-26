@@ -501,6 +501,122 @@ def _write_trend(html: str, args: argparse.Namespace, name: str) -> None:
         print(f"Wrote trend dashboard to {target}")
 
 
+def build_quality_check_parser() -> argparse.ArgumentParser:
+    """``python -m app_files.cli quality check …`` — gate a run on its quality."""
+    parser = argparse.ArgumentParser(
+        prog="app_files.cli quality check",
+        description=(
+            "Judge a file against the quality: block in its config. The SLA "
+            "floors and the regression action decide the exit code, so this is "
+            "usable directly in a cron job or a CI step."
+        ),
+    )
+    parser.add_argument("input", type=Path, help="the file to check")
+    parser.add_argument("-c", "--config", required=True, type=Path,
+                        help="config holding the quality: block")
+    parser.add_argument("--baseline", action="store_true",
+                        help="pin this run as the source's baseline (records it too)")
+    parser.add_argument("--record", action="store_true",
+                        help="record this run in the source's quality history")
+    parser.add_argument("-o", "--outdir", type=Path, default=None,
+                        help="write quality_report.json here")
+    return parser
+
+
+def run_quality_check_command(argv: list[str]) -> int:
+    """Handle ``python -m app_files.cli quality check …``.
+
+    Exit codes: ``0`` the run met its SLA and did not regress past its action,
+    ``1`` the run breached its SLA or regressed under block/quarantine, ``2``
+    the config could not be read or the block was malformed. The distinction
+    matters because a cron job wants to tell "the data is bad" from "the config
+    is wrong".
+    """
+    args = build_quality_check_parser().parse_args(argv)
+
+    if not args.config.exists():
+        print(f"No config at {args.config}", file=sys.stderr)
+        return 2
+    if not args.input.exists():
+        print(f"No input file at {args.input}", file=sys.stderr)
+        return 2
+
+    import pandas as pd
+
+    from app_files.core import ConfigError
+    from app_files.ingestion import read_any
+    from app_files.quality.binding import bind_quality, check_regression
+
+    try:
+        declared = _read_config(args.config)
+    except Exception as exc:  # noqa: BLE001 - an unreadable config is reported
+        print(f"Could not read {args.config}: {exc}", file=sys.stderr)
+        return 2
+
+    frame = read_any(args.input)
+
+    try:
+        binding = bind_quality(frame, declared)
+    except ConfigError as exc:
+        print(f"Invalid quality block: {exc}", file=sys.stderr)
+        return 2
+
+    if binding is None:
+        print(
+            "No quality: block declared in "
+            f"{args.config}; nothing to check."
+        )
+        return 0
+
+    history = None
+    if args.baseline or args.record:
+        from app_files.profiling import pin_baseline, record_quality
+
+        if args.baseline:
+            point = pin_baseline(args.input.name, binding.profile_result)
+            print(
+                f"Baseline pinned for {point.source} at "
+                f"{point.overall:.1f}."
+            )
+        else:
+            history = record_quality(args.input.name, binding.profile_result)
+
+    print(binding.describe())
+
+    if args.outdir is not None:
+        import json
+
+        args.outdir.mkdir(parents=True, exist_ok=True)
+        target = args.outdir / "quality_report.json"
+        target.write_text(
+            json.dumps(binding.summary(), indent=2, default=str), encoding="utf-8"
+        )
+        print(f"Wrote quality report to {target}")
+
+    if binding.breached:
+        return 1
+
+    # The regression check reads the stored baseline and writes nothing, so a
+    # check never moves the baseline it is measuring against.
+    decision = check_regression(args.input.name, binding)
+    if decision.regressed:
+        print(decision.summary())
+        if not decision.proceed:
+            return 1
+
+    return 0
+
+
+def _read_config(path: Path) -> dict[str, Any]:
+    """Read a config file into a mapping, or raise if it is not one."""
+    import yaml
+
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} is not a config mapping")
+    return data
+
+
 def build_reconcile_parser() -> argparse.ArgumentParser:
     """``python -m app_files.cli reconcile …`` — match a statement to a ledger."""
     parser = argparse.ArgumentParser(
@@ -868,6 +984,10 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "reconcile":
         return run_reconcile_command(argv[1:])
     if argv and argv[0] == "quality":
+        # ``quality check`` gates a file against its quality: block; the bare
+        # ``quality <source>`` still reads a source's recorded history.
+        if len(argv) > 1 and argv[1] == "check":
+            return run_quality_check_command(argv[2:])
         return run_quality_command(argv[1:])
     if argv and argv[0] == "migrate":
         return run_migrate_command(argv[1:])

@@ -33,6 +33,7 @@ class ConfiguredBindings:
     normalization: Any | None
     dedupe: Any | None
     qa_report_html: str
+    quality: Any | None = None
 
     @property
     def declared_rules(self) -> int:
@@ -51,6 +52,8 @@ class ConfiguredBindings:
             result["normalization"] = self.normalization.summary()
         if self.dedupe is not None:
             result["dedupe"] = self.dedupe.summary()
+        if self.quality is not None:
+            result["quality"] = self.quality.summary()
         return result
 
 
@@ -98,7 +101,36 @@ def apply_configured_bindings(
         normalization=apply_configured_normalization(result.clean_frame, crm),
         dedupe=apply_configured_dedupe(result.clean_frame, crm),
         qa_report_html=qa_html,
+        quality=_configured_quality(result.clean_frame, crm),
     )
+
+
+def _configured_quality(frame: pd.DataFrame, crm: str | Path) -> Any | None:
+    """Resolve a config's ``quality:`` block against the frame, or ``None``.
+
+    The block is read from the same file the other bindings read, so one config
+    drives them all. Profiling runs only when a block is declared — an unbound
+    config pays nothing and writes nothing.
+    """
+    from app_files.quality.binding import bind_quality
+
+    declared = _declared_blocks(crm)
+    if "quality" not in declared:
+        return None
+    return bind_quality(frame, declared)
+
+
+def _declared_blocks(crm: str | Path) -> dict[str, Any]:
+    """The raw config mapping for ``crm``, or an empty mapping if unreadable."""
+    path = Path(crm)
+    if not path.exists():
+        return {}
+    try:
+        import yaml
+
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001 - an unreadable config is the caller's error
+        return {}
 
 
 def write_bound_deliverables(
@@ -138,6 +170,13 @@ def write_bound_deliverables(
             written["duplicates_removed"] = _write_csv(
                 outdir / "duplicates_removed.csv", merges
             )
+    if bindings.quality is not None:
+        import json
+
+        written["quality_report"] = _write_text(
+            outdir / "quality_report.json",
+            json.dumps(bindings.quality.summary(), indent=2, default=str),
+        )
     return written
 
 

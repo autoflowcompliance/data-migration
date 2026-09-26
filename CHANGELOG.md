@@ -22,7 +22,10 @@ this work produces byte-identical output.
 - **Rules.** Cross-field rules, rule versioning, and a sandbox gate before
   promotion.
 - **Profiling.** Quality trend history, baseline comparison, and dimension
-  anomaly detection.
+  anomaly detection. A `quality:` config block turns the score into a gate: a
+  floor per dimension, plus the action a regression against the pinned baseline
+  should take (`alert`, `block`, `quarantine`). Reachable as
+  `quality check`, `POST /quality` and `SDK.quality()`.
 - **Lineage.** Interactive lineage graph, blast-radius analysis, OpenLineage
   export.
 - **Reconciliation.** N-way reconciliation with configurable match logic and

@@ -52,8 +52,8 @@ irreversible.
 ## Commands
 
 ```bash
-python -m pytest -q                 # full suite, 691 tests, ~18s
-python -m pytest app_files/tests/   # the original 25 pre-existing tests
+python -m pytest -q                 # full suite, 1969 tests at HEAD, ~69s
+python -m pytest app_files/tests/   # the original 27 pre-existing tests
 python main.py                      # DataFlow (NiceGUI) — port 8080
 python build_desktop.py --check     # packaged desktop target
 ```
@@ -154,6 +154,21 @@ impossible to reconcile against orders. Values passed to
 a name containing `&` truncates itself and swallows the reference after it.
 
 ## API notes that are easy to get wrong
+
+- The extra API routes live in `app_files/distribution/api_extras.py`, not
+  `app_files/api_extras.py`. `register_extra_routes(app)` appends to the
+  Starlette app and is idempotent; `distribution/api.py` keeps only the original
+  five endpoints so those stay byte-identical. `_read_upload`, `_form_value`,
+  and `_frame_from_bytes` are imported from `api.py` — reuse them rather than
+  re-parsing the multipart body.
+- Form fields arrive as **strings**, so a numeric SLA floor posted as
+  `sla_completeness=0.5` is the text `"0.5"` and a strict parser rejects it as
+  "not a number". `quality_endpoint` coerces with `_as_number` before building
+  the SLA; any new endpoint taking a number from a form needs the same.
+- `quality check` exit codes: `0` met the SLA and did not regress, `1` breached
+  the SLA **or** regressed under `block`/`quarantine`, `2` the config was
+  unreadable or the block malformed. `action` softens a regression only — a
+  declared SLA floor is a hard gate and exits `1` even under `alert`.
 
 - `run_pipeline(source, crm=..., lineage_tracker=LineageTracker())` — lineage
   is opt-in via a tracker instance, not a `track_lineage=` flag.

@@ -16,6 +16,14 @@ CSV = (
     b"b@x.com,+14155559999,John Smith\n"
 )
 
+# One blank cell in six, so completeness is 83.3% and a 100% floor is a real
+# breach rather than a floor the data happens to meet.
+CSV_WITH_A_GAP = (
+    b"Email Address,Phone,Full Name\n"
+    b"a@x.com,+14155552671,Jane Doe\n"
+    b"b@x.com,+14155559999,\n"
+)
+
 
 @pytest.fixture
 def app(tmp_path, monkeypatch):
@@ -65,6 +73,70 @@ class TestMapEndpoint:
             "/map",
             files={"file": ("c.csv", CSV, "text/csv")},
             data={"crm": "not-a-real-crm"},
+        )
+        assert response.status_code == 400
+
+
+class TestQualityEndpoint:
+    """Module 10 over the API: judge an upload against its ``quality:`` block."""
+
+    def test_route_is_registered(self, app):
+        assert "/quality" in {route.path for route in app.routes}
+
+    def test_a_file_meeting_its_sla_passes(self, client):
+        response = client.post(
+            "/quality",
+            files={"file": ("c.csv", CSV, "text/csv")},
+            data={"config": "hubspot", "sla_completeness": "0.5"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ok"
+        assert body["passed"] is True
+        assert body["breaches"] == []
+
+    def test_a_file_under_its_sla_fails(self, client):
+        body = client.post(
+            "/quality",
+            files={"file": ("c.csv", CSV_WITH_A_GAP, "text/csv")},
+            data={"sla_completeness": "1.0"},
+        ).json()
+        assert body["passed"] is False
+        assert body["breaches"][0]["dimension"] == "completeness"
+
+    def test_no_sla_means_nothing_to_enforce(self, client):
+        body = client.post(
+            "/quality", files={"file": ("c.csv", CSV, "text/csv")}
+        ).json()
+        assert body["passed"] is True
+        assert body["sla_declared"] == {}
+
+    def test_the_response_carries_the_five_scores(self, client):
+        body = client.post(
+            "/quality", files={"file": ("c.csv", CSV, "text/csv")}
+        ).json()
+        assert set(body["scores"]) == {
+            "completeness",
+            "uniqueness",
+            "validity",
+            "consistency",
+            "timeliness",
+        }
+
+    def test_an_ambiguous_floor_is_a_400(self, client):
+        response = client.post(
+            "/quality",
+            files={"file": ("c.csv", CSV, "text/csv")},
+            data={"sla_completeness": "1.5"},
+        )
+        assert response.status_code == 400
+        assert "ambiguous" in response.json()["error"]
+
+    def test_an_unknown_action_is_a_400(self, client):
+        response = client.post(
+            "/quality",
+            files={"file": ("c.csv", CSV, "text/csv")},
+            data={"regression_action": "explode"},
         )
         assert response.status_code == 400
 
@@ -178,6 +250,24 @@ class TestPythonSDK:
         sdk = DataFlowClient("http://test", session=self._session(client))
         result = sdk.schedule("0 9 * * *", count=2)
         assert result.ok and result.data["count"] == 2
+
+    def test_quality_through_the_sdk(self, client):
+        from app_files.distribution.sdk import DataFlowClient
+
+        sdk = DataFlowClient("http://test", session=self._session(client))
+        result = sdk.quality(CSV, filename="c.csv", sla={"completeness": 0.5})
+        assert result.ok
+        assert result.data["passed"] is True
+
+    def test_quality_breach_through_the_sdk(self, client):
+        from app_files.distribution.sdk import DataFlowClient
+
+        sdk = DataFlowClient("http://test", session=self._session(client))
+        result = sdk.quality(
+            CSV_WITH_A_GAP, filename="c.csv", sla={"completeness": 1.0}
+        )
+        assert result.ok
+        assert result.data["passed"] is False
 
     def test_multipart_body_carries_the_filename(self):
         from app_files.distribution.sdk import _multipart
